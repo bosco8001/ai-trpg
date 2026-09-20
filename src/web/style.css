@@ -1,0 +1,276 @@
+@import "./design-tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-body);
+  font-size: 100%;
+  line-height: 1.7;
+  scroll-padding-block: var(--space-6);
+}
+
+body {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-primary);
+  background-color: var(--surface-page);
+  background-image: radial-gradient(circle at 14% 18%, color-mix(in srgb, var(--action-primary) 7%, transparent), transparent 36%),
+    linear-gradient(180deg, var(--surface-page-top), var(--surface-page));
+}
+
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.site-shell {
+  display: grid;
+  place-items: center;
+  min-block-size: 100vh;
+  min-block-size: 100dvh;
+  padding-block: max(var(--space-8), env(safe-area-inset-top)) max(var(--space-8), env(safe-area-inset-bottom));
+  padding-inline: max(var(--space-4), env(safe-area-inset-left)) max(var(--space-4), env(safe-area-inset-right));
+}
+
+.site-shell__inner {
+  display: grid;
+  gap: var(--space-8);
+  align-items: center;
+  width: min(100%, 60rem);
+  min-width: 0;
+}
+
+.site-shell__intro,
+.connection-panel,
+.connection-status__content {
+  min-width: 0;
+}
+
+.site-shell__eyebrow,
+.connection-panel__eyebrow {
+  margin: 0 0 var(--space-3);
+  color: var(--action-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.site-shell__eyebrow::before {
+  display: inline-block;
+  width: 1.5rem;
+  height: var(--border-width);
+  margin-inline-end: var(--space-2);
+  background: currentColor;
+  content: "";
+  vertical-align: middle;
+}
+
+h1,
+h2,
+p {
+  margin-block-start: 0;
+}
+
+h1,
+h2 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+h1 {
+  margin-block-end: var(--space-4);
+  font-size: clamp(2.125rem, 6vw, 3.25rem);
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+}
+
+.site-shell__lede {
+  margin-block-end: 0;
+  color: var(--text-muted);
+}
+
+.reading-copy {
+  max-inline-size: var(--measure-reading);
+  font-size: var(--text-reading-size);
+  line-height: var(--text-reading-leading);
+  overflow-wrap: anywhere;
+}
+
+.ui-panel {
+  position: relative;
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--border-ornament);
+  border-radius: var(--radius-panel);
+  background: var(--surface-panel);
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--surface-page) 70%, transparent);
+}
+
+.ui-panel::before {
+  position: absolute;
+  inset-block-start: calc(-1 * var(--border-width));
+  inset-inline-start: var(--space-6);
+  width: 5rem;
+  height: var(--border-width);
+  background: var(--action-primary);
+  content: "";
+}
+
+.connection-panel h2 {
+  margin-block-end: var(--space-6);
+  font-size: clamp(1.5rem, 3vw, 1.75rem);
+  line-height: 1.35;
+}
+
+.connection-status {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-height: 5.75rem;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border-ornament);
+  border-radius: var(--radius-control);
+  background: var(--surface-elevated);
+  transition: background-color var(--motion-gentle) var(--ease-settle),
+    border-color var(--motion-gentle) var(--ease-settle);
+}
+
+.connection-status__marker {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-block-start: 0.5rem;
+  border-radius: 50%;
+  background: var(--action-primary);
+}
+
+.connection-status[data-state="checking"] .connection-status__marker {
+  animation: status-breathe 1.6s ease-in-out infinite;
+}
+
+.connection-status[data-state="connected"] .connection-status__marker {
+  background: var(--state-success);
+}
+
+.connection-status[data-state="connected"] strong {
+  color: var(--state-success);
+}
+
+.connection-status[data-state="unavailable"] {
+  border-color: var(--state-danger);
+  background: var(--surface-danger);
+}
+
+.connection-status[data-state="unavailable"] .connection-status__marker {
+  background: var(--state-danger);
+}
+
+.connection-status[data-state="unavailable"] strong {
+  color: var(--state-danger);
+}
+
+.connection-status strong {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.connection-status p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.connection-panel__hint {
+  min-height: 1.7em;
+  margin-block: var(--space-3) var(--space-6);
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 3rem;
+  padding: var(--space-2) var(--space-4);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-control);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color var(--motion-fast) var(--ease-settle),
+    border-color var(--motion-fast) var(--ease-settle),
+    box-shadow var(--motion-fast) var(--ease-settle);
+}
+
+.ui-button--primary {
+  color: var(--text-on-action);
+  background: var(--action-primary);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background: var(--action-primary-hover);
+}
+
+.ui-button--secondary {
+  color: var(--text-primary);
+  border-color: var(--border-interactive);
+  background: var(--surface-elevated);
+}
+
+.ui-button--secondary:hover:not(:disabled) {
+  border-color: var(--action-primary);
+  background: var(--surface-panel);
+}
+
+.ui-button:active:not(:disabled) {
+  box-shadow: inset 0 0 0 var(--border-width) currentColor;
+}
+
+.ui-button:disabled {
+  color: var(--text-muted);
+  border-color: var(--border-interactive);
+  background: var(--surface-elevated);
+  cursor: wait;
+}
+
+.connection-panel .ui-button {
+  width: 100%;
+}
+
+@keyframes status-breathe {
+  50% { opacity: 0.5; }
+}
+
+@media (min-width: 48rem) {
+  .site-shell {
+    padding-inline: max(var(--space-8), env(safe-area-inset-left)) max(var(--space-8), env(safe-area-inset-right));
+  }
+
+  .site-shell__inner {
+    grid-template-columns: minmax(0, 1fr) minmax(19rem, 25rem);
+    gap: var(--space-12);
+  }
+}
+
+@media (max-width: 25rem) {
+  .ui-panel { padding: var(--space-4); }
+  .ui-panel::before { inset-inline-start: var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection-status[data-state="checking"] .connection-status__marker {
+    animation: none;
+  }
+}

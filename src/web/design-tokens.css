@@ -1,0 +1,45 @@
+:root {
+  color-scheme: dark;
+  --surface-page: #11100f;
+  --surface-page-top: #171411;
+  --surface-panel: #1c1a18;
+  --surface-elevated: #25211e;
+  --surface-danger: #352124;
+  --text-primary: #e9dfce;
+  --text-muted: #b9ad98;
+  --text-on-action: #1b1510;
+  --text-on-danger: #f7ece6;
+  --action-primary: #c9a86a;
+  --action-primary-hover: #e0bf82;
+  --state-success: #a6c2a0;
+  --state-danger: #e6a6a5;
+  --action-danger: #8c3b43;
+  --border-ornament: #665640;
+  --border-interactive: #8e7654;
+  --focus-ring: #f0c879;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  --font-heading: "Noto Serif TC", "Songti TC", "PMingLiU", "MingLiU", serif;
+  --text-reading-size: 1.0625rem;
+  --text-reading-leading: 1.75;
+  --measure-reading: 42em;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --border-width: 1px;
+  --radius-panel: 0.25rem;
+  --radius-control: 0.2rem;
+  --motion-fast: 140ms;
+  --motion-gentle: 220ms;
+  --ease-settle: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-gentle: 0ms;
+  }
+}
