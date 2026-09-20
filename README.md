@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1、2、3、4 已由使用者確認。Phase 5 建立後端文字模型中立介面，等待手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1、2、3、4、5 已由使用者確認。Phase 6 建立第一個文字探索介面，等待手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。前端仍是已確認的連線頁。
 
@@ -106,6 +106,46 @@ npm run llm:check -- timeout
 若尚未安裝專案 npm 依賴，先依下方「安裝與啟動」的 `npm ci` 指令安裝。Phase 5 不新增套件或金鑰設定，也不要求修改 `.env`。手動驗證後請回報結果；工程測試不能代替你的階段驗收。
 
 後端程式位置：`src/server/llm/contracts.ts` 定義中立型別與安全錯誤；`language-model.ts` 檢查請求／回應、處理逾時；`fake-adapter.ts` 提供固定回應；`check.ts` 只供終端機檢查。正式供應商與模型仍列在 `OPEN_QUESTIONS.md`。權威狀態仍由 `src/domain/` 決定，模型結果沒有直接修改狀態的路徑。
+
+## Phase 6：文字探索介面手動測試
+
+Phase 6 是可操作的前端介面，但不是遊戲規則或 AI 判定。探索紀錄只保存在目前瀏覽器頁面；重新整理後，本階段新增的紀錄會消失。詳細邊界見 [Phase 6 文件](docs/development/PHASE_6_EXPLORATION.md)。
+
+### 啟動
+
+在專案根目錄執行：
+
+```sh
+npm run dev
+```
+
+開啟 <http://127.0.0.1:5173>。若只測試前端本機輸入，也可分別啟動 `npm run dev:web`；頁首會顯示服務未連線，但輸入功能仍可操作。
+
+### 桌面測試
+
+1. 確認頁面顯示「探索」、「故事紀錄」、固定測試場景、測試玩家行動與介面測試回覆。
+2. 在「你的行動」輸入例如「我慢慢走向森林裡的廢墟。」後按「送出行動」。確認文字出現在紀錄，輸入框清空，並出現說明尚未進行自然語言判定、規則驗證或狀態更新的固定回覆。
+3. 重新整理頁面，確認剛才輸入的文字消失，固定測試內容仍存在。
+4. 輸入只含空格或換行，確認送出按鈕停用且不新增紀錄。
+5. 按頁首「重新檢查」，確認服務連線狀態可再次更新；它不應影響故事紀錄。
+
+### 約 375px 手機寬度測試
+
+在瀏覽器開發者工具選擇約 375px 寬的手機 viewport，或用手機開啟本機網址。
+
+1. 確認頁面沒有整頁橫向捲動；長文字正常換行，textarea 與按鈕沒有超出畫面。
+2. 點選 textarea，輸入多行文字，再輕觸送出按鈕；按鈕應容易點按，新增紀錄應容易看到。
+3. 將手機鍵盤打開後，確認仍看得到輸入區，且送出後可繼續輸入。
+4. 轉成橫向後，確認標題、服務狀態、故事紀錄與輸入區仍可閱讀和操作。
+
+### 鍵盤與可及性測試
+
+1. 用 Tab 由頁首一路移到「重新檢查」、textarea 與「送出行動」，確認每個焦點環清楚可見。
+2. 在 textarea 輸入文字後按 Enter，確認送出並清空輸入框；按 Shift+Enter，確認只加入換行，尚未送出。
+3. 在瀏覽器縮放至 200%，確認內容可捲動閱讀、文字沒有被裁切，控制項仍可操作。
+4. 在系統或瀏覽器啟用「減少動態效果」後送出文字，確認功能仍正常。
+
+Phase 6 不會呼叫 LLM、修改 authoritative state、保存 history、生成正式敘事或觸發任何遊戲事件。
 
 ## 安裝與啟動
 

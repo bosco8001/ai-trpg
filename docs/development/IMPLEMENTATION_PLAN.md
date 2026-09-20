@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0、1、2、3、4 已由使用者確認。Phase 5 工程完成，等待使用者手動確認；其餘尚未開始。
+Phase 0、1、2、3、4、5 已由使用者確認。Phase 6 工程完成，等待使用者手動確認；其餘尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -104,4 +104,12 @@ Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自
 
 新增 `src/server/llm/contracts.ts`、`language-model.ts`、`fake-adapter.ts`、`check.ts` 與 `tests/llm.test.ts`。修改 `package.json`、`README.md`、`OPEN_QUESTIONS.md` 與本計畫。沒有新增 npm 套件、環境變數或前端 API；實際供應商／模型仍未定。
 
-`npm run build` 通過；`npm test` 共 23 項，其中 22 項通過、需明確提供隔離資料庫的既有整合測試略過。四種 `npm run llm:check` 情境均以本機 fake 執行成功。Phase 5 等待使用者手動確認；不得自動進入 Phase 6。
+`npm run build` 通過；`npm test` 共 23 項，其中 22 項通過、需明確提供隔離資料庫的既有整合測試略過。四種 `npm run llm:check` 情境均以本機 fake 執行成功。Phase 5 其後已由使用者手動確認。
+
+## Phase 6 交付紀錄
+
+將 Phase 1／2 的連線頁演進為第一個可操作的文字探索介面。固定測試敘事、玩家輸入與系統測試回覆以 local UI history 顯示；Enter 送出、Shift+Enter 換行，空白輸入不建立紀錄。API 健康狀態保留為頁首輔助資訊。畫面重用既有 semantic tokens、Button、Panel、焦點環與 reduced-motion 設定。詳見 [Phase 6 文件](PHASE_6_EXPLORATION.md) 與 [README 手動測試](../../README.md#phase-6文字探索介面手動測試)。
+
+新增 `src/web/exploration.ts`、`src/web/ExplorationPage.tsx`、`tests/exploration.test.ts`、`docs/development/PHASE_6_EXPLORATION.md`。修改 `src/web/App.tsx`、`src/web/style.css`、`README.md` 與本計畫。沒有修改 domain、PostgreSQL schema、LLM adapter 或 canonical 文件。
+
+`npm run typecheck`、`npm run build` 通過。`npm test` 共 28 項，其中 27 項通過、需隔離資料庫的既有 integration test 略過。Phase 6 等待使用者手動確認；不得自動進入 Phase 7。
