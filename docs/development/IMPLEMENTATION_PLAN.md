@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0、1、2、3、4 已由使用者確認；其餘尚未開始。
+Phase 0、1、2、3、4 已由使用者確認。Phase 5 工程完成，等待使用者手動確認；其餘尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -97,3 +97,11 @@ Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自
 新增 `compose.yaml`、`.env.example`、`migrations/001_game_states.mjs`、`src/domain/game-state-repository.ts`、`src/server/postgres-game-state-repository.ts`、`tests/persistence.test.ts`。修改 domain 驗證、domain session、測試 API、伺服器設定、套件及型別設定、README 與本計畫。
 
 `npm run build` 通過。`npm test` 在隔離 PostgreSQL 上 17 項通過，包括資料庫保存、衝突、重讀與異常快照檢查。暫存 PostgreSQL 上 `npm run db:migrate:dry-run` 與 `npm run db:migrate` 通過；Docker Compose 本機操作需待使用者安裝 Docker Desktop 後手動測試。Phase 4 其後已由使用者手動確認；下一階段為 Phase 5。
+
+## Phase 5 交付紀錄
+
+建立後端專用的 `LanguageModel` 介面、文字請求／結果型別、adapter 邊界與可注入的逾時設定。外部回應一律先以 `unknown` 接收，再檢查為非空純文字；格式錯誤、服務不可用與逾時只產生固定的中立錯誤。固定回應 adapter 不連網、不需要金鑰，可供後續 application 測試替換。詳細手動測試見 [README](../../README.md#phase-5文字模型介面手動檢查)。
+
+新增 `src/server/llm/contracts.ts`、`language-model.ts`、`fake-adapter.ts`、`check.ts` 與 `tests/llm.test.ts`。修改 `package.json`、`README.md`、`OPEN_QUESTIONS.md` 與本計畫。沒有新增 npm 套件、環境變數或前端 API；實際供應商／模型仍未定。
+
+`npm run build` 通過；`npm test` 共 23 項，其中 22 項通過、需明確提供隔離資料庫的既有整合測試略過。四種 `npm run llm:check` 情境均以本機 fake 執行成功。Phase 5 等待使用者手動確認；不得自動進入 Phase 6。

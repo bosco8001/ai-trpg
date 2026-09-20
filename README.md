@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1、2、3、4 已由使用者確認。Phase 4 已接上目前 domain 的最小 PostgreSQL 保存邊界。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1、2、3、4 已由使用者確認。Phase 5 建立後端文字模型中立介面，等待手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。前端仍是已確認的連線頁。
 
@@ -87,6 +87,25 @@ curl -s http://127.0.0.1:3002/api/dev/domain
 完成後在 A 按 Ctrl+C，執行 `docker compose down` 停止資料庫並**保留資料**。只有你明確要刪除本專案的本機 PostgreSQL 資料時，才另行執行 `docker compose down --volumes`；**此命令會刪除具名 database volume**，不屬於一般停止流程。不要用它作為普通清理步驟。
 
 這兩個 `/api/dev/domain` 測試路由須明確設定 `DOMAIN_SANDBOX=1` 才開放；`DOMAIN_STORAGE=postgres` 才使用資料庫。未設定時沿用 Phase 3 的記憶體測試模式；production 不開放測試路由。正式登入、多角色與存檔介面尚未建立。
+
+## Phase 5：文字模型介面手動檢查
+
+這階段只有後端的模型插座與固定回應測試模型；不用啟動 Docker、API 服務或瀏覽器，也不需要 API key、Internet 或付費請求。網站仍顯示原本的連線頁。
+
+在專案根目錄開啟終端機。已有 Phase 1–4 的 npm 依賴時，直接依序執行：
+
+```sh
+npm run llm:check
+npm run llm:check -- malformed
+npm run llm:check -- unavailable
+npm run llm:check -- timeout
+```
+
+第一行應顯示 `成功：TEST：文字模型介面已連通。`，每次結果相同。後三行應各自顯示 `已安全處理` 與 `malformed-response`、`unavailable`、`timeout`，附繁體中文說明；不應出現供應商內部細節或任何金鑰。這些都是本機假資料與模擬失敗，不會聯絡外部模型。
+
+若尚未安裝專案 npm 依賴，先依下方「安裝與啟動」的 `npm ci` 指令安裝。Phase 5 不新增套件或金鑰設定，也不要求修改 `.env`。手動驗證後請回報結果；工程測試不能代替你的階段驗收。
+
+後端程式位置：`src/server/llm/contracts.ts` 定義中立型別與安全錯誤；`language-model.ts` 檢查請求／回應、處理逾時；`fake-adapter.ts` 提供固定回應；`check.ts` 只供終端機檢查。正式供應商與模型仍列在 `OPEN_QUESTIONS.md`。權威狀態仍由 `src/domain/` 決定，模型結果沒有直接修改狀態的路徑。
 
 ## 安裝與啟動
 
