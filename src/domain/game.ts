@@ -1,4 +1,16 @@
-/** 最小權威狀態切片；尚未表示完整角色、探索或戰鬥狀態。 */
+export type ExplorationLocationId = "TEST-forest-edge" | "TEST-ruin-entrance";
+
+export interface ExplorationState {
+  readonly locationId: ExplorationLocationId;
+  readonly lastObservationTargetId: "TEST-stone-door" | null;
+}
+
+/** Phase 8 工程 fixture 的起點；不是正式世界初始地點。 */
+export function createInitialTestExplorationState(): ExplorationState {
+  return Object.freeze({ locationId: "TEST-forest-edge", lastObservationTargetId: null });
+}
+
+/** 最小權威狀態切片；TEST 探索識別碼全是工程資料，不是正式世界設定。 */
 export interface GameState {
   readonly revision: number;
   readonly activity: "outside-combat" | "in-combat";
@@ -8,6 +20,7 @@ export interface GameState {
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
   };
+  readonly exploration: ExplorationState;
 }
 
 export interface SetEquippedSkillsCommand {
@@ -16,18 +29,38 @@ export interface SetEquippedSkillsCommand {
   readonly skillIds: readonly string[];
 }
 
+export interface ApproachTargetCommand {
+  readonly type: "approach-target";
+  readonly expectedRevision: number;
+  readonly targetId: "TEST-ruin-entrance";
+}
+
+export interface InspectTargetCommand {
+  readonly type: "inspect-target";
+  readonly expectedRevision: number;
+  readonly targetId: "TEST-stone-door";
+}
+
+export type DomainCommand = SetEquippedSkillsCommand | ApproachTargetCommand | InspectTargetCommand;
+
+export type CommandEffect =
+  | { readonly type: "equipped-skills-updated"; readonly skillIds: readonly string[] }
+  | { readonly type: "location-changed"; readonly locationId: ExplorationLocationId }
+  | { readonly type: "target-inspected"; readonly targetId: "TEST-stone-door" };
+
 export type RejectionCode = "invalid-command" | "stale-revision" | "revision-limit"
-  | "in-combat" | "too-many-skills" | "duplicate-skill" | "skill-not-learned";
+  | "in-combat" | "target-not-found" | "too-many-skills" | "duplicate-skill" | "skill-not-learned";
 
 export type CommandResult =
-  | { readonly ok: true; readonly state: GameState }
+  | { readonly ok: true; readonly state: GameState; readonly effect: CommandEffect }
   | { readonly ok: false; readonly code: RejectionCode; readonly message: string };
 
 const rejectionMessages: Record<RejectionCode, string> = {
-  "invalid-command": "命令格式不符；只接受技能配置命令，不接受直接修改權威狀態。",
+  "invalid-command": "命令格式不符；不接受直接修改權威狀態。",
   "stale-revision": "狀態已更新，請重新讀取後再送出命令。",
   "revision-limit": "狀態版本已達工程上限，無法接受新命令。",
-  "in-combat": "戰鬥中不能更換裝備技能。",
+  "in-combat": "戰鬥中不能執行這項操作。",
+  "target-not-found": "目前位置沒有可執行這項操作的目標。",
   "too-many-skills": "最多只能裝備六個主動技能。",
   "duplicate-skill": "同一技能不能重複選取。",
   "skill-not-learned": "只能裝備技能庫中的已學主動技能。",
@@ -58,16 +91,19 @@ function isIds(value: unknown): value is string[] {
   return Array.isArray(value) && Array.from(value).every(isId);
 }
 
-/** 不做型別轉換，也不移除多餘欄位後偷偷接受請求。 */
-export function parseCommand(value: unknown): SetEquippedSkillsCommand | undefined {
-  if (!isRecord(value) || Object.keys(value).length !== 3
-    || value.type !== "set-equipped-skills" || !isRevision(value.expectedRevision)
-    || !isIds(value.skillIds)) return undefined;
-  return {
-    type: "set-equipped-skills",
-    expectedRevision: value.expectedRevision,
-    skillIds: [...value.skillIds],
-  };
+/** 不做型別轉換，也不移除多餘欄位後偷偷接受命令。 */
+export function parseCommand(value: unknown): DomainCommand | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 3 || !isRevision(value.expectedRevision)) return undefined;
+  if (value.type === "set-equipped-skills" && isIds(value.skillIds)) {
+    return { type: value.type, expectedRevision: value.expectedRevision, skillIds: [...value.skillIds] };
+  }
+  if (value.type === "approach-target" && value.targetId === "TEST-ruin-entrance") {
+    return { type: value.type, expectedRevision: value.expectedRevision, targetId: value.targetId };
+  }
+  if (value.type === "inspect-target" && value.targetId === "TEST-stone-door") {
+    return { type: value.type, expectedRevision: value.expectedRevision, targetId: value.targetId };
+  }
+  return undefined;
 }
 
 function loadoutError(learned: readonly string[], equipped: readonly string[]): RejectionCode | undefined {
@@ -79,19 +115,24 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
-  if (!hasExactKeys(seed, ["revision", "activity", "character"])
-    || !hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])) {
-    throw new Error("初始 domain 狀態不符合技能配置契約。");
+  if (!hasExactKeys(seed, ["revision", "activity", "character", "exploration"])
+    || !hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
+    || !hasExactKeys(seed.exploration, ["locationId", "lastObservationTargetId"])) {
+    throw new Error("初始 domain 狀態不符合契約。");
   }
   const character = seed.character;
+  const exploration = seed.exploration;
   if (!isRevision(seed.revision)
     || (seed.activity !== "outside-combat" && seed.activity !== "in-combat")
     || !isId(character.id)
     || !isIds(character.learnedActiveSkillIds)
     || !isIds(character.equippedSkillIds)
     || new Set(character.learnedActiveSkillIds).size !== character.learnedActiveSkillIds.length
-    || loadoutError(character.learnedActiveSkillIds, character.equippedSkillIds)) {
-    throw new Error("初始 domain 狀態不符合技能配置契約。");
+    || loadoutError(character.learnedActiveSkillIds, character.equippedSkillIds)
+    || (exploration.locationId !== "TEST-forest-edge" && exploration.locationId !== "TEST-ruin-entrance")
+    || (exploration.lastObservationTargetId !== null
+      && exploration.lastObservationTargetId !== "TEST-stone-door")) {
+    throw new Error("初始 domain 狀態不符合契約。");
   }
   return Object.freeze({
     revision: seed.revision,
@@ -101,7 +142,72 @@ export function createGameState(seed: unknown): GameState {
       learnedActiveSkillIds: Object.freeze([...character.learnedActiveSkillIds]),
       equippedSkillIds: Object.freeze([...character.equippedSkillIds]),
     }),
+    exploration: Object.freeze({
+      locationId: exploration.locationId,
+      lastObservationTargetId: exploration.lastObservationTargetId,
+    }),
   });
+}
+
+export type CandidateRejectionCode = "invalid-candidate" | "clarification-required"
+  | "unsupported-action" | "target-not-found" | "stale-revision";
+
+export type CandidateValidationResult =
+  | { readonly ok: true; readonly command: ApproachTargetCommand | InspectTargetCommand }
+  | { readonly ok: false; readonly code: CandidateRejectionCode; readonly message: string };
+
+const candidateMessages: Record<CandidateRejectionCode, string> = {
+  "invalid-candidate": "候選行動格式不正確。",
+  "clarification-required": "候選行動仍需玩家澄清。",
+  "unsupported-action": "目前的權威探索規則尚未支援這項行動。",
+  "target-not-found": "目前位置找不到可唯一對應的目標。",
+  "stale-revision": "狀態已更新，請依最新狀態重新送出行動。",
+};
+
+function rejectCandidate(code: CandidateRejectionCode): CandidateValidationResult {
+  return { ok: false, code, message: candidateMessages[code] };
+}
+
+function validCandidateText(value: unknown, nullable = false): boolean {
+  return (nullable && value === null) || (typeof value === "string" && value.trim() === value
+    && value.length > 0 && Array.from(value).length <= 500);
+}
+
+/** 把不可信 candidate 解析成有限的 domain command；自由文字永遠不直接成為 state ID。 */
+export function validateCandidateAction(
+  state: GameState,
+  candidate: unknown,
+  expectedRevision: unknown,
+): CandidateValidationResult {
+  if (!isRevision(expectedRevision) || !hasExactKeys(candidate,
+    ["status", "kind", "target", "manner", "clarificationQuestion", "originalText"])
+    || (candidate.status !== "candidate" && candidate.status !== "clarification-needed"
+      && candidate.status !== "unsupported")
+    || (candidate.kind !== "move" && candidate.kind !== "inspect" && candidate.kind !== "interact"
+      && candidate.kind !== "speak" && candidate.kind !== "other")
+    || !validCandidateText(candidate.target, true) || !validCandidateText(candidate.manner, true)
+    || !validCandidateText(candidate.clarificationQuestion, true)
+    || !validCandidateText(candidate.originalText)) return rejectCandidate("invalid-candidate");
+  if (expectedRevision !== state.revision) return rejectCandidate("stale-revision");
+  if (candidate.status === "clarification-needed") return candidate.clarificationQuestion === null
+    ? rejectCandidate("invalid-candidate") : rejectCandidate("clarification-required");
+  if (candidate.status === "unsupported") return candidate.kind === "other"
+    && candidate.clarificationQuestion === null
+    ? rejectCandidate("unsupported-action") : rejectCandidate("invalid-candidate");
+  if (candidate.clarificationQuestion !== null) return rejectCandidate("invalid-candidate");
+  if (candidate.kind === "move") {
+    if (state.exploration.locationId === "TEST-forest-edge" && candidate.target === "森林裡的廢墟") {
+      return { ok: true, command: { type: "approach-target", expectedRevision, targetId: "TEST-ruin-entrance" } };
+    }
+    return rejectCandidate("target-not-found");
+  }
+  if (candidate.kind === "inspect") {
+    if (state.exploration.locationId === "TEST-ruin-entrance" && candidate.target === "門上的符號") {
+      return { ok: true, command: { type: "inspect-target", expectedRevision, targetId: "TEST-stone-door" } };
+    }
+    return rejectCandidate("target-not-found");
+  }
+  return rejectCandidate("unsupported-action");
 }
 
 /** 純狀態轉換：無 I/O、不修改輸入。所有呼叫端都必須經過相同驗證。 */
@@ -111,14 +217,32 @@ export function applyCommand(state: GameState, input: unknown): CommandResult {
   if (command.expectedRevision !== state.revision) return reject("stale-revision");
   if (state.revision === Number.MAX_SAFE_INTEGER) return reject("revision-limit");
   if (state.activity === "in-combat") return reject("in-combat");
+  if (command.type === "approach-target") {
+    if (state.exploration.locationId !== "TEST-forest-edge") return reject("target-not-found");
+    const next = createGameState({
+      ...state, revision: state.revision + 1,
+      exploration: { locationId: command.targetId, lastObservationTargetId: null },
+    });
+    return { ok: true, state: next, effect: { type: "location-changed", locationId: command.targetId } };
+  }
+  if (command.type === "inspect-target") {
+    if (state.exploration.locationId !== "TEST-ruin-entrance") return reject("target-not-found");
+    const next = createGameState({
+      ...state, revision: state.revision + 1,
+      exploration: { ...state.exploration, lastObservationTargetId: command.targetId },
+    });
+    return { ok: true, state: next, effect: { type: "target-inspected", targetId: command.targetId } };
+  }
   const error = loadoutError(state.character.learnedActiveSkillIds, command.skillIds);
   if (error) return reject(error);
+  const skillIds = [...command.skillIds];
   return {
     ok: true,
     state: createGameState({
       ...state,
       revision: state.revision + 1,
-      character: { ...state.character, equippedSkillIds: command.skillIds },
+      character: { ...state.character, equippedSkillIds: skillIds },
     }),
+    effect: { type: "equipped-skills-updated", skillIds },
   };
 }

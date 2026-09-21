@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0、1、2、3、4、5 已由使用者確認。Phase 6 工程完成，等待使用者手動確認；其餘尚未開始。
+Phase 0–7 已由使用者確認。Phase 8 工程完成，等待使用者手動確認；其餘尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -112,4 +112,24 @@ Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自
 
 新增 `src/web/exploration.ts`、`src/web/ExplorationPage.tsx`、`tests/exploration.test.ts`、`docs/development/PHASE_6_EXPLORATION.md`。修改 `src/web/App.tsx`、`src/web/style.css`、`README.md` 與本計畫。沒有修改 domain、PostgreSQL schema、LLM adapter 或 canonical 文件。
 
-`npm run typecheck`、`npm run build` 通過。`npm test` 共 28 項，其中 27 項通過、需隔離資料庫的既有 integration test 略過。Phase 6 等待使用者手動確認；不得自動進入 Phase 7。
+`npm run typecheck`、`npm run build` 通過。`npm test` 共 28 項，其中 27 項通過、需隔離資料庫的既有 integration test 略過。Phase 6 其後已由使用者手動確認。
+
+## Phase 7 交付紀錄
+
+加入後端探索文字解析服務：玩家文字經 Phase 5 中立 `LanguageModel` 介面及固定測試 adapter，經嚴格 runtime validation 才形成 candidate action。解析 API 與探索頁顯示「候選解析（固定測試）」、歧義澄清或未支援；沒有執行 domain 命令或保存資料。輸入上限 500 字屬工程限制，不是遊戲規則。詳見 [Phase 7 文件](PHASE_7_INTERPRETATION.md) 與 [README 手動測試](../../README.md#phase-7自然語言候選解析手動測試)。
+
+修改 `src/server/llm/` 的請求契約，新增 `src/server/interpretation/` 與 `src/shared/interpretation.ts`，接入 `src/server/app.ts`、`index.ts`、`src/web/`，新增 `tests/interpretation.test.ts` 並更新相關文件。正式模型仍未決定；Phase 8 才驗證與更新狀態，Phase 9 才敘述已確定結果。
+
+`npm run typecheck` 與 `npm run build` 通過；`npm test` 共 37 項，其中 36 項通過、需要隔離資料庫的既有 PostgreSQL integration test 略過。工程檢查涵蓋有效解析、歧義、未知句子、不可信輸出、逾時、安全錯誤、API 格式與解析前後權威測試狀態一致。
+
+Phase 7 其後已由使用者手動確認。
+
+## Phase 8 交付紀錄
+
+將最小探索狀態加入 authoritative `GameState`，只包含工程位置 ID 與最近觀察目標。固定文字候選必須先經 deterministic resolver，才能形成 `approach-target` 或 `inspect-target` domain command；自由文字不會直接寫成 ID。成功命令沿用既有 revision 與 repository optimistic concurrency，並回傳機械式 effect。歧義、未支援、未知目標、舊版本與不合法欄位不修改狀態。
+
+新增 `src/server/exploration/`、`src/shared/exploration-action.ts`、`src/server/test-game-state.ts`、`tests/exploration-action.test.ts` 與 [Phase 8 文件](PHASE_8_AUTHORITATIVE_EXPLORATION.md)。修改 domain、session、Fastify routes、PostgreSQL snapshot hydration、探索頁及相關測試／文件。既有 JSONB snapshot 可保存新增狀態，所以沒有新增 migration 或 table；舊 Phase 4 snapshot 由 persistence 邊界安全補上初始 TEST 探索資料。
+
+`npm run typecheck`、`npm run build` 與 `git diff --check` 通過。`npm test` 共 48 項，其中 47 項通過；需明確提供隔離 `TEST_DATABASE_URL` 的既有 PostgreSQL integration test 略過。其餘測試涵蓋完整 API 管線、位置與觀察 transition、revision、所有拒絕不改狀態、request／candidate／command／response runtime validation、舊 snapshot 相容與異常 exploration snapshot 拒絕，以及安全 repository 錯誤。
+
+Phase 8 等待使用者手動確認；不得自動進入 Phase 9。

@@ -463,6 +463,53 @@ h1 {
   color: var(--text-muted);
 }
 
+.narrative-entry[data-source="interpretation"] .narrative-entry__label {
+  color: var(--action-primary);
+}
+
+.narrative-entry[data-source="interpretation"] .narrative-entry__text {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border-interactive);
+}
+
+.narrative-entry[data-source="ruling"] .narrative-entry__label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.narrative-entry[data-source="ruling"] .narrative-entry__text {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border-interactive);
+}
+
+.exploration-state {
+  margin-block-end: var(--space-6);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-ornament);
+  background: var(--surface-elevated);
+}
+
+.exploration-state h3 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-heading);
+  font-size: 1rem;
+}
+
+.exploration-state dl {
+  display: grid;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.exploration-state dl > div {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.exploration-state dt { color: var(--text-muted); }
+.exploration-state dd { margin: 0; overflow-wrap: anywhere; }
+
 .narrative-entry[data-source="system"] .narrative-entry__label::before {
   width: 0.55rem;
   height: var(--border-width);

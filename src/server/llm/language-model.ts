@@ -12,9 +12,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function validRequest(value: unknown): value is GenerateRequest {
-  return isRecord(value) && Object.keys(value).length === 1
+  return isRecord(value) && Object.keys(value).every((key) => key === "input" || key === "instruction")
     && Object.hasOwn(value, "input")
-    && typeof value.input === "string" && value.input.trim().length > 0;
+    && typeof value.input === "string" && value.input.trim().length > 0
+    && (!Object.hasOwn(value, "instruction")
+      || (typeof value.instruction === "string" && value.instruction.trim().length > 0));
 }
 
 function parseResult(value: unknown): GenerateResult {

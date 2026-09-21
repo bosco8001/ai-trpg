@@ -1,4 +1,4 @@
-/** 僅保存 Phase 3 已存在的 GameState 技能配置切片。 */
+/** 保存經 domain 驗證的 GameState JSON snapshot；後續小切片可沿用，不預建額外資料表。 */
 export const up = (pgm) => {
   pgm.createTable("game_states", {
     character_id: { type: "text", primaryKey: true },

@@ -1,6 +1,8 @@
 /** 後端 application 使用的中立文字模型契約；不屬於權威 domain state。 */
 export interface GenerateRequest {
   readonly input: string;
+  /** 應用層指示與玩家文字分開；正式 adapter 須映射為較高權限的指示。 */
+  readonly instruction?: string;
 }
 
 export interface GenerateResult {

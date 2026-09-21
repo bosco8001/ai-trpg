@@ -36,12 +36,12 @@ test("有效行動加入玩家紀錄與固定回覆，然後清空輸入", () =>
   const before = structuredClone(initialNarrativeEntries);
   const next = submitLocalExplorationAction(initialNarrativeEntries, "  我慢慢走向測試路徑。  ");
   assert.equal(next.input, "");
-  assert.match(next.feedback ?? "", /尚未進行自然語言判定/);
+  assert.match(next.feedback ?? "", /正在取得候選解析/);
   assert.equal(next.entries.length, initialNarrativeEntries.length + 2);
   assert.deepEqual(next.entries.at(-2), {
     id: "local-4-action", source: "action", label: "你的行動", text: "我慢慢走向測試路徑。",
   });
-  assert.match(next.entries.at(-1)?.text ?? "", /尚未進行自然語言判定、規則驗證或狀態更新/);
+  assert.match(next.entries.at(-1)?.text ?? "", /尚未進行規則驗證或狀態更新/);
   assert.deepEqual(initialNarrativeEntries, before);
 });
 

@@ -2,6 +2,9 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { buildApp } from "./app.js";
 import { PostgresGameStateRepository } from "./postgres-game-state-repository.js";
+import { createLanguageModel } from "./llm/language-model.js";
+import { createActionInterpreter } from "./interpretation/interpreter.js";
+import { FixtureInterpretationAdapter } from "./interpretation/fixture-adapter.js";
 
 const port = Number(process.env.PORT ?? 3001);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -10,13 +13,13 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 
 const domainSandbox = process.env.DOMAIN_SANDBOX === "1" && process.env.NODE_ENV !== "production";
 const storage = process.env.DOMAIN_STORAGE ?? "memory";
-if (domainSandbox && storage !== "memory" && storage !== "postgres") {
+if (storage !== "memory" && storage !== "postgres") {
   throw new Error("DOMAIN_STORAGE 只接受 memory 或 postgres。");
 }
-if (domainSandbox && storage === "postgres" && !process.env.DATABASE_URL) {
+if (storage === "postgres" && !process.env.DATABASE_URL) {
   throw new Error("PostgreSQL 測試模式需要 DATABASE_URL。請建立 .env。");
 }
-const pool = domainSandbox && storage === "postgres"
+const pool = storage === "postgres"
   ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 3000 })
   : undefined;
 
@@ -24,6 +27,10 @@ const app = await buildApp({
   logger: true,
   domainSandbox,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
+  storage,
+  interpreter: createActionInterpreter(createLanguageModel(
+    new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },
+  )),
   webRoot: process.env.NODE_ENV === "production"
     ? fileURLToPath(new URL("../web/", import.meta.url))
     : undefined,

@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import { createGameState } from "../domain/game.js";
+import { createGameState, createInitialTestExplorationState } from "../domain/game.js";
 import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 
@@ -22,7 +22,7 @@ interface StateRow {
 }
 
 function snapshotOf(state: GameState) {
-  return { activity: state.activity, character: state.character };
+  return { activity: state.activity, character: state.character, exploration: state.exploration };
 }
 
 /** 僅接受經 domain 驗證的快照，資料庫列也必須重新驗證。 */
@@ -33,14 +33,22 @@ export function hydrateStateRow(row: StateRow): GameState {
       || typeof row.snapshot !== "object" || row.snapshot === null || Array.isArray(row.snapshot)) {
       throw new Error("資料列格式錯誤。");
     }
-    const snapshotKeys = Object.keys(row.snapshot);
-    if (snapshotKeys.length !== 2 || !snapshotKeys.includes("activity")
-      || !snapshotKeys.includes("character")) {
+    const snapshot = row.snapshot as Record<string, unknown>;
+    const snapshotKeys = Object.keys(snapshot);
+    const legacy = snapshotKeys.length === 2 && snapshotKeys.includes("activity")
+      && snapshotKeys.includes("character");
+    const current = snapshotKeys.length === 3 && snapshotKeys.includes("activity")
+      && snapshotKeys.includes("character") && snapshotKeys.includes("exploration");
+    if (!legacy && !current) {
       throw new Error("快照欄位格式錯誤。");
     }
     const revision = Number(row.revision);
     if (!Number.isSafeInteger(revision)) throw new Error("狀態版本超出安全範圍。");
-    const state = createGameState({ ...row.snapshot, revision });
+    const state = createGameState({
+      ...snapshot,
+      exploration: legacy ? createInitialTestExplorationState() : snapshot.exploration,
+      revision,
+    });
     if (state.character.id !== row.character_id) throw new Error("角色識別碼不一致。");
     return state;
   } catch (error) {

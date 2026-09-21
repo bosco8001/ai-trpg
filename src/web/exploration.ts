@@ -1,4 +1,7 @@
-export type NarrativeSource = "narration" | "action" | "system";
+import { MAX_PLAYER_TEXT_LENGTH, type CandidateAction } from "../shared/interpretation.js";
+import type { ExplorationRuling } from "../shared/exploration-action.js";
+
+export type NarrativeSource = "narration" | "action" | "system" | "interpretation" | "ruling";
 
 export interface NarrativeEntry {
   readonly id: string;
@@ -24,12 +27,13 @@ export const initialNarrativeEntries: readonly NarrativeEntry[] = [
     id: "fixture-response",
     source: "system",
     label: "介面測試回覆",
-    text: "這是固定測試回覆；尚未進行自然語言判定、規則驗證或狀態更新。",
+    text: "這是固定的初始介面 fixture。你新送出的文字會另外顯示候選解析與權威裁定。",
   },
 ];
 
 export function isSubmittableAction(value: string): boolean {
-  return value.trim().length > 0;
+  const length = Array.from(value.trim()).length;
+  return length > 0 && length <= MAX_PLAYER_TEXT_LENGTH;
 }
 
 export function shouldSubmitOnEnter(key: string, shiftKey: boolean): boolean {
@@ -50,8 +54,8 @@ export function appendLocalExplorationAction(
     {
       id: `${id}-response`,
       source: "system",
-      label: "介面測試回覆",
-      text: "已記錄你的文字。這是 Phase 6 介面測試，尚未進行自然語言判定、規則驗證或狀態更新。",
+      label: "解析提示",
+      text: "已記錄你的文字，正在取得固定測試解析；尚未進行規則驗證或狀態更新。",
     },
   ];
 }
@@ -71,6 +75,26 @@ export function submitLocalExplorationAction(
   return {
     entries: appendLocalExplorationAction(entries, value),
     input: "",
-    feedback: "已加入探索紀錄。尚未進行自然語言判定或遊戲狀態更新。",
+    feedback: "已加入探索紀錄，正在取得候選解析；尚未更新遊戲狀態。",
   };
+}
+
+const kindLabels: Record<CandidateAction["kind"], string> = {
+  move: "移動／接近", inspect: "觀察", interact: "互動", speak: "說話", other: "其他／未分類",
+};
+
+export function describeCandidate(candidate: CandidateAction): string {
+  if (candidate.status === "unsupported") return "固定測試解析尚未支援這句話；沒有判定遊戲結果。";
+  if (candidate.status === "clarification-needed") {
+    return `需要澄清：${candidate.clarificationQuestion} 尚未判定遊戲結果。`;
+  }
+  return `候選意圖：${kindLabels[candidate.kind]}；目標：${candidate.target ?? "未指明"}；方式：${candidate.manner ?? "未指明"}。尚未判定是否合法或成功。`;
+}
+
+export function describeRuling(ruling: ExplorationRuling): string {
+  if (!ruling.accepted) return `未執行：${ruling.message}`;
+  if (ruling.effect.type === "location-changed") {
+    return `已接受：權威位置更新為 ${ruling.effect.locationId}。`;
+  }
+  return `已接受：權威觀察標記更新為 ${ruling.effect.targetId}。`;
 }

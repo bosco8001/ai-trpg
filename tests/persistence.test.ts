@@ -22,6 +22,7 @@ function seed(id = "TEST-character"): GameState {
       learnedActiveSkillIds: ["TEST-skill-1", "TEST-skill-2"],
       equippedSkillIds: [],
     },
+    exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
   };
 }
 
@@ -36,6 +37,10 @@ test("資料庫快照必須重新通過完整 domain 驗證", () => {
     snapshot: { activity: "outside-combat", character: seed().character },
   };
   assert.deepEqual(hydrateStateRow(valid), seed());
+  assert.deepEqual(hydrateStateRow({
+    ...valid,
+    snapshot: { ...valid.snapshot, exploration: seed().exploration },
+  }), seed());
   for (const row of [
     { ...valid, revision: "9007199254740992" },
     { ...valid, snapshot: { ...valid.snapshot, revision: 999 } },
@@ -44,6 +49,8 @@ test("資料庫快照必須重新通過完整 domain 驗證", () => {
     { ...valid, snapshot: { ...valid.snapshot, character: { ...seed().character, equippedSkillIds: ["TEST-skill-1", "TEST-skill-1"] } } },
     { ...valid, character_id: "other" },
     { ...valid, snapshot: null },
+    { ...valid, snapshot: { ...valid.snapshot, exploration: { locationId: "final-boss-room", lastObservationTargetId: null } } },
+    { ...valid, snapshot: { ...valid.snapshot, exploration: { ...seed().exploration, hp: 999 } } },
   ]) {
     assert.throws(() => hydrateStateRow(row), InvalidPersistedStateError);
   }
@@ -121,15 +128,26 @@ test("PostgreSQL adapter 的條件式更新、重讀與資料驗證", {
     const saved = await repositoryB.load(id);
     assert.equal(saved?.revision, 1);
     assert.equal(saved?.character.equippedSkillIds.length, 1);
+    const moved = await first.execute({
+      type: "approach-target", expectedRevision: 1, targetId: "TEST-ruin-entrance",
+    });
+    assert.equal(moved.ok, true);
+    const explorationSaved = await repositoryB.load(id);
+    assert.equal(explorationSaved?.revision, 2);
+    assert.equal(explorationSaved?.exploration.locationId, "TEST-ruin-entrance");
     const restartedPool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 1 });
     const reloaded = new PostgresGameStateRepository(restartedPool);
     // 新 adapter 模擬 API 重啟，驗證狀態不是程序記憶體資料。
     try {
-      assert.deepEqual(await reloaded.load(id), saved);
+      assert.deepEqual(await reloaded.load(id), explorationSaved);
     } finally {
       await restartedPool.end();
     }
-    await pool.query("UPDATE game_states SET snapshot = $2::jsonb WHERE character_id = $1", [id, JSON.stringify({ activity: "outside-combat", character: { ...seed(id).character, equippedSkillIds: ["unlearned"] } })]);
+    await pool.query("UPDATE game_states SET snapshot = $2::jsonb WHERE character_id = $1", [id, JSON.stringify({
+      activity: "outside-combat",
+      character: explorationSaved?.character,
+      exploration: { locationId: "final-boss-room", lastObservationTargetId: null },
+    })]);
     await assert.rejects(repositoryA.load(id), InvalidPersistedStateError);
   } finally {
     await pool.query("DELETE FROM game_states WHERE character_id = $1", [id]);

@@ -9,6 +9,7 @@ const learned = Array.from({ length: 7 }, (_, i) => `TEST-skill-${i + 1}`);
 const seed = (): GameState => ({
   revision: 0, activity: "outside-combat",
   character: { id: "TEST-character", learnedActiveSkillIds: [...learned], equippedSkillIds: [] },
+  exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
 });
 const command = (skillIds: readonly string[], expectedRevision = 0) => ({
   type: "set-equipped-skills", expectedRevision, skillIds,

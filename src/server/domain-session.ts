@@ -2,6 +2,11 @@ import { applyCommand, createGameState } from "../domain/game.js";
 import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 
+export interface GameStateSession {
+  getState(): GameState | Promise<GameState>;
+  execute(input: unknown): ReturnType<typeof applyCommand> | Promise<ReturnType<typeof applyCommand>>;
+}
+
 /** 單程序記憶體邊界；Phase 4 才處理持久化與資料庫併發。 */
 export function createDomainSession(initialState: GameState) {
   let state = createGameState(initialState);
