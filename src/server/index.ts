@@ -7,6 +7,7 @@ import { createActionInterpreter } from "./interpretation/interpreter.js";
 import { FixtureInterpretationAdapter } from "./interpretation/fixture-adapter.js";
 import { createExplorationNarrator } from "./narration/narrator.js";
 import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
+import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
 
 const port = Number(process.env.PORT ?? 3001);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -34,6 +35,7 @@ const app = await buildApp({
   logger: true,
   domainSandbox,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
+  saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },

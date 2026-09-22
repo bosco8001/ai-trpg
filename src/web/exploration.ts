@@ -31,6 +31,19 @@ export const initialNarrativeEntries: readonly NarrativeEntry[] = [
   },
 ];
 
+/** Load 不保存或重播舊 history；只重建最小 TEST 場景並加入 deterministic 系統提示。 */
+export function narrativeEntriesAfterLoad(slotId: number): readonly NarrativeEntry[] {
+  return [
+    initialNarrativeEntries[0]!,
+    {
+      id: `loaded-slot-${slotId}`,
+      source: "system",
+      label: "系統載入",
+      text: `已載入存檔 ${slotId}。先前頁面中的探索紀錄未包含於目前存檔格式。`,
+    },
+  ];
+}
+
 export function isSubmittableAction(value: string): boolean {
   const length = Array.from(value.trim()).length;
   return length > 0 && length <= MAX_PLAYER_TEXT_LENGTH;

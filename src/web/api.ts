@@ -6,6 +6,13 @@ import {
   type ExplorationActionResponse,
   type ExplorationStateSummary,
 } from "../shared/exploration-action.js";
+import {
+  isSaveOperationResponse,
+  isSaveSlotsResponse,
+  type SaveOperationResponse,
+  type SaveSlotId,
+  type SaveSlotsResponse,
+} from "../shared/save-game.js";
 
 export async function checkApiHealth(
   signal: AbortSignal,
@@ -83,4 +90,77 @@ export async function executeExplorationAction(
     throw new Error("探索裁定回應格式不正確。");
   }
   return body;
+}
+
+function isSafeApiError(value: unknown): value is { error: string; message: string } {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === 2 && "error" in value && typeof value.error === "string"
+    && "message" in value && typeof value.message === "string";
+}
+
+async function saveApiError(response: Response, fallback: string): Promise<Error> {
+  try {
+    const body: unknown = await response.json();
+    if (isSafeApiError(body) && body.message.trim().length > 0) return new Error(body.message);
+  } catch {
+    // 使用固定安全訊息；不顯示原始 response 或內部錯誤。
+  }
+  return new Error(fallback);
+}
+
+export async function listSaveSlots(fetcher: typeof fetch = fetch): Promise<SaveSlotsResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/save-slots", { cache: "no-store" });
+  } catch {
+    throw new Error("存檔列表暫時無法使用，請稍後再試。");
+  }
+  if (!response.ok) throw await saveApiError(response, "存檔列表暫時無法使用，請稍後再試。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("存檔列表回應格式不正確。");
+  }
+  if (!isSaveSlotsResponse(body)) throw new Error("存檔列表回應格式不正確。");
+  return body;
+}
+
+async function changeSaveSlot(
+  method: "PUT" | "POST",
+  slotId: SaveSlotId,
+  expectedRevision: number,
+  fetcher: typeof fetch,
+): Promise<SaveOperationResponse> {
+  const suffix = method === "POST" ? "/load" : "";
+  let response: Response;
+  try {
+    response = await fetcher(`/api/save-slots/${slotId}${suffix}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(method === "PUT" ? "目前無法儲存，請稍後再試。" : "目前無法載入，請稍後再試。");
+  }
+  if (!response.ok) {
+    throw await saveApiError(response, method === "PUT" ? "目前無法儲存，請稍後再試。" : "目前無法載入，請稍後再試。");
+  }
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("存檔操作回應格式不正確。");
+  }
+  if (!isSaveOperationResponse(body)) throw new Error("存檔操作回應格式不正確。");
+  return body;
+}
+
+export function saveGame(slotId: SaveSlotId, expectedRevision: number, fetcher: typeof fetch = fetch) {
+  return changeSaveSlot("PUT", slotId, expectedRevision, fetcher);
+}
+
+export function loadGame(slotId: SaveSlotId, expectedRevision: number, fetcher: typeof fetch = fetch) {
+  return changeSaveSlot("POST", slotId, expectedRevision, fetcher);
 }

@@ -1,6 +1,6 @@
 # Phase 9.5：Exploration UI Alignment
 
-> Phase 9 已由使用者手動確認。Phase 9.5 等待使用者手動確認；不得開始 Phase 10。
+> Phase 9 與 Phase 9.5 已由使用者手動確認。Phase 10 已開始，Phase 9.5 不再是待驗收項目。
 
 這一階段像整理冒險桌面：故事放在中間，五張可點選的建議放在下方，旁邊保留幾個未來才會裝內容的抽屜。它只調整 React presentation 與 interaction，不新增遊戲規則。
 
@@ -44,7 +44,7 @@ Enter 送出、Shift+Enter 換行。成功送出時只清空文字，**不會收
 - 背包：沒有 inventory、item use、loot、經濟或 persistence。
 - 裝備：只有 placeholder slot，沒有 equip rule、屬性或戰鬥計算。
 - 隊伍：沒有代行者、招募、隊友戰術或隊伍 persistence。
-- 系統：只保留「Save / Load：尚未接入（Phase 10）」與顯示設定的位置。
+- 系統：本階段只保留 Save / Load 與顯示設定的位置；Save / Load 其後由 Phase 10 接入。
 
 面板可由 ×、Escape 或背景遮罩關閉。開啟時焦點移到關閉按鈕，關閉後回到原本的工具按鈕；Tab 保留在面板內。工具面板不呼叫 API，也不讀寫 `GameState` 或 PostgreSQL。
 
@@ -60,6 +60,6 @@ Enter 送出、Shift+Enter 換行。成功送出時只清空文字，**不會收
 
 ## 未實作
 
-Phase 10 Save / Load、正式 inventory／equipment／party system、system settings backend、LLM-generated suggestions、conversation persistence、combat、map、NPC、quests、RAG、streaming 與 tool calling 都不在本階段。
+Phase 10 Save / Load 不屬於 Phase 9.5 的交付；正式 inventory／equipment／party system、system settings backend、LLM-generated suggestions、conversation persistence、combat、map、NPC、quests、RAG、streaming 與 tool calling 也未在本階段實作。
 
 完整手動測試步驟見 [README](../../README.md#phase-95探索頁-ui-alignment-手動測試)。

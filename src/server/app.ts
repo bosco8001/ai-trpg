@@ -10,6 +10,10 @@ import { createTestGameState } from "./test-game-state.js";
 import { createExplorationActionService } from "./exploration/action-service.js";
 import { registerExplorationRoutes } from "./exploration/routes.js";
 import type { ExplorationNarrator } from "./narration/contracts.js";
+import type { SaveGameRepository } from "./save-game/contracts.js";
+import { InMemorySaveGameRepository } from "./save-game/memory-repository.js";
+import { createSaveGameService } from "./save-game/service.js";
+import { registerSaveGameRoutes } from "./save-game/routes.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -20,12 +24,15 @@ export async function buildApp(options: {
   domainSession?: GameStateSession;
   storage?: "memory" | "postgres";
   narrator?: ExplorationNarrator;
+  saveGameRepository?: SaveGameRepository;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
   const session = options.domainSession ?? (options.domainRepository
     ? createPersistedDomainSession(options.domainRepository, createTestGameState())
     : createDomainSession(createTestGameState()));
+  const saveGameRepository = options.saveGameRepository
+    ?? new InMemorySaveGameRepository(() => session.getState());
 
   if (options.domainSandbox && process.env.NODE_ENV !== "production") {
     registerDomainSandbox(app, session, storage);
@@ -36,6 +43,7 @@ export async function buildApp(options: {
       options.interpreter, session, storage, options.narrator,
     ));
   }
+  registerSaveGameRoutes(app, createSaveGameService(saveGameRepository, session, storage));
 
   app.get<{ Reply: HealthResponse }>("/api/health", {
     schema: {

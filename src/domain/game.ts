@@ -23,6 +23,44 @@ export interface GameState {
   readonly exploration: ExplorationState;
 }
 
+/** 可保存／恢復的權威內容；live revision 由目前 session 決定，不屬於此資料。 */
+export type GameStateContents = Omit<GameState, "revision">;
+
+export function gameStateContents(state: GameState): GameStateContents {
+  const validated = createGameState(state);
+  return Object.freeze({
+    activity: validated.activity,
+    character: validated.character,
+    exploration: validated.exploration,
+  });
+}
+
+export type StateReplacementResult =
+  | { readonly ok: true; readonly state: GameState }
+  | { readonly ok: false; readonly code: "invalid-state" | "stale-revision" | "revision-limit"; readonly message: string };
+
+/** Load 是 system operation：恢復內容，但 revision 永遠從目前 live state 往前一格。 */
+export function replaceGameStateContents(
+  current: GameState,
+  expectedRevision: unknown,
+  contents: unknown,
+): StateReplacementResult {
+  if (!isRevision(expectedRevision) || expectedRevision !== current.revision) {
+    return { ok: false, code: "stale-revision", message: "狀態已更新，請重新讀取後再載入存檔。" };
+  }
+  if (current.revision === Number.MAX_SAFE_INTEGER) {
+    return { ok: false, code: "revision-limit", message: "狀態版本已達工程上限，無法載入存檔。" };
+  }
+  try {
+    if (!isRecord(contents)) throw new Error("存檔內容不是物件。");
+    const next = createGameState({ ...contents, revision: current.revision + 1 });
+    if (next.character.id !== current.character.id) throw new Error("角色識別碼不一致。");
+    return { ok: true, state: next };
+  } catch {
+    return { ok: false, code: "invalid-state", message: "存檔內容不符合目前的遊戲狀態契約。" };
+  }
+}
+
 export interface SetEquippedSkillsCommand {
   readonly type: "set-equipped-skills";
   readonly expectedRevision: number;

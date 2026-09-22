@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–9 已由使用者確認。Phase 9.5 已完成探索頁 UI alignment，等待使用者手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–9.5 已由使用者確認。Phase 10 已完成 Manual Save / Load 工程實作，等待使用者手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。目前前端是文字探索頁。
 
@@ -31,7 +31,7 @@ npm run db:migrate:dry-run
 npm run db:migrate
 ```
 
-在 `docker compose ps` 確認 `db` 變成 `healthy` 後執行 migration。dry-run 只顯示預計執行的 SQL；正式命令會建立 `game_states` 與 migration 紀錄表。再次執行 `npm run db:migrate` 應顯示沒有待執行的 migration。若已有自己的 PostgreSQL，可提供相應 `DATABASE_URL`，但仍須先執行 migration；請勿對含有重要資料的現有資料庫進行本階段測試。
+在 `docker compose ps` 確認 `db` 變成 `healthy` 後執行 migration。dry-run 只顯示預計執行的 SQL；正式命令會依序建立 `game_states`、Phase 10 的 `save_slots` 與 migration 紀錄表。再次執行 `npm run db:migrate` 應顯示沒有待執行的 migration。若已有自己的 PostgreSQL，可提供相應 `DATABASE_URL`，但仍須先執行 migration；請勿對含有重要資料的現有資料庫進行本階段測試。
 
 ### 3. 測試保存、重啟與版本衝突
 
@@ -86,7 +86,7 @@ curl -s http://127.0.0.1:3002/api/dev/domain
 
 完成後在 A 按 Ctrl+C，執行 `docker compose down` 停止資料庫並**保留資料**。只有你明確要刪除本專案的本機 PostgreSQL 資料時，才另行執行 `docker compose down --volumes`；**此命令會刪除具名 database volume**，不屬於一般停止流程。不要用它作為普通清理步驟。
 
-這兩個 `/api/dev/domain` 測試路由須明確設定 `DOMAIN_SANDBOX=1` 才開放；`DOMAIN_STORAGE=postgres` 才使用資料庫。未設定時沿用 Phase 3 的記憶體測試模式；production 不開放測試路由。正式登入、多角色與存檔介面尚未建立。
+這兩個 `/api/dev/domain` 測試路由須明確設定 `DOMAIN_SANDBOX=1` 才開放；`DOMAIN_STORAGE=postgres` 才使用資料庫。未設定時沿用 Phase 3 的記憶體測試模式；production 不開放測試路由。正式登入與多角色尚未建立；Phase 10 只提供目前單一工程 GameState 的三個手動存檔槽。
 
 ## Phase 5：文字模型介面手動檢查
 
@@ -266,7 +266,76 @@ Phase 9.5 只整理正式 React 探索頁的 layout 與 interaction。它不增�
 3. 開啟自由輸入，打開手機鍵盤後輸入並送出；textarea 應清空但保持展開，且不超出 viewport。
 4. 開啟任一工具面板，確認它接近全寬、可清楚關閉，且文字不被裁切。
 
-Phase 9.5 不包含 Save / Load、背包規則、裝備規則、隊伍資料或戰鬥。完成手動測試後請回報結果；Phase 10 不會自動開始。
+Phase 9.5 當時不包含 Save / Load、背包規則、裝備規則、隊伍資料或戰鬥；此階段其後已由使用者手動確認。Save / Load 由下一節的 Phase 10 單獨實作。
+
+## Phase 10：Manual Save / Load 手動測試
+
+Phase 10 提供三個手動存檔槽。Save 保存目前 authoritative GameState，不增加 live revision；Load 恢復舊內容，但視為現在發生的一次正式變更，因此 live revision 只從載入前版本增加一次。詳細契約見 [Phase 10 文件](docs/development/PHASE_10_SAVE_LOAD.md)。
+
+### Memory mode
+
+1. 停止舊服務，在專案根目錄執行：
+
+   ```sh
+   DOMAIN_STORAGE=memory NARRATION_FIXTURE_MODE=normal npm run dev
+   ```
+
+2. 開啟 <http://127.0.0.1:5173>，確認工程狀態是 `TEST-forest-edge`、revision `0`。點「系統」，確認存檔 1、2、3 都顯示「尚無存檔」，空槽只有「儲存」。
+3. 儲存到存檔 1。確認該槽顯示位置、保存時間、格式 v1、來源版本 `0`；頁面 live revision 仍為 `0`，而且不出現 interpretation 或 narration。
+4. 關閉系統面板，點「我慢慢走向森林裡的廢墟。」；確認位置變成 `TEST-ruin-entrance`、revision `1`。再點「我仔細查看門上的符號。」；確認 observation marker 是 `TEST-stone-door`、revision `2`。
+5. 重開系統面板，按存檔 1 的「載入」。在確認提示中按「確認載入」。確認位置恢復為 `TEST-forest-edge`、observation marker 恢復為「尚無」，但 revision 變成 `3`，不是存檔來源版本 `0`。
+6. 確認載入後第一個建議重新是「我慢慢走向森林裡的廢墟。」。舊的本頁探索紀錄應清除，並顯示「先前頁面中的探索紀錄未包含於目前存檔格式」的 deterministic 系統提示；Load 不產生 AI narration。
+7. 再次移動到 `TEST-ruin-entrance`，開啟系統面板並按存檔 1 的「覆蓋」。確認先出現覆蓋提示；取消一次，再重做並確認。Save 後 live revision 不應增加，slot 的 source revision 與位置應更新。
+8. 快速連按任一 Save／Load 確認按鈕，確認操作期間其他存檔按鈕停用，不會重複執行。用 Escape、× 或背景可關閉 drawer。
+
+### Memory restart
+
+Memory mode 保存任一存檔後，停止 `npm run dev` 並用相同命令重新啟動。三個 slot 會回到空槽，authoritative TEST state 也回到初始狀態；這是記憶體模式的預期行為。
+
+### Stale、空槽與安全失敗
+
+瀏覽器 UI 會使用目前 revision。若要直接測 stale protection，先在畫面或 `GET /api/exploration/state` 查出 live revision，再故意送出不同數字：
+
+```sh
+curl -i http://127.0.0.1:3001/api/save-slots/1 \
+  -X PUT \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":999}'
+
+curl -i http://127.0.0.1:3001/api/save-slots/2/load \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":0}'
+```
+
+第一個應回 HTTP 409 `stale-revision`；第二個在 Slot 2 仍空且 revision 符合時回 HTTP 404 `slot-empty`。若目前 revision 不是 `0`，把第二個 body 改為畫面顯示的版本。兩種失敗都不應修改 location、observation marker 或 revision。Slot `0`、`4`、`999`、`abc` 及含 `state`、`location`、`hp`、`snapshot` 等額外欄位的 request 都會安全拒絕。
+
+### PostgreSQL mode
+
+先按 Phase 4 流程建立 `.env`，啟動資料庫並執行新增 migration：
+
+```sh
+docker compose up -d db
+docker compose ps
+npm run db:migrate:dry-run
+npm run db:migrate
+```
+
+確認資料庫 healthy 後啟動：
+
+```sh
+DOMAIN_STORAGE=postgres NARRATION_FIXTURE_MODE=normal npm run dev
+```
+
+1. 在系統面板保存存檔 1，記下 `savedAt`、`sourceRevision` 與 location。
+2. 停止 API／開發服務，但不要執行 `docker compose down --volumes`。重新用相同命令啟動，確認存檔 1 仍存在。
+3. 讓 live state 改到另一個合法 TEST 狀態，載入存檔 1。確認載入內容正確，且 revision 只從載入前版本增加一次。
+4. 再次停止並重啟 API，確認載入後的 authoritative location、observation marker 與 revision 仍存在。
+5. 可在 API 運行時執行 `docker compose down` 模擬資料庫離線。Save／Load 應顯示安全繁體中文錯誤，live state 不應局部恢復或增加 revision；回應不應出現 SQL、connection URL、credentials 或 stack trace。用 `docker compose up -d db` 恢復服務。
+
+一般停止流程使用 `docker compose down`，會保留 named volume。只有明確要刪除本專案全部本機 PostgreSQL 資料與存檔槽時才使用 `docker compose down --volumes`。
+
+Phase 10 只保存 authoritative GameState。React drawer、textarea、candidate、narration、local exploration history、suggestion fixture、focus 與 loading 狀態都不保存。沒有 autosave、quicksave、刪除、雲端存檔、多 campaign、正式 LLM provider 或 combat 規則。手動測試完成後請回報結果；Phase 11 不會自動開始。
 
 ## 安裝與啟動
 

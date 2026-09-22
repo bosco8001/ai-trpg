@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0–9 已由使用者確認。Phase 9.5 工程完成，等待使用者手動確認；Phase 10 及其後尚未開始。
+Phase 0–9.5 已由使用者確認。Phase 10 已完成工程實作，等待使用者手動確認；Phase 11 及其後尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -151,4 +151,16 @@ Phase 9 其後已由使用者手動確認，包括正常敘事、拒絕、prompt
 
 新增 `src/web/exploration-ui.ts`、`src/web/ui/Icon.tsx`、`tests/exploration-ui.test.ts` 與 [Phase 9.5 文件](PHASE_9_5_EXPLORATION_UI.md)。修改探索頁、探索樣式、既有探索測試與 README。沒有修改 domain、server action service、shared API contract、PostgreSQL schema／repository、narration adapter 或 canonical rules。
 
-`npm run typecheck` 通過。`npm test` 共 65 項，其中 64 項通過、既有需隔離 `TEST_DATABASE_URL` 的 PostgreSQL integration test 略過。新增測試涵蓋五項 presentation-only 建議、建議仍經 action API、自由輸入送出後保持展開、工具面板開關與 Escape、以及 placeholder 沒有權威 state 欄位。其餘 Phase 1–9 測試均無 regression。Phase 9.5 等待使用者手動確認；不得開始 Phase 10。
+`npm run typecheck` 通過。`npm test` 共 65 項，其中 64 項通過、既有需隔離 `TEST_DATABASE_URL` 的 PostgreSQL integration test 略過。新增測試涵蓋五項 presentation-only 建議、建議仍經 action API、自由輸入送出後保持展開、工具面板開關與 Escape、以及 placeholder 沒有權威 state 欄位。其餘 Phase 1–9 測試均無 regression。Phase 9.5 其後已由使用者手動確認。
+
+## Phase 10 交付紀錄
+
+建立三個手動存檔槽與 Save Format v1。Save 只保存目前 authoritative GameState 內容並記錄 `sourceRevision`，不增加 live revision；Load 以 snapshot 內容取代目前 state，但 live revision 只從載入前版本增加一次，永不恢復舊版本。Save／Load 都要求 `expectedRevision`，stale、空槽、損壞資料、不支援版本與 repository failure 均不修改權威狀態。
+
+新增 `src/server/save-game/`、`src/shared/save-game.ts`、`src/web/SaveSlotsPanel.tsx`、`migrations/002_save_slots.mjs`、`tests/save-game.test.ts` 與 [Phase 10 文件](PHASE_10_SAVE_LOAD.md)。修改 domain state replacement 邊界、session、server composition、frontend API／探索頁／樣式及相關文件。System drawer 現在可列出、保存、確認覆蓋及確認載入；Load 後以前端收到的 authoritative state 更新工程摘要與建議，並清除不在存檔格式內的 local exploration history。
+
+Memory repository 供不連資料庫的測試與開發；API restart 後其存檔消失。PostgreSQL repository 使用新增的 `save_slots` table 保存 slot、format version、source revision、JSONB snapshot 與 backend timestamp；條件式 SQL 與既有 `GameStateRepository` 共同維持 optimistic concurrency。正式 provider、conversation／narration persistence、autosave、刪除、多 campaign 與 combat 均未加入。
+
+`npm run typecheck` 與 `npm run build` 通過；Vite 與 server TypeScript 均成功建置。`npm test` 共 79 項，其中 77 項通過；兩項需要明確提供隔離 `TEST_DATABASE_URL` 的 PostgreSQL integration test 依既有安全策略略過。`npm run db:migrate:dry-run` 成功產生 `002_save_slots` 的預期 SQL；`node --check migrations/002_save_slots.mjs` 與 `git diff --check` 通過。沒有對一般本機資料庫執行會寫入或清除資料的整合測試。
+
+Phase 10 等待使用者手動確認；不得開始 Phase 11。

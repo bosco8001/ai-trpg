@@ -82,8 +82,8 @@ export const utilityPanels: Readonly<Record<UtilityPanelId, UtilityPanelContent>
   },
   system: {
     title: "系統",
-    description: "這裡只保留未來系統功能的位置。",
-    items: ["Save / Load：尚未接入（Phase 10）", "顯示設定：尚未接入"],
+    description: "手動 Save / Load 與系統功能。",
+    items: ["顯示設定：尚未接入"],
   },
 };
 

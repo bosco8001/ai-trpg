@@ -2,9 +2,11 @@ import { useEffect, useReducer, useRef, useState, type KeyboardEvent as ReactKey
 import { Button } from "./ui/Button.js";
 import { Icon, type IconName } from "./ui/Icon.js";
 import { Panel } from "./ui/Panel.js";
-import { executeExplorationAction, loadExplorationState } from "./api.js";
+import { executeExplorationAction, listSaveSlots, loadExplorationState, loadGame, saveGame } from "./api.js";
+import { SaveSlotsPanel, type SaveConfirmation } from "./SaveSlotsPanel.js";
 import { MAX_PLAYER_TEXT_LENGTH } from "../shared/interpretation.js";
 import type { ExplorationStateSummary } from "../shared/exploration-action.js";
+import type { SaveSlotId, SaveSlotSummary } from "../shared/save-game.js";
 import {
   actionComposerReducer,
   getSuggestedActions,
@@ -16,6 +18,7 @@ import {
 } from "./exploration-ui.js";
 import {
   initialNarrativeEntries,
+  narrativeEntriesAfterLoad,
   describeCandidate,
   describeRuling,
   isSubmittableAction,
@@ -83,12 +86,18 @@ export function ExplorationPage({
   const [feedback, setFeedback] = useState("介面測試模式：輸入只會暫存在這個頁面。 ");
   const [isProcessing, setIsProcessing] = useState(false);
   const [gameState, setGameState] = useState<ExplorationStateSummary | null>(null);
+  const [saveSlots, setSaveSlots] = useState<readonly SaveSlotSummary[] | null>(null);
+  const [saveSlotsLoading, setSaveSlotsLoading] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState("");
+  const [saveConfirmation, setSaveConfirmation] = useState<SaveConfirmation | null>(null);
+  const [busySlotId, setBusySlotId] = useState<SaveSlotId | null>(null);
   const entryId = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const utilityTriggerRef = useRef<HTMLButtonElement>(null);
   const processingRef = useRef(false);
+  const saveOperationRef = useRef(false);
   const submittedCount = entries.length - initialNarrativeEntries.length;
   const suggestedActions = getSuggestedActions(gameState?.locationId ?? "TEST-forest-edge");
 
@@ -127,8 +136,61 @@ export function ExplorationPage({
     };
   }, [activeUtility]);
 
+  useEffect(() => {
+    if (activeUtility !== "system") return;
+    let disposed = false;
+    setSaveSlotsLoading(true);
+    setSaveFeedback("");
+    void listSaveSlots()
+      .then((response) => { if (!disposed) setSaveSlots(response.slots); })
+      .catch((error: unknown) => {
+        if (!disposed) setSaveFeedback(error instanceof Error ? error.message : "存檔列表暫時無法使用。");
+      })
+      .finally(() => { if (!disposed) setSaveSlotsLoading(false); });
+    return () => { disposed = true; };
+  }, [activeUtility]);
+
   function closeUtilityPanel() {
+    setSaveConfirmation(null);
     dispatchUtility({ type: "close" });
+  }
+
+  function updateSlot(updated: Extract<SaveSlotSummary, { empty: false }>) {
+    setSaveSlots((current) => current?.map((slot) => slot.slotId === updated.slotId ? updated : slot) ?? null);
+  }
+
+  function refreshSaveStateAfterFailure() {
+    void loadExplorationState().then(setGameState).catch(() => undefined);
+    void listSaveSlots().then((response) => setSaveSlots(response.slots)).catch(() => undefined);
+  }
+
+  function runSaveOperation(kind: "save" | "load", slotId: SaveSlotId) {
+    if (!gameState || saveOperationRef.current) return;
+    saveOperationRef.current = true;
+    setBusySlotId(slotId);
+    setSaveFeedback(kind === "save" ? `正在儲存存檔 ${slotId}……` : `正在載入存檔 ${slotId}……`);
+    const operation = kind === "save"
+      ? saveGame(slotId, gameState.revision)
+      : loadGame(slotId, gameState.revision);
+    void operation.then((response) => {
+      updateSlot(response.slot);
+      setGameState(response.state);
+      setSaveConfirmation(null);
+      if (kind === "load") {
+        setEntries(narrativeEntriesAfterLoad(slotId));
+        dispatchComposer({ type: "submitted" });
+        setFeedback(`已載入存檔 ${slotId}；本頁舊探索紀錄已清除。`);
+        setSaveFeedback(`已載入存檔 ${slotId}。權威狀態版本現在是 ${response.state.revision}。`);
+      } else {
+        setSaveFeedback(`存檔 ${slotId} 已儲存；live revision 維持 ${response.state.revision}。`);
+      }
+    }).catch((error: unknown) => {
+      setSaveFeedback(error instanceof Error ? error.message : "存檔操作暫時無法完成。");
+      refreshSaveStateAfterFailure();
+    }).finally(() => {
+      saveOperationRef.current = false;
+      setBusySlotId(null);
+    });
   }
 
   function submitAction(rawText: string, source: "composer" | "suggestion") {
@@ -284,8 +346,30 @@ export function ExplorationPage({
               <div><p className="exploration-panel__eyebrow">工具面板</p><h2 id="utility-panel-heading">{activePanel.title}</h2></div>
               <button ref={drawerCloseRef} className="utility-drawer__close" type="button" aria-label={`關閉${activePanel.title}面板`} title="關閉" onClick={closeUtilityPanel}><Icon name="close" /></button>
             </div>
-            <p>{activePanel.description}</p>
-            <ul className="utility-drawer__list">{activePanel.items.map((item) => <li key={item}>{item}</li>)}</ul>
+            {activeUtility === "system" ? (
+              <SaveSlotsPanel
+                slots={saveSlots}
+                loading={saveSlotsLoading}
+                busySlotId={busySlotId}
+                feedback={saveFeedback}
+                confirmation={saveConfirmation}
+                onSave={(slot) => {
+                  if (slot.empty) runSaveOperation("save", slot.slotId);
+                  else setSaveConfirmation({ kind: "overwrite", slotId: slot.slotId });
+                }}
+                onLoad={(slotId) => setSaveConfirmation({ kind: "load", slotId })}
+                onConfirm={() => {
+                  if (!saveConfirmation) return;
+                  runSaveOperation(saveConfirmation.kind === "overwrite" ? "save" : "load", saveConfirmation.slotId);
+                }}
+                onCancel={() => setSaveConfirmation(null)}
+              />
+            ) : (
+              <>
+                <p>{activePanel.description}</p>
+                <ul className="utility-drawer__list">{activePanel.items.map((item) => <li key={item}>{item}</li>)}</ul>
+              </>
+            )}
           </aside>
         </div>
       ) : null}
