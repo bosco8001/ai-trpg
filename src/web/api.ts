@@ -13,6 +13,12 @@ import {
   type SaveSlotId,
   type SaveSlotsResponse,
 } from "../shared/save-game.js";
+import {
+  isAuthoritativeGameStateResponse,
+  isCombatSandboxAdvanceResponse,
+  type AuthoritativeGameStateResponse,
+  type CombatSandboxAdvanceResponse,
+} from "../shared/game-state.js";
 
 export async function checkApiHealth(
   signal: AbortSignal,
@@ -60,6 +66,54 @@ export async function loadExplorationState(fetcher: typeof fetch = fetch): Promi
   if (!response.ok) throw new Error("暫時無法讀取權威探索狀態。");
   const body: unknown = await response.json();
   if (!isExplorationStateSummary(body)) throw new Error("權威探索狀態格式不正確。");
+  return body;
+}
+
+/** 讀取切換探索／戰鬥畫面所需的權威快照；前端不自行推算 combat state。 */
+export async function loadAuthoritativeGameState(
+  fetcher: typeof fetch = fetch,
+): Promise<AuthoritativeGameStateResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/game-state", { cache: "no-store" });
+  } catch {
+    throw new Error("目前無法讀取戰鬥狀態。");
+  }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("戰鬥狀態回應格式不正確。");
+  }
+  if (!isAuthoritativeGameStateResponse(body)) throw new Error("戰鬥狀態回應格式不正確。");
+  return body;
+}
+
+/** 只供 COMBAT_SANDBOX 的工程按鈕使用；正式玩家指令尚未建立。 */
+export async function advanceTestCombatTurn(
+  expectedRevision: number,
+  fetcher: typeof fetch = fetch,
+): Promise<CombatSandboxAdvanceResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/dev/combat/advance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("目前無法推進 TEST 戰鬥回合。");
+  }
+  if (!response.ok) throw await saveApiError(response, "目前無法推進 TEST 戰鬥回合。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("TEST 戰鬥回應格式不正確。");
+  }
+  if (!isCombatSandboxAdvanceResponse(body)) throw new Error("TEST 戰鬥回應格式不正確。");
   return body;
 }
 

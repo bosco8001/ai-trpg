@@ -19,6 +19,7 @@ import { RandomD20Roller } from "./combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "./combat/fixtures.js";
 import { createCombatService } from "./combat/service.js";
 import { registerCombatSandbox } from "./combat/routes.js";
+import { registerGameStateRoute } from "./game-state-route.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -40,11 +41,14 @@ export async function buildApp(options: {
     : createDomainSession(createTestGameState()));
   const saveGameRepository = options.saveGameRepository
     ?? new InMemorySaveGameRepository(() => session.getState());
+  const combatSandboxEnabled = options.combatSandbox === true && process.env.NODE_ENV !== "production";
+
+  registerGameStateRoute(app, session, storage, combatSandboxEnabled);
 
   if (options.domainSandbox && process.env.NODE_ENV !== "production") {
     registerDomainSandbox(app, session, storage);
   }
-  if (options.combatSandbox && process.env.NODE_ENV !== "production") {
+  if (combatSandboxEnabled) {
     registerCombatSandbox(app, createCombatService(
       session,
       TEST_COMBAT_PARTICIPANTS,

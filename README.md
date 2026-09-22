@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–10 已由使用者確認。Phase 11 已完成戰鬥回合與先攻引擎的工程實作，等待使用者手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–11 已由使用者確認。Phase 12 已完成 Responsive Combat UI Skeleton 的工程實作，等待使用者手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。目前前端是文字探索頁。
 
@@ -512,7 +512,64 @@ npm run dev:api
 6. 用相同命令重新啟動，再次 GET。
 7. 確認所有 combat state 與 revision 保持一致。
 
-請使用沒有重要資料的本機測試資料庫。若資料庫已停留在 active combat，本階段沒有 End Combat；不要嘗試用 Save／Load 繞過。Phase 11 完成後等待你的手動驗收，不會自動開始 Phase 12。
+請使用沒有重要資料的本機測試資料庫。若資料庫已停留在 active combat，本階段沒有 End Combat；不要嘗試用 Save／Load 繞過。Phase 11 已由使用者手動確認。
+
+## Phase 12：Responsive Combat UI Skeleton 手動測試
+
+Phase 12 將 Phase 11 的 authoritative CombatState 顯示為戰鬥畫面；沒有攻擊、傷害、HP／MP、targeting、技能執行或 combat narration。完整邊界見 [Phase 12 文件](docs/development/PHASE_12_COMBAT_UI.md)。四排位置是 presentation-only TEST fixture，不是正式前後排規則。
+
+### 進入戰鬥畫面
+
+以正常 fixture 啟動完整網站：
+
+```sh
+DOMAIN_STORAGE=memory \
+COMBAT_SANDBOX=1 \
+COMBAT_ROLL_FIXTURE_MODE=normal \
+NARRATION_FIXTURE_MODE=normal \
+npm run dev
+```
+
+先開啟 <http://127.0.0.1:5173>，確認仍是原本探索頁。另一個終端機開始 TEST combat：
+
+```sh
+curl -s http://127.0.0.1:3001/api/dev/combat/start \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":0}'
+```
+
+重新整理瀏覽器。畫面應切換到 `TEST 戰鬥`，並顯示：
+
+- 第 1 回合。
+- 目前行動：`TEST 敵人 1`。
+- 權威順序：`TEST 敵人 1 → TEST 玩家 → TEST 敵人 2`。
+- 四排：敵方後排、敵方前排、我方前排、我方後排。
+- 戰況、戰鬥敘事 placeholder、唯讀技能與全部 disabled 的指令。
+
+不要預期 HP、MP、傷害、選目標、攻擊成功或 AI 戰鬥敘事。
+
+### TEST 推進回合
+
+只有 `COMBAT_SANDBOX=1` 時，右側工程測試區會出現「TEST：推進下一回合」。依序按三次，確認畫面每次都由後端回傳的新 state 更新：
+
+```text
+Round 1 / TEST 敵人 1 / revision 1
+Round 1 / TEST 玩家 / revision 2
+Round 1 / TEST 敵人 2 / revision 3
+Round 2 / TEST 敵人 1 / revision 4
+```
+
+確認 header、turn order 與 participant card 的「目前行動」標記同時改變。重新整理瀏覽器後，Memory API 尚未停止時應保留相同 combat state。
+
+### Layout、鍵盤與錯誤
+
+1. 桌面寬度確認 battlefield 比右側資訊欄寬；頁面沒有水平捲動。
+2. 在約 375px 寬度確認改為單欄：header、turn order、battlefield、右側資訊依序向下，沒有整頁水平捲動。
+3. 在 200% browser zoom 確認 participant 名稱、目前行動與 disabled 指令仍可讀，內容不互相覆蓋。
+4. 用 Tab 確認「重新讀取戰鬥狀態」與 TEST 按鈕有明顯 focus；disabled command 不可執行。
+5. 在 Combat UI 顯示時停止 API，按「重新讀取戰鬥狀態」。應出現安全繁體中文錯誤與重試入口，不應顯示 stack、SQL、網址或 network detail。
+
+Phase 12 沒有 migration，也不保存 UI layout、scroll position 或 TEST placement。完成後等待你的手動驗收，不會自動開始 Phase 13。
 
 ## 安裝與啟動
 

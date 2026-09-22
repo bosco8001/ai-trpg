@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0–10 已由使用者確認。Phase 11 已完成工程實作，等待使用者手動確認；Phase 12 及其後尚未開始。
+Phase 0–11 已由使用者確認。Phase 12 已完成工程實作，等待使用者手動確認；Phase 13 及其後尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -173,4 +173,14 @@ Phase 10 其後已由使用者手動確認，包括 Memory／PostgreSQL 保存�
 
 CombatState 沿用 `game_states` JSONB，不新增 migration；舊 snapshot 缺少 combat 時安全補為 `null`。Save Format v1 不升版且不包含 CombatState。戰鬥中的 Save／Load 暫時回 `combat-not-supported`，只是避免遺失狀態的工程防護；正式政策仍列在 OPEN_QUESTIONS。
 
-工程檢查結果：`npm test` 共 94 項，91 項通過、3 項因未提供隔離的 `TEST_DATABASE_URL` 而安全略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有新 migration。Phase 11 等待使用者手動確認；不得開始 Phase 12。
+工程檢查結果：`npm test` 共 94 項，91 項通過、3 項因未提供隔離的 `TEST_DATABASE_URL` 而安全略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有新 migration。Phase 11 其後已由使用者手動確認。
+
+## Phase 12 交付紀錄
+
+新增前端唯讀權威狀態 contract 與 `GET /api/game-state`，讓 application 層依 `activity` 切換 Exploration UI 或 Combat UI；所有 API JSON 都先經 shared runtime validation。新增 CombatPage，直接顯示 Phase 11 的 Round、current actor、turn order、participants 與 initiative，不由 React 重算排序。四排戰場使用明確 TEST presentation fixture，沒有寫回 GameState、PostgreSQL 或 revision。
+
+右側提供戰況、無 LLM 的戰鬥敘事 placeholder、唯讀已裝備技能與六個 native disabled 指令。`COMBAT_SANDBOX=1` 才顯示「TEST：推進下一回合」，它只呼叫既有 dev route 並採用 backend 回傳 state。沒有攻擊、HP／MP、target、row movement、combat narration 或任何新 domain rule。桌面使用 battlefield + right rail；窄螢幕改為單欄。Phase 2 tokens、focus ring、safe-area、touch target 與 reduced-motion 設定繼續沿用。
+
+新增 `src/shared/game-state.ts`、`src/server/game-state-route.ts`、`src/web/CombatPage.tsx`、`src/web/combat-ui.ts`、`tests/combat-ui.test.ts` 與 [Phase 12 文件](PHASE_12_COMBAT_UI.md)。修改 App、frontend API、server composition、樣式、README 與本計畫。沒有 migration、table 或 authoritative state schema 變更。
+
+工程檢查結果：`npm test` 共 103 項，100 項通過、3 項因未提供隔離的 `TEST_DATABASE_URL` 而安全略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有新 migration。Phase 12 等待使用者手動確認；不得開始 Phase 13。
