@@ -20,11 +20,17 @@ export type ExplorationRuling =
       | "target-not-found" | "stale-revision" | "invalid-candidate" | "action-not-allowed"
       | "revision-limit"; readonly message: string };
 
+export type NarrationPresentation =
+  | { readonly status: "ready"; readonly text: string }
+  | { readonly status: "not-requested"; readonly text: null }
+  | { readonly status: "timeout" | "unavailable" | "malformed-response"; readonly text: string };
+
 export interface ExplorationActionResponse {
   readonly mode: "test-fixture";
   readonly candidate: CandidateAction;
   readonly ruling: ExplorationRuling;
   readonly state: ExplorationStateSummary;
+  readonly narration: NarrationPresentation;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -68,8 +74,20 @@ function isRuling(value: unknown): value is ExplorationRuling {
     && typeof value.message === "string" && value.message.trim().length > 0;
 }
 
+function isNarration(value: unknown): value is NarrationPresentation {
+  if (!isRecord(value) || !exact(value, ["status", "text"])) return false;
+  if (value.status === "not-requested") return value.text === null;
+  if (value.status !== "ready" && value.status !== "timeout" && value.status !== "unavailable"
+    && value.status !== "malformed-response") return false;
+  return typeof value.text === "string" && value.text.trim() === value.text
+    && Array.from(value.text).length > 0 && Array.from(value.text).length <= 600;
+}
+
 export function isExplorationActionResponse(value: unknown): value is ExplorationActionResponse {
-  return isRecord(value) && exact(value, ["mode", "candidate", "ruling", "state"])
+  return isRecord(value) && exact(value, ["mode", "candidate", "ruling", "state", "narration"])
     && value.mode === "test-fixture" && isCandidateAction(value.candidate)
-    && isRuling(value.ruling) && isExplorationStateSummary(value.state);
+    && isRuling(value.ruling) && isExplorationStateSummary(value.state)
+    && isNarration(value.narration)
+    && (value.ruling.accepted ? value.narration.status !== "not-requested"
+      : value.narration.status === "not-requested");
 }

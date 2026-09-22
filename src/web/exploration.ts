@@ -54,8 +54,8 @@ export function appendLocalExplorationAction(
     {
       id: `${id}-response`,
       source: "system",
-      label: "解析提示",
-      text: "已記錄你的文字，正在取得固定測試解析；尚未進行規則驗證或狀態更新。",
+      label: "處理提示",
+      text: "已記錄你的文字，正在依序進行候選解析、權威裁定與固定測試敘事。",
     },
   ];
 }
@@ -75,7 +75,7 @@ export function submitLocalExplorationAction(
   return {
     entries: appendLocalExplorationAction(entries, value),
     input: "",
-    feedback: "已加入探索紀錄，正在取得候選解析；尚未更新遊戲狀態。",
+    feedback: "已加入探索紀錄，正在解析、裁定並整理敘事……",
   };
 }
 

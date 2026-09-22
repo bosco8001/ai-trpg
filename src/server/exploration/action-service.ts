@@ -3,9 +3,11 @@ import type {
   ExplorationActionResponse,
   ExplorationRuling,
   ExplorationStateSummary,
+  NarrationPresentation,
 } from "../../shared/exploration-action.js";
 import type { ActionInterpreter } from "../interpretation/interpreter.js";
 import type { GameStateSession } from "../domain-session.js";
+import { NarrationFailure, type ExplorationNarrator } from "../narration/contracts.js";
 
 export interface ExplorationActionService {
   getState(): Promise<ExplorationStateSummary>;
@@ -29,11 +31,45 @@ function commandRejection(code: RejectionCode, message: string): ExplorationRuli
   return { accepted: false, code: publicCode, message };
 }
 
+const noNarration = { status: "not-requested", text: null } as const;
+const narrationFallbackText = "行動已完成，但探索敘事暫時無法產生。";
+
+async function narrateTransition(
+  narrator: ExplorationNarrator | undefined,
+  before: GameState,
+  transition: Extract<Awaited<ReturnType<GameStateSession["execute"]>>, { ok: true }>,
+): Promise<NarrationPresentation> {
+  if (!narrator) return { status: "unavailable", text: narrationFallbackText };
+  try {
+    const request = transition.effect.type === "location-changed"
+      ? {
+          type: "location-changed" as const,
+          fromLocationId: before.exploration.locationId,
+          toLocationId: transition.effect.locationId,
+        }
+      : transition.effect.type === "target-inspected"
+        ? {
+            type: "target-inspected" as const,
+            locationId: transition.state.exploration.locationId,
+            targetId: transition.effect.targetId,
+          }
+        : undefined;
+    if (!request) throw new NarrationFailure("invalid-request");
+    const result = await narrator.narrate(request);
+    return { status: "ready", text: result.text };
+  } catch (error) {
+    const status = error instanceof NarrationFailure && error.code !== "invalid-request"
+      ? error.code : "malformed-response";
+    return { status, text: narrationFallbackText };
+  }
+}
+
 /** Phase 7 只提供 candidate；本服務透過 deterministic domain boundary 才能改狀態。 */
 export function createExplorationActionService(
   interpreter: ActionInterpreter,
   session: GameStateSession,
   storage: "memory" | "postgres",
+  narrator?: ExplorationNarrator,
 ): ExplorationActionService {
   return {
     async getState() {
@@ -48,6 +84,7 @@ export function createExplorationActionService(
           mode: "test-fixture", candidate,
           ruling: { accepted: false, code: validation.code, message: validation.message },
           state: summary(before, storage),
+          narration: noNarration,
         };
       }
       const transition = await session.execute(validation.command);
@@ -57,6 +94,7 @@ export function createExplorationActionService(
           mode: "test-fixture", candidate,
           ruling: commandRejection(transition.code, transition.message),
           state: summary(current, storage),
+          narration: noNarration,
         };
       }
       if (transition.effect.type !== "location-changed" && transition.effect.type !== "target-inspected") {
@@ -66,6 +104,7 @@ export function createExplorationActionService(
         mode: "test-fixture", candidate,
         ruling: { accepted: true, code: "accepted", effect: transition.effect },
         state: summary(transition.state, storage),
+        narration: await narrateTransition(narrator, before, transition),
       };
     },
   };

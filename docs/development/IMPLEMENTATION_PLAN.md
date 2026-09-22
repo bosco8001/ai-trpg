@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0–7 已由使用者確認。Phase 8 工程完成，等待使用者手動確認；其餘尚未開始。
+Phase 0–9 已由使用者確認。Phase 9.5 工程完成，等待使用者手動確認；Phase 10 及其後尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -15,6 +15,7 @@ Phase 0–7 已由使用者確認。Phase 8 工程完成，等待使用者手動
 | 7 | 自然語言 action interpretation |
 | 8 | Validation → authoritative state update |
 | 9 | 文字探索 narration integration |
+| 9.5 | 已確認探索頁 layout／interaction 的 React alignment |
 | 10 | 探索流程 save/load |
 | 11 | 戰鬥回合與先攻引擎 |
 | 12 | Responsive Combat UI 骨架 |
@@ -132,4 +133,22 @@ Phase 7 其後已由使用者手動確認。
 
 `npm run typecheck`、`npm run build` 與 `git diff --check` 通過。`npm test` 共 48 項，其中 47 項通過；需明確提供隔離 `TEST_DATABASE_URL` 的既有 PostgreSQL integration test 略過。其餘測試涵蓋完整 API 管線、位置與觀察 transition、revision、所有拒絕不改狀態、request／candidate／command／response runtime validation、舊 snapshot 相容與異常 exploration snapshot 拒絕，以及安全 repository 錯誤。
 
-Phase 8 等待使用者手動確認；不得自動進入 Phase 9。
+Phase 8 其後已由使用者手動確認，包括 PostgreSQL persistence 驗收。
+
+## Phase 9 交付紀錄
+
+在 Phase 8 transition 成功並提交後，才把最小 authoritative facts 交給 `ExplorationNarrator`。Narrator 重用 Phase 5 `LanguageModel`，固定 adapter 不連網、不需金鑰。模型輸出必須是 exact `{ text }` JSON，並通過長度、段落、必要 TEST 目標與保守事實 guard。被拒絕的 action 不呼叫 narrator；timeout、unavailable 或 malformed response 只產生安全 fallback，不 rollback 或重做已成功命令。
+
+新增 `src/server/narration/`、`tests/narration.test.ts` 與 [Phase 9 文件](PHASE_9_EXPLORATION_NARRATION.md)。修改 action service、共用 response contract、server composition、固定模式設定、探索 UI 與相關文件。沒有修改 authoritative domain rules、PostgreSQL schema 或 migration，也沒有保存 narration。
+
+`npm run typecheck`、`npm run build` 與 `git diff --check` 通過。`npm test` 共 61 項，其中 60 項通過；需明確提供隔離 `TEST_DATABASE_URL` 的既有 PostgreSQL integration test 略過。Narration 測試涵蓋移動、觀察、authoritative-only input、prompt injection 隔離、exact response、consistency guard、rejection 不呼叫、三種失敗、commit 後 fallback、無 double execution、repository 已保存狀態與安全錯誤。
+
+Phase 9 其後已由使用者手動確認，包括正常敘事、拒絕、prompt injection、unavailable、timeout、malformed，以及 PostgreSQL 下敘事失敗不影響 authoritative state。
+
+## Phase 9.5 交付紀錄
+
+只重整正式 React exploration UI：故事紀錄下方新增五個可點選的固定測試建議、緊湊圓形工具列、預設收起且可連續送出的自由輸入，以及右側 placeholder 工具面板。建議 contract 只有 `id` 與自然語言 `text`；按鈕仍使用原本 action API，因此完整經過 Phase 7 candidate、Phase 8 deterministic validation／revision 與 Phase 9 narration。建議與工具面板都沒有 command、成功結果或 state mutation 能力。
+
+新增 `src/web/exploration-ui.ts`、`src/web/ui/Icon.tsx`、`tests/exploration-ui.test.ts` 與 [Phase 9.5 文件](PHASE_9_5_EXPLORATION_UI.md)。修改探索頁、探索樣式、既有探索測試與 README。沒有修改 domain、server action service、shared API contract、PostgreSQL schema／repository、narration adapter 或 canonical rules。
+
+`npm run typecheck` 通過。`npm test` 共 65 項，其中 64 項通過、既有需隔離 `TEST_DATABASE_URL` 的 PostgreSQL integration test 略過。新增測試涵蓋五項 presentation-only 建議、建議仍經 action API、自由輸入送出後保持展開、工具面板開關與 Escape、以及 placeholder 沒有權威 state 欄位。其餘 Phase 1–9 測試均無 regression。Phase 9.5 等待使用者手動確認；不得開始 Phase 10。

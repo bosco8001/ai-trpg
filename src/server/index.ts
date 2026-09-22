@@ -5,6 +5,8 @@ import { PostgresGameStateRepository } from "./postgres-game-state-repository.js
 import { createLanguageModel } from "./llm/language-model.js";
 import { createActionInterpreter } from "./interpretation/interpreter.js";
 import { FixtureInterpretationAdapter } from "./interpretation/fixture-adapter.js";
+import { createExplorationNarrator } from "./narration/narrator.js";
+import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
 
 const port = Number(process.env.PORT ?? 3001);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -13,11 +15,16 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 
 const domainSandbox = process.env.DOMAIN_SANDBOX === "1" && process.env.NODE_ENV !== "production";
 const storage = process.env.DOMAIN_STORAGE ?? "memory";
+const narrationMode = process.env.NARRATION_FIXTURE_MODE ?? "normal";
 if (storage !== "memory" && storage !== "postgres") {
   throw new Error("DOMAIN_STORAGE 只接受 memory 或 postgres。");
 }
 if (storage === "postgres" && !process.env.DATABASE_URL) {
   throw new Error("PostgreSQL 測試模式需要 DATABASE_URL。請建立 .env。");
+}
+if (narrationMode !== "normal" && narrationMode !== "unavailable"
+  && narrationMode !== "timeout" && narrationMode !== "malformed") {
+  throw new Error("NARRATION_FIXTURE_MODE 只接受 normal、unavailable、timeout 或 malformed。");
 }
 const pool = storage === "postgres"
   ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 3000 })
@@ -30,6 +37,9 @@ const app = await buildApp({
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },
+  )),
+  narrator: createExplorationNarrator(createLanguageModel(
+    new FixtureNarrationAdapter(narrationMode as NarrationFixtureMode), { timeoutMs: 250 },
   )),
   webRoot: process.env.NODE_ENV === "production"
     ? fileURLToPath(new URL("../web/", import.meta.url))

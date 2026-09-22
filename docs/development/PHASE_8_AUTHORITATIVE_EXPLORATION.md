@@ -1,5 +1,7 @@
 # Phase 8：Deterministic Validation 與權威探索狀態
 
+> Phase 8 已由使用者手動確認，包括 PostgreSQL persistence。目前 Phase 9 已在成功 authoritative result 之後加入 presentation-only 敘事。
+
 這一階段像裁判接過翻譯員的表格。裁判只接受明確、可驗證的工程動作，通過後才更新唯一有效的記分板。翻譯員與玩家文字都不能直接改記分板。
 
 ## 權威管線
@@ -57,7 +59,7 @@ Phase 7 的 `/api/interpret` 仍只解析。Phase 8 的 `POST /api/exploration/a
 - Phase 9：把已確定的 structured result 交給 LLM 產生探索敘述；LLM 仍不能修改結果。
 - 正式 LLM provider、完整探索分類、正式地點與目標、地圖、技能檢定、擲骰、背包、NPC、任務、戰鬥及 save/load UI 都不在本階段。
 
-完整手動測試見 [README](../../README.md#phase-8權威探索裁定手動測試)。Phase 8 等待使用者手動確認；不得自動進入 Phase 9。
+完整手動測試見 [README](../../README.md#phase-8權威探索裁定手動測試)。Phase 8 其後已由使用者手動確認。
 
 ## 工程檢查
 

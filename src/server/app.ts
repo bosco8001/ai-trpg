@@ -9,6 +9,7 @@ import { createDomainSession, createPersistedDomainSession, type GameStateSessio
 import { createTestGameState } from "./test-game-state.js";
 import { createExplorationActionService } from "./exploration/action-service.js";
 import { registerExplorationRoutes } from "./exploration/routes.js";
+import type { ExplorationNarrator } from "./narration/contracts.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -18,6 +19,7 @@ export async function buildApp(options: {
   interpreter?: ActionInterpreter;
   domainSession?: GameStateSession;
   storage?: "memory" | "postgres";
+  narrator?: ExplorationNarrator;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
@@ -30,7 +32,9 @@ export async function buildApp(options: {
   }
   if (options.interpreter) {
     registerInterpretationRoute(app, options.interpreter);
-    registerExplorationRoutes(app, createExplorationActionService(options.interpreter, session, storage));
+    registerExplorationRoutes(app, createExplorationActionService(
+      options.interpreter, session, storage, options.narrator,
+    ));
   }
 
   app.get<{ Reply: HealthResponse }>("/api/health", {

@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Button } from "./ui/Button.js";
+import { Icon, type IconName } from "./ui/Icon.js";
 import { Panel } from "./ui/Panel.js";
 import { executeExplorationAction, loadExplorationState } from "./api.js";
 import { MAX_PLAYER_TEXT_LENGTH } from "../shared/interpretation.js";
 import type { ExplorationStateSummary } from "../shared/exploration-action.js";
+import {
+  actionComposerReducer,
+  getSuggestedActions,
+  initialActionComposerState,
+  isUtilityDismissKey,
+  utilityPanelReducer,
+  utilityPanels,
+  type UtilityPanelId,
+} from "./exploration-ui.js";
 import {
   initialNarrativeEntries,
   describeCandidate,
@@ -22,6 +32,13 @@ const connectionLabels: Record<ConnectionState, string> = {
   unavailable: "服務目前無法連線",
 };
 
+const utilityTools: readonly { id: UtilityPanelId; label: string; icon: IconName }[] = [
+  { id: "inventory", label: "背包", icon: "backpack" },
+  { id: "equipment", label: "裝備", icon: "equipment" },
+  { id: "party", label: "隊伍", icon: "party" },
+  { id: "system", label: "系統", icon: "settings" },
+];
+
 function NarrativeHistory({ entries }: { entries: readonly NarrativeEntry[] }) {
   return (
     <ol className="narrative-history" aria-label="探索紀錄">
@@ -35,6 +52,24 @@ function NarrativeHistory({ entries }: { entries: readonly NarrativeEntry[] }) {
   );
 }
 
+function trapDrawerFocus(event: ReactKeyboardEvent<HTMLElement>) {
+  if (event.key !== "Tab") return;
+  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+    "button:not([disabled]), [href], textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+  ));
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!first || !last) return;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 export function ExplorationPage({
   connectionState,
   onRetryConnection,
@@ -43,14 +78,19 @@ export function ExplorationPage({
   onRetryConnection?: () => void;
 }) {
   const [entries, setEntries] = useState<readonly NarrativeEntry[]>(initialNarrativeEntries);
-  const [action, setAction] = useState("");
+  const [composer, dispatchComposer] = useReducer(actionComposerReducer, initialActionComposerState);
+  const [activeUtility, dispatchUtility] = useReducer(utilityPanelReducer, null);
   const [feedback, setFeedback] = useState("介面測試模式：輸入只會暫存在這個頁面。 ");
-  const [isInterpreting, setIsInterpreting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [gameState, setGameState] = useState<ExplorationStateSummary | null>(null);
   const entryId = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  const utilityTriggerRef = useRef<HTMLButtonElement>(null);
+  const processingRef = useRef(false);
   const submittedCount = entries.length - initialNarrativeEntries.length;
+  const suggestedActions = getSuggestedActions(gameState?.locationId ?? "TEST-forest-edge");
 
   useEffect(() => {
     let disposed = false;
@@ -61,40 +101,64 @@ export function ExplorationPage({
   }, []);
 
   useEffect(() => {
-    if (submittedCount > 0) {
-      historyEndRef.current?.scrollIntoView({ block: "nearest" });
-    }
+    if (submittedCount > 0) historyEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [submittedCount]);
 
-  function submitAction() {
-    if (!isSubmittableAction(action) || isInterpreting || !gameState) return;
-    const text = action.trim();
+  useEffect(() => {
+    if (!composer.isOpen) return;
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [composer.isOpen]);
+
+  useEffect(() => {
+    if (!activeUtility) return;
+    const opener = utilityTriggerRef.current;
+    const frame = requestAnimationFrame(() => drawerCloseRef.current?.focus());
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isUtilityDismissKey(event.key)) return;
+      event.preventDefault();
+      dispatchUtility({ type: "close" });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKeyDown);
+      opener?.focus();
+    };
+  }, [activeUtility]);
+
+  function closeUtilityPanel() {
+    dispatchUtility({ type: "close" });
+  }
+
+  function submitAction(rawText: string, source: "composer" | "suggestion") {
+    if (!isSubmittableAction(rawText) || isProcessing || processingRef.current || !gameState) return;
+    const text = rawText.trim();
     const next = submitLocalExplorationAction(entries, text);
     setEntries(next.entries);
-    setAction("");
-    setFeedback(next.feedback ?? "正在取得候選解析。");
-    setIsInterpreting(true);
+    if (source === "composer") dispatchComposer({ type: "submitted" });
+    setFeedback(next.feedback ?? "正在解析、裁定並整理敘事……");
+    processingRef.current = true;
+    setIsProcessing(true);
     void executeExplorationAction(text, gameState.revision).then((response) => {
       entryId.current += 1;
       const id = entryId.current;
-      setEntries((current) => [...current,
-        {
-          id: `interpretation-${id}`,
-          source: "interpretation",
-          label: "候選解析（固定測試）",
-          text: describeCandidate(response.candidate),
-        },
-        {
-          id: `ruling-${id}`,
-          source: "ruling",
-          label: "系統裁定（權威）",
-          text: describeRuling(response.ruling),
-        },
-      ]);
+      const additions: NarrativeEntry[] = [
+        { id: `interpretation-${id}`, source: "interpretation", label: "候選解析（固定測試）", text: describeCandidate(response.candidate) },
+        { id: `ruling-${id}`, source: "ruling", label: "系統裁定（權威）", text: describeRuling(response.ruling) },
+      ];
+      if (response.narration.status === "ready") {
+        additions.push({ id: `narration-${id}`, source: "narration", label: "探索敘事（固定測試）", text: response.narration.text });
+      } else if (response.narration.status !== "not-requested") {
+        additions.push({ id: `narration-${id}`, source: "system", label: "探索敘事暫時不可用", text: response.narration.text });
+      }
+      setEntries((current) => [...current, ...additions]);
       setGameState(response.state);
-      setFeedback(response.ruling.accepted
-        ? "權威狀態已更新；尚未產生故事敘述。"
-        : "行動未執行；權威狀態未被這次請求修改。");
+      setFeedback(response.ruling.accepted && response.narration.status === "ready"
+        ? "權威狀態已更新，探索敘事已整理完成。"
+        : response.ruling.accepted
+          ? "權威狀態已更新；探索敘事暫時不可用。"
+          : "行動未執行；權威狀態未被這次請求修改。");
     }).catch(() => {
       entryId.current += 1;
       setEntries((current) => [...current, {
@@ -104,9 +168,14 @@ export function ExplorationPage({
         text: "探索解析或裁定暫時不可用；你的文字仍只在本頁紀錄，沒有更新遊戲狀態。",
       }]);
       setFeedback("探索解析或裁定暫時不可用；請稍後再試。");
-    }).finally(() => setIsInterpreting(false));
-    requestAnimationFrame(() => inputRef.current?.focus());
+    }).finally(() => {
+      processingRef.current = false;
+      setIsProcessing(false);
+    });
+    if (source === "composer") requestAnimationFrame(() => inputRef.current?.focus());
   }
+
+  const activePanel = activeUtility ? utilityPanels[activeUtility] : null;
 
   return (
     <main id="main-content" className="exploration-shell" tabIndex={-1}>
@@ -118,20 +187,9 @@ export function ExplorationPage({
             <p className="exploration-header__lede reading-copy">文字探索介面</p>
           </div>
           <div className="connection-brief" data-state={connectionState}>
-            <p role="status" aria-live="polite">
-              <span aria-hidden="true" className="connection-brief__marker" />
-              {connectionLabels[connectionState]}
-            </p>
+            <p role="status" aria-live="polite"><span aria-hidden="true" className="connection-brief__marker" />{connectionLabels[connectionState]}</p>
             {onRetryConnection ? (
-              <Button
-                className="connection-brief__retry"
-                variant="secondary"
-                loading={connectionState === "checking"}
-                loadingLabel="確認中……"
-                onClick={onRetryConnection}
-              >
-                重新檢查
-              </Button>
+              <Button className="connection-brief__retry" variant="secondary" loading={connectionState === "checking"} loadingLabel="確認中……" onClick={onRetryConnection}>重新檢查</Button>
             ) : null}
           </div>
         </header>
@@ -142,12 +200,9 @@ export function ExplorationPage({
               <p className="exploration-panel__eyebrow">故事紀錄</p>
               <h2 id="history-heading">旅程尚待書寫</h2>
             </div>
-            <p className="exploration-panel__mode">權威探索測試</p>
+            <p className="exploration-panel__mode">固定敘事測試</p>
           </div>
-
-          <p className="exploration-panel__notice">
-            候選解析會交給 deterministic 裁判；只有合法命令能更新下方權威 TEST 狀態。畫面不會產生故事敘述。
-          </p>
+          <p className="exploration-panel__notice">裁判先更新權威 TEST 狀態，說書人才描述已確定的結果。敘事失敗不會撤銷成功行動。</p>
 
           <section className="exploration-state" aria-labelledby="exploration-state-heading">
             <h3 id="exploration-state-heading">Phase 8 工程測試狀態</h3>
@@ -164,47 +219,76 @@ export function ExplorationPage({
           <NarrativeHistory entries={entries} />
           <div ref={historyEndRef} aria-hidden="true" />
 
-          <form
-            className="action-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submitAction();
-            }}
-          >
-            <label htmlFor="exploration-action">你的行動</label>
-            <p id="exploration-action-help" className="action-form__hint">
-              Enter 送出，Shift+Enter 換行。最多 {MAX_PLAYER_TEXT_LENGTH} 字；目前只有文件列出的固定測試句可解析。
-            </p>
-            <textarea
-              ref={inputRef}
-              id="exploration-action"
-              name="exploration-action"
-              value={action}
-              rows={4}
-              maxLength={MAX_PLAYER_TEXT_LENGTH}
-              placeholder="描述你想做的事情……"
-              aria-describedby="exploration-action-help"
-              onChange={(event) => setAction(event.target.value)}
-              onKeyDown={(event) => {
-                if (shouldSubmitOnEnter(event.key, event.shiftKey)) {
-                  event.preventDefault();
-                  submitAction();
-                }
-              }}
-            />
-            <div className="action-form__footer">
-              <p
-                className="action-form__feedback"
-                {...(submittedCount > 0 ? { role: "status", "aria-live": "polite", "aria-atomic": "true" } : {})}
-              >
-                {feedback}
-              </p>
-              <Button type="submit" loading={isInterpreting} loadingLabel="裁定中……"
-                disabled={!isSubmittableAction(action) || isInterpreting || !gameState}>送出行動</Button>
+          <section className="suggested-actions" aria-labelledby="suggested-actions-heading" aria-busy={isProcessing || undefined}>
+            <div className="suggested-actions__heading">
+              <div>
+                <p className="exploration-panel__eyebrow">下一步</p>
+                <h3 id="suggested-actions-heading">可採取的行動方向</h3>
+              </div>
+              <p>固定測試建議</p>
             </div>
-          </form>
+            <p className="suggested-actions__hint">這五項只是可點選的自然語言 fixture；每次仍會經候選解析、權威裁定與探索敘事。</p>
+            <div className="suggested-actions__grid">
+              {suggestedActions.map((suggestion) => (
+                <Button key={suggestion.id} variant="secondary" className="suggested-action" disabled={isProcessing || !gameState}
+                  onClick={() => submitAction(suggestion.text, "suggestion")}>{suggestion.text}</Button>
+              ))}
+            </div>
+          </section>
+
+          <section className="utility-toolbar" aria-label="探索工具">
+            <button className="utility-tool" type="button" aria-label="自行描述行動" aria-expanded={composer.isOpen}
+              aria-controls="free-action-composer" disabled={isProcessing} onClick={() => dispatchComposer({ type: "open" })}>
+              <span className="utility-tool__icon"><Icon name="quill" /></span><span>行動</span>
+            </button>
+            {utilityTools.map((tool) => (
+              <button key={tool.id} className="utility-tool" type="button" aria-label={`開啟${tool.label}面板`}
+                aria-expanded={activeUtility === tool.id} aria-controls="utility-panel"
+                onClick={(event) => { utilityTriggerRef.current = event.currentTarget; dispatchUtility({ type: "open", panel: tool.id }); }}>
+                <span className="utility-tool__icon"><Icon name={tool.icon} /></span><span>{tool.label}</span>
+              </button>
+            ))}
+          </section>
+
+          {composer.isOpen ? (
+            <form id="free-action-composer" className="action-form" onSubmit={(event) => { event.preventDefault(); submitAction(composer.text, "composer"); }}>
+              <div className="action-form__heading">
+                <label htmlFor="exploration-action">自行描述行動</label>
+                <button className="action-form__close" type="button" aria-label="收起自行描述行動輸入區" title="收起" disabled={isProcessing}
+                  onClick={() => dispatchComposer({ type: "close" })}><Icon name="close" /><span aria-hidden="true">收起</span></button>
+              </div>
+              <p id="exploration-action-help" className="action-form__hint">Enter 送出，Shift+Enter 換行。最多 {MAX_PLAYER_TEXT_LENGTH} 字；目前只有文件列出的固定測試句可解析。</p>
+              <textarea ref={inputRef} id="exploration-action" name="exploration-action" value={composer.text} rows={4}
+                maxLength={MAX_PLAYER_TEXT_LENGTH} placeholder="描述你想做的事情……" aria-describedby="exploration-action-help" disabled={isProcessing}
+                onChange={(event) => dispatchComposer({ type: "change", text: event.target.value })}
+                onKeyDown={(event) => {
+                  if (shouldSubmitOnEnter(event.key, event.shiftKey)) {
+                    event.preventDefault();
+                    submitAction(composer.text, "composer");
+                  }
+                }} />
+              <div className="action-form__footer">
+                <p className="action-form__feedback" {...(submittedCount > 0 ? { role: "status", "aria-live": "polite", "aria-atomic": "true" } : {})}>{feedback}</p>
+                <Button type="submit" loading={isProcessing} loadingLabel="正在整理敘事……" disabled={!isSubmittableAction(composer.text) || isProcessing || !gameState}>送出行動</Button>
+              </div>
+            </form>
+          ) : null}
         </Panel>
       </div>
+
+      {activeUtility && activePanel ? (
+        <div className="utility-drawer-layer">
+          <button className="utility-drawer__backdrop" type="button" aria-label={`關閉${activePanel.title}面板`} onClick={closeUtilityPanel} />
+          <aside id="utility-panel" className="utility-drawer" role="dialog" aria-modal="true" aria-labelledby="utility-panel-heading" onKeyDown={trapDrawerFocus}>
+            <div className="utility-drawer__heading">
+              <div><p className="exploration-panel__eyebrow">工具面板</p><h2 id="utility-panel-heading">{activePanel.title}</h2></div>
+              <button ref={drawerCloseRef} className="utility-drawer__close" type="button" aria-label={`關閉${activePanel.title}面板`} title="關閉" onClick={closeUtilityPanel}><Icon name="close" /></button>
+            </div>
+            <p>{activePanel.description}</p>
+            <ul className="utility-drawer__list">{activePanel.items.map((item) => <li key={item}>{item}</li>)}</ul>
+          </aside>
+        </div>
+      ) : null}
     </main>
   );
 }

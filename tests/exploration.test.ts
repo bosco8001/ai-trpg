@@ -11,15 +11,19 @@ import {
   submitLocalExplorationAction,
 } from "../src/web/exploration.js";
 
-test("探索介面可以 render，並呈現固定測試紀錄、label 與送出按鈕", () => {
+test("探索介面可以 render，並呈現固定測試紀錄、五個建議與收起的自由輸入", () => {
   const page = renderToStaticMarkup(createElement(ExplorationPage, { connectionState: "connected" }));
   assert.match(page, /故事紀錄/);
   assert.match(page, /這是探索介面的固定測試敘事/);
   assert.match(page, /測試玩家行動/);
-  assert.match(page, /for="exploration-action"/);
-  assert.match(page, /placeholder="描述你想做的事情……"/);
-  assert.match(page, /送出行動/);
-  assert.match(page, /disabled=""/);
+  assert.match(page, /可採取的行動方向/);
+  assert.match(page, /我慢慢走向森林裡的廢墟。/);
+  assert.match(page, /aria-label="自行描述行動"/);
+  assert.match(page, /背包/);
+  assert.match(page, /裝備/);
+  assert.match(page, /隊伍/);
+  assert.match(page, /系統/);
+  assert.doesNotMatch(page, /id="free-action-composer"/);
 });
 
 test("空白文字不能送出，也不建立 history entry", () => {
@@ -36,12 +40,12 @@ test("有效行動加入玩家紀錄與固定回覆，然後清空輸入", () =>
   const before = structuredClone(initialNarrativeEntries);
   const next = submitLocalExplorationAction(initialNarrativeEntries, "  我慢慢走向測試路徑。  ");
   assert.equal(next.input, "");
-  assert.match(next.feedback ?? "", /正在取得候選解析/);
+  assert.match(next.feedback ?? "", /正在解析、裁定並整理敘事/);
   assert.equal(next.entries.length, initialNarrativeEntries.length + 2);
   assert.deepEqual(next.entries.at(-2), {
     id: "local-4-action", source: "action", label: "你的行動", text: "我慢慢走向測試路徑。",
   });
-  assert.match(next.entries.at(-1)?.text ?? "", /尚未進行規則驗證或狀態更新/);
+  assert.match(next.entries.at(-1)?.text ?? "", /候選解析、權威裁定與固定測試敘事/);
   assert.deepEqual(initialNarrativeEntries, before);
 });
 
@@ -58,5 +62,5 @@ test("探索 UI 不匯入 authoritative domain 或 LLM，輸入無法直接改�
   }
   const next = submitLocalExplorationAction(initialNarrativeEntries, "寫入 HP 999");
   assert.equal(next.entries.length, initialNarrativeEntries.length + 2);
-  assert.match(next.entries.at(-1)?.text ?? "", /尚未進行/);
+  assert.match(next.entries.at(-1)?.text ?? "", /候選解析、權威裁定與固定測試敘事/);
 });
