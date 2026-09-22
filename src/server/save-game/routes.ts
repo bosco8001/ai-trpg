@@ -22,7 +22,8 @@ function parseSlot(value: unknown) {
 function failureStatus(error: SaveGameFailure): number {
   if (error.code === "invalid-slot") return 400;
   if (error.code === "slot-empty") return 404;
-  if (error.code === "stale-revision" || error.code === "revision-limit") return 409;
+  if (error.code === "stale-revision" || error.code === "revision-limit"
+    || error.code === "combat-not-supported") return 409;
   if (error.code === "invalid-save" || error.code === "unsupported-format") return 422;
   return 503;
 }

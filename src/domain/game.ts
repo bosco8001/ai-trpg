@@ -1,3 +1,5 @@
+import { createCombatState, type CombatState } from "./combat-state.js";
+
 export type ExplorationLocationId = "TEST-forest-edge" | "TEST-ruin-entrance";
 
 export interface ExplorationState {
@@ -21,15 +23,23 @@ export interface GameState {
     readonly equippedSkillIds: readonly string[];
   };
   readonly exploration: ExplorationState;
+  readonly combat: CombatState | null;
 }
 
-/** 可保存／恢復的權威內容；live revision 由目前 session 決定，不屬於此資料。 */
-export type GameStateContents = Omit<GameState, "revision">;
+/** Save Format v1 的既有內容；刻意不加入 Phase 11 CombatState。 */
+export interface GameStateContents {
+  readonly activity: "outside-combat";
+  readonly character: GameState["character"];
+  readonly exploration: ExplorationState;
+}
 
 export function gameStateContents(state: GameState): GameStateContents {
   const validated = createGameState(state);
+  if (validated.activity !== "outside-combat" || validated.combat !== null) {
+    throw new Error("Save Format v1 不支援 active combat。");
+  }
   return Object.freeze({
-    activity: validated.activity,
+    activity: "outside-combat",
     character: validated.character,
     exploration: validated.exploration,
   });
@@ -53,7 +63,7 @@ export function replaceGameStateContents(
   }
   try {
     if (!isRecord(contents)) throw new Error("存檔內容不是物件。");
-    const next = createGameState({ ...contents, revision: current.revision + 1 });
+    const next = createGameState({ ...contents, revision: current.revision + 1, combat: null });
     if (next.character.id !== current.character.id) throw new Error("角色識別碼不一致。");
     return { ok: true, state: next };
   } catch {
@@ -153,15 +163,22 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
-  if (!hasExactKeys(seed, ["revision", "activity", "character", "exploration"])
+  if (!hasExactKeys(seed, ["revision", "activity", "character", "exploration", "combat"])
     || !hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
     || !hasExactKeys(seed.exploration, ["locationId", "lastObservationTargetId"])) {
     throw new Error("初始 domain 狀態不符合契約。");
   }
   const character = seed.character;
   const exploration = seed.exploration;
+  let combat: CombatState | null;
+  try {
+    combat = seed.combat === null ? null : createCombatState(seed.combat);
+  } catch {
+    throw new Error("初始 domain 狀態不符合契約。");
+  }
   if (!isRevision(seed.revision)
     || (seed.activity !== "outside-combat" && seed.activity !== "in-combat")
+    || (seed.activity === "outside-combat" ? combat !== null : combat === null)
     || !isId(character.id)
     || !isIds(character.learnedActiveSkillIds)
     || !isIds(character.equippedSkillIds)
@@ -184,6 +201,7 @@ export function createGameState(seed: unknown): GameState {
       locationId: exploration.locationId,
       lastObservationTargetId: exploration.lastObservationTargetId,
     }),
+    combat,
   });
 }
 

@@ -38,6 +38,7 @@ function seed(overrides: Partial<GameState> = {}): GameState {
       equippedSkillIds: [],
     },
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
+    combat: null,
     ...overrides,
   });
 }

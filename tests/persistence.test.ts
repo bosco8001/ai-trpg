@@ -23,6 +23,7 @@ function seed(id = "TEST-character"): GameState {
       equippedSkillIds: [],
     },
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
+    combat: null,
   };
 }
 

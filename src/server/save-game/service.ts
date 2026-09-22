@@ -42,6 +42,9 @@ function summary(state: GameState, storage: "memory" | "postgres"): ExplorationS
 
 export function createSaveSnapshot(state: GameState): SaveSnapshotV1 {
   const validated = createGameState(state);
+  if (validated.activity === "in-combat" || validated.combat !== null) {
+    throw new SaveGameFailure("combat-not-supported");
+  }
   return {
     formatVersion: SAVE_FORMAT_VERSION,
     sourceRevision: validated.revision,
@@ -60,7 +63,7 @@ export function decodeSaveSnapshot(record: StoredSaveSlot): SaveSnapshotV1 {
     throw new SaveGameFailure("invalid-save");
   }
   try {
-    const validated = createGameState({ ...record.snapshot, revision: record.sourceRevision });
+    const validated = createGameState({ ...record.snapshot, revision: record.sourceRevision, combat: null });
     return {
       formatVersion: SAVE_FORMAT_VERSION,
       sourceRevision: record.sourceRevision,
@@ -131,6 +134,9 @@ export function createSaveGameService(
       validateRequest(slotId, expectedRevision);
       try {
         const current = createGameState(await session.getState());
+        if (current.activity === "in-combat" || current.combat !== null) {
+          throw new SaveGameFailure("combat-not-supported");
+        }
         if (current.revision !== expectedRevision) throw new SaveGameFailure("stale-revision");
         const snapshot = createSaveSnapshot(current);
         const record = await repository.writeIfLiveRevision(slotId, snapshot, {
@@ -147,6 +153,9 @@ export function createSaveGameService(
       validateRequest(slotId, expectedRevision);
       try {
         const current = createGameState(await session.getState());
+        if (current.activity === "in-combat" || current.combat !== null) {
+          throw new SaveGameFailure("combat-not-supported");
+        }
         if (current.revision !== expectedRevision) throw new SaveGameFailure("stale-revision");
         const record = await repository.read(slotId);
         if (!record) throw new SaveGameFailure("slot-empty");

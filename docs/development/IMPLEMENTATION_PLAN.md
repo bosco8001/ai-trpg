@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0–9.5 已由使用者確認。Phase 10 已完成工程實作，等待使用者手動確認；Phase 11 及其後尚未開始。
+Phase 0–10 已由使用者確認。Phase 11 已完成工程實作，等待使用者手動確認；Phase 12 及其後尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -163,4 +163,14 @@ Memory repository 供不連資料庫的測試與開發；API restart 後其存�
 
 `npm run typecheck` 與 `npm run build` 通過；Vite 與 server TypeScript 均成功建置。`npm test` 共 79 項，其中 77 項通過；兩項需要明確提供隔離 `TEST_DATABASE_URL` 的 PostgreSQL integration test 依既有安全策略略過。`npm run db:migrate:dry-run` 成功產生 `002_save_slots` 的預期 SQL；`node --check migrations/002_save_slots.mjs` 與 `git diff --check` 通過。沒有對一般本機資料庫執行會寫入或清除資料的整合測試。
 
-Phase 10 等待使用者手動確認；不得開始 Phase 11。
+Phase 10 其後已由使用者手動確認，包括 Memory／PostgreSQL 保存、載入、restart persistence 與 monotonic revision。
+
+## Phase 11 交付紀錄
+
+將最小 `CombatState` 加入 authoritative `GameState`：保存三名 TEST participant、初始 D20、DEX modifier、initiative total、所有 tie-break rolls、final order、Round、current turn index 與 current actor。Start Combat 依 canonical `D20 + DEX modifier` 排序，同 total 者只在平手小組內重擲；再次平手只讓仍同點者繼續。Start 與每次 Advance 各自只增加一次 revision，敵人 Turn 不會自動執行或跳過。
+
+新增 `src/domain/combat-state.ts`、`src/domain/combat.ts`、`src/server/combat/`、`tests/combat-turns.test.ts` 與 [Phase 11 文件](PHASE_11_COMBAT_TURNS.md)。修改 GameState runtime validation、domain session、server composition、PostgreSQL snapshot hydration、Phase 10 Save／Load safeguard、README、OPEN_QUESTIONS 與本計畫。`COMBAT_SANDBOX=1` 才在非 production 開放 TEST combat routes；`COMBAT_ROLL_FIXTURE_MODE=normal|tie` 提供可重現的手動測試。
+
+CombatState 沿用 `game_states` JSONB，不新增 migration；舊 snapshot 缺少 combat 時安全補為 `null`。Save Format v1 不升版且不包含 CombatState。戰鬥中的 Save／Load 暫時回 `combat-not-supported`，只是避免遺失狀態的工程防護；正式政策仍列在 OPEN_QUESTIONS。
+
+工程檢查結果：`npm test` 共 94 項，91 項通過、3 項因未提供隔離的 `TEST_DATABASE_URL` 而安全略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有新 migration。Phase 11 等待使用者手動確認；不得開始 Phase 12。

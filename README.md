@@ -2,13 +2,13 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–9.5 已由使用者確認。Phase 10 已完成 Manual Save / Load 工程實作，等待使用者手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–10 已由使用者確認。Phase 11 已完成戰鬥回合與先攻引擎的工程實作，等待使用者手動確認。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。目前前端是文字探索頁。
 
 ## Phase 4：本機 PostgreSQL 與手動測試
 
-Phase 4 最初只保存 Phase 3 的測試角色技能配置；Phase 8 已沿用同一個 JSONB snapshot 加入最小 TEST 探索狀態，沒有新增資料表。Docker Desktop 由你自行安裝，並須啟動後才能使用以下 `docker compose` 指令。資料庫 image 固定為 `postgres:17.11-bookworm`；本機預設以 `127.0.0.1:5433` 連接，避免與常見的 5432 連接埠衝突。
+Phase 4 最初只保存 Phase 3 的測試角色技能配置；Phase 8 與 Phase 11 沿用同一個 JSONB snapshot，分別加入最小 TEST 探索狀態與 CombatState，沒有新增 gameplay table。Docker Desktop 由你自行安裝，並須啟動後才能使用以下 `docker compose` 指令。資料庫 image 固定為 `postgres:17.11-bookworm`；本機預設以 `127.0.0.1:5433` 連接，避免與常見的 5432 連接埠衝突。
 
 ### 1. 建立本機設定
 
@@ -335,7 +335,184 @@ DOMAIN_STORAGE=postgres NARRATION_FIXTURE_MODE=normal npm run dev
 
 一般停止流程使用 `docker compose down`，會保留 named volume。只有明確要刪除本專案全部本機 PostgreSQL 資料與存檔槽時才使用 `docker compose down --volumes`。
 
-Phase 10 只保存 authoritative GameState。React drawer、textarea、candidate、narration、local exploration history、suggestion fixture、focus 與 loading 狀態都不保存。沒有 autosave、quicksave、刪除、雲端存檔、多 campaign、正式 LLM provider 或 combat 規則。手動測試完成後請回報結果；Phase 11 不會自動開始。
+Phase 10 只保存 authoritative GameState。React drawer、textarea、candidate、narration、local exploration history、suggestion fixture、focus 與 loading 狀態都不保存。沒有 autosave、quicksave、刪除、雲端存檔或多 campaign。Phase 10 其後已由使用者手動確認；Phase 11 對 active combat 加入暫時 Save／Load 防護，但沒有改變 Save Format v1。
+
+## Phase 11：戰鬥回合與先攻引擎手動測試
+
+Phase 11 只建立 authoritative initiative、turn order、Round 與 Turn 推進。它沒有 Combat UI、攻擊、傷害或戰鬥敘事。完整結構與邊界見 [Phase 11 文件](docs/development/PHASE_11_COMBAT_TURNS.md)。所有 `TEST-` participant 與 DEX modifier 都是工程 fixture，不是 canonical 角色或敵人。
+
+### Memory normal initiative
+
+停止舊服務後啟動 API：
+
+```sh
+DOMAIN_STORAGE=memory \
+COMBAT_SANDBOX=1 \
+COMBAT_ROLL_FIXTURE_MODE=normal \
+npm run dev:api
+```
+
+另一個終端機先查看初始狀態：
+
+```sh
+curl -s http://127.0.0.1:3001/api/dev/combat
+```
+
+應看到 `activity: outside-combat`、`revision: 0`、`combat: null`。開始 TEST combat：
+
+```sh
+curl -s http://127.0.0.1:3001/api/dev/combat/start \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":0}'
+```
+
+Normal fixture 的固定結果：
+
+| Participant | D20 | DEX | Total |
+|---|---:|---:|---:|
+| `TEST-player` | 12 | +2 | 14 |
+| `TEST-enemy-1` | 17 | +1 | 18 |
+| `TEST-enemy-2` | 8 | +0 | 8 |
+
+Final order 必須是：
+
+```text
+TEST-enemy-1 → TEST-player → TEST-enemy-2
+```
+
+同時確認 Round `1`、index `0`、current actor `TEST-enemy-1`、revision `1`。Start 不應自動攻擊或推進第一個 Turn。
+
+### Turn advance
+
+接續 normal fixture，依序執行：
+
+```sh
+curl -s http://127.0.0.1:3001/api/dev/combat/advance \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":1}'
+
+curl -s http://127.0.0.1:3001/api/dev/combat/advance \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":2}'
+
+curl -s http://127.0.0.1:3001/api/dev/combat/advance \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":3}'
+```
+
+預期時鐘：
+
+```text
+Start：Round 1 / TEST-enemy-1 / revision 1
+Advance 1：Round 1 / TEST-player / revision 2
+Advance 2：Round 1 / TEST-enemy-2 / revision 3
+Advance 3：Round 2 / TEST-enemy-1 / revision 4
+```
+
+每一步都必須停在該 participant，不會自動跳過 enemy Turn。
+
+### Repeated tie
+
+停止 API，重新以全新 Memory state 啟動：
+
+```sh
+DOMAIN_STORAGE=memory \
+COMBAT_SANDBOX=1 \
+COMBAT_ROLL_FIXTURE_MODE=tie \
+npm run dev:api
+```
+
+再次以 `expectedRevision: 0` Start。初始 D20 是 `10, 11, 6`：玩家與敵人 1 加上 DEX 後同為 12。第一次 tie-break 是 `7, 7`，第二次是玩家 `4`、敵人 1 `15`。確認：
+
+- `tieBreakRolls` 分別是 `[7, 4]` 與 `[7, 15]`。
+- 兩者原 initiative total 都仍是 12。
+- `TEST-enemy-2` 沒有 tie-break roll。
+- final order 仍為 `TEST-enemy-1 → TEST-player → TEST-enemy-2`。
+- Start 整體 revision 只從 0 變成 1。
+
+### Stale revision
+
+Start 後 current revision 是 1 時，故意送舊版本：
+
+```sh
+curl -i http://127.0.0.1:3001/api/dev/combat/advance \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":0}'
+```
+
+應回 HTTP 409 `stale-revision`。Round、index、actor 與 revision 都不變。加入 `round`、`initiative`、`currentActorId` 等額外 request 欄位則應回 HTTP 400。
+
+### Exploration blocked
+
+以 `npm run dev` 取代 `npm run dev:api` 也可同時保留前端。Active combat 時執行：
+
+```sh
+curl -s http://127.0.0.1:3001/api/exploration/actions \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"我慢慢走向森林裡的廢墟。","expectedRevision":1}'
+```
+
+應得到 `action-not-allowed`。Exploration location、combat order、Round、actor 與 revision 都不變，也不產生 exploration narration。
+
+### Save / Load temporary safeguard
+
+重新啟動 normal Memory server。先在戰鬥前保存 Slot 1，再 Start：
+
+```sh
+curl -s http://127.0.0.1:3001/api/save-slots/1 \
+  -X PUT \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":0}'
+
+curl -s http://127.0.0.1:3001/api/dev/combat/start \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":0}'
+```
+
+Active combat 時嘗試 Save 與 Load：
+
+```sh
+curl -i http://127.0.0.1:3001/api/save-slots/2 \
+  -X PUT \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":1}'
+
+curl -i http://127.0.0.1:3001/api/save-slots/1/load \
+  -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"expectedRevision":1}'
+```
+
+兩者都應回 HTTP 409 `combat-not-supported` 與「目前工程階段尚未支援戰鬥中的存檔與載入。」revision 保持 1。這只是暫時工程防護，戰鬥中是否允許 Save／Load 仍未定案。
+
+### PostgreSQL restart
+
+Phase 11 沒有新增 migration。先確認資料庫與既有 migrations：
+
+```sh
+docker compose up -d db
+docker compose ps
+npm run db:migrate
+```
+
+啟動：
+
+```sh
+DOMAIN_STORAGE=postgres \
+COMBAT_SANDBOX=1 \
+COMBAT_ROLL_FIXTURE_MODE=normal \
+npm run dev:api
+```
+
+1. 用 `GET /api/dev/combat` 讀取目前 revision。
+2. 以該 revision Start Combat。
+3. 以 Start 後的新 revision Advance 一次或兩次。
+4. 記下 revision、Round、index、actor、order 與 initiative results。
+5. 停止 API，但不要刪除 volume。
+6. 用相同命令重新啟動，再次 GET。
+7. 確認所有 combat state 與 revision 保持一致。
+
+請使用沒有重要資料的本機測試資料庫。若資料庫已停留在 active combat，本階段沒有 End Combat；不要嘗試用 Save／Load 繞過。Phase 11 完成後等待你的手動驗收，不會自動開始 Phase 12。
 
 ## 安裝與啟動
 

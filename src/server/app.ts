@@ -14,6 +14,11 @@ import type { SaveGameRepository } from "./save-game/contracts.js";
 import { InMemorySaveGameRepository } from "./save-game/memory-repository.js";
 import { createSaveGameService } from "./save-game/service.js";
 import { registerSaveGameRoutes } from "./save-game/routes.js";
+import type { DiceRoller } from "../domain/combat.js";
+import { RandomD20Roller } from "./combat/dice.js";
+import { TEST_COMBAT_PARTICIPANTS } from "./combat/fixtures.js";
+import { createCombatService } from "./combat/service.js";
+import { registerCombatSandbox } from "./combat/routes.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -25,6 +30,8 @@ export async function buildApp(options: {
   storage?: "memory" | "postgres";
   narrator?: ExplorationNarrator;
   saveGameRepository?: SaveGameRepository;
+  combatSandbox?: boolean;
+  combatRoller?: DiceRoller;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
@@ -36,6 +43,13 @@ export async function buildApp(options: {
 
   if (options.domainSandbox && process.env.NODE_ENV !== "production") {
     registerDomainSandbox(app, session, storage);
+  }
+  if (options.combatSandbox && process.env.NODE_ENV !== "production") {
+    registerCombatSandbox(app, createCombatService(
+      session,
+      TEST_COMBAT_PARTICIPANTS,
+      options.combatRoller ?? new RandomD20Roller(),
+    ), storage);
   }
   if (options.interpreter) {
     registerInterpretationRoute(app, options.interpreter);

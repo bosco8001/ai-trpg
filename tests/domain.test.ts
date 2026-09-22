@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { applyCommand, createGameState } from "../src/domain/game.js";
 import type { GameState } from "../src/domain/game.js";
+import { startCombat } from "../src/domain/combat.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { buildApp } from "../src/server/app.js";
 
@@ -10,6 +11,7 @@ const seed = (): GameState => ({
   revision: 0, activity: "outside-combat",
   character: { id: "TEST-character", learnedActiveSkillIds: [...learned], equippedSkillIds: [] },
   exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
+  combat: null,
 });
 const command = (skillIds: readonly string[], expectedRevision = 0) => ({
   type: "set-equipped-skills", expectedRevision, skillIds,
@@ -68,11 +70,15 @@ test("runtime boundary 拒絕直接狀態寫入、額外欄位與隱式型別轉
 });
 
 test("戰鬥標記只作命令守門，不允許更換配置", () => {
-  const state = createGameState({ ...seed(), activity: "in-combat" });
-  const result = applyCommand(state, command(["TEST-skill-1"]));
+  const started = startCombat(createGameState(seed()), { expectedRevision: 0 }, [
+    { id: "TEST-player", displayName: "TEST 玩家", side: "party", dexterityModifier: 0 },
+  ], { d20: () => 10 });
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+  const result = applyCommand(started.state, command(["TEST-skill-1"], 1));
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "in-combat");
-  assert.deepEqual(state.character.equippedSkillIds, []);
+  assert.deepEqual(started.state.character.equippedSkillIds, []);
 });
 
 test("初始狀態拒絕不一致配置，且不保留外部可變參照", () => {

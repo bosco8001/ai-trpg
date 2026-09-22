@@ -22,7 +22,12 @@ interface StateRow {
 }
 
 function snapshotOf(state: GameState) {
-  return { activity: state.activity, character: state.character, exploration: state.exploration };
+  return {
+    activity: state.activity,
+    character: state.character,
+    exploration: state.exploration,
+    combat: state.combat,
+  };
 }
 
 /** 僅接受經 domain 驗證的快照，資料庫列也必須重新驗證。 */
@@ -37,9 +42,12 @@ export function hydrateStateRow(row: StateRow): GameState {
     const snapshotKeys = Object.keys(snapshot);
     const legacy = snapshotKeys.length === 2 && snapshotKeys.includes("activity")
       && snapshotKeys.includes("character");
-    const current = snapshotKeys.length === 3 && snapshotKeys.includes("activity")
+    const explorationOnly = snapshotKeys.length === 3 && snapshotKeys.includes("activity")
       && snapshotKeys.includes("character") && snapshotKeys.includes("exploration");
-    if (!legacy && !current) {
+    const current = snapshotKeys.length === 4 && snapshotKeys.includes("activity")
+      && snapshotKeys.includes("character") && snapshotKeys.includes("exploration")
+      && snapshotKeys.includes("combat");
+    if (!legacy && !explorationOnly && !current) {
       throw new Error("快照欄位格式錯誤。");
     }
     const revision = Number(row.revision);
@@ -47,6 +55,7 @@ export function hydrateStateRow(row: StateRow): GameState {
     const state = createGameState({
       ...snapshot,
       exploration: legacy ? createInitialTestExplorationState() : snapshot.exploration,
+      combat: current ? snapshot.combat : null,
       revision,
     });
     if (state.character.id !== row.character_id) throw new Error("角色識別碼不一致。");

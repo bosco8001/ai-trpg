@@ -22,6 +22,7 @@ function seed(locationId: GameState["exploration"]["locationId"] = "TEST-forest-
     activity: "outside-combat",
     character: { id: "TEST-character", learnedActiveSkillIds: [], equippedSkillIds: [] },
     exploration: { locationId, lastObservationTargetId: null },
+    combat: null,
   });
 }
 

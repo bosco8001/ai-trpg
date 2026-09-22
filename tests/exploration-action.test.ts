@@ -11,6 +11,7 @@ import { executeExplorationAction, loadExplorationState } from "../src/web/api.j
 import type { CandidateAction } from "../src/shared/interpretation.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { PersistenceUnavailableError } from "../src/server/postgres-game-state-repository.js";
+import { startCombat } from "../src/domain/combat.js";
 
 function seed(overrides: Partial<GameState["exploration"]> = {}): GameState {
   return createGameState({
@@ -22,6 +23,7 @@ function seed(overrides: Partial<GameState["exploration"]> = {}): GameState {
       equippedSkillIds: [],
     },
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null, ...overrides },
+    combat: null,
   });
 }
 
@@ -128,13 +130,17 @@ test("candidate 注入權威欄位、非法 command 與 stale revision 都不能
 });
 
 test("戰鬥中禁止探索 transition，權威狀態維持不變", async () => {
-  const state = createGameState({ ...seed(), activity: "in-combat" });
-  const session = createDomainSession(state);
+  const started = startCombat(seed(), { expectedRevision: 0 }, [
+    { id: "TEST-player", displayName: "TEST 玩家", side: "party", dexterityModifier: 0 },
+  ], { d20: () => 10 });
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+  const session = createDomainSession(started.state);
   const service = createExplorationActionService({ async interpret() { return moveCandidate(); } }, session, "memory");
-  const response = await service.execute(moveCandidate().originalText, 0);
+  const response = await service.execute(moveCandidate().originalText, 1);
   assert.equal(response.ruling.accepted, false);
   if (!response.ruling.accepted) assert.equal(response.ruling.code, "action-not-allowed");
-  assert.equal(response.state.revision, 0);
+  assert.equal(response.state.revision, 1);
   assert.equal(response.state.locationId, "TEST-forest-edge");
 });
 

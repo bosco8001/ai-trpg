@@ -35,7 +35,7 @@ export interface SaveGameRepository {
 export type CurrentStateReader = () => GameState | Promise<GameState>;
 
 export type SaveGameFailureCode = "invalid-slot" | "stale-revision" | "slot-empty"
-  | "invalid-save" | "unsupported-format" | "revision-limit" | "unavailable";
+  | "invalid-save" | "unsupported-format" | "revision-limit" | "combat-not-supported" | "unavailable";
 
 const failureMessages: Record<SaveGameFailureCode, string> = {
   "invalid-slot": "只支援存檔 1、2、3。",
@@ -44,6 +44,7 @@ const failureMessages: Record<SaveGameFailureCode, string> = {
   "invalid-save": "此存檔內容已損壞或不符合目前格式。",
   "unsupported-format": "此存檔版本目前無法讀取。",
   "revision-limit": "狀態版本已達工程上限，無法載入存檔。",
+  "combat-not-supported": "目前工程階段尚未支援戰鬥中的存檔與載入。",
   unavailable: "存檔服務暫時無法使用，請稍後再試。",
 };
 

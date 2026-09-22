@@ -20,6 +20,7 @@
 - 死亡、昏迷、封魔等特殊狀態是否中斷詠唱。
 
 ## Combat
+- 戰鬥中是否允許 Save / Load 尚未決定。Phase 11 暫時安全拒絕戰鬥中的保存與載入，避免 Save Format v1 遺失 CombatState；這不是正式 gameplay rule。
 - 防禦的正式減傷百分比。
 - 防禦狀態精確持續 timing。
 - 防禦是否對所有傷害類型完全相同。

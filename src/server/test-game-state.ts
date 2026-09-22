@@ -11,5 +11,6 @@ export function createTestGameState(): GameState {
       equippedSkillIds: [],
     },
     exploration: createInitialTestExplorationState(),
+    combat: null,
   });
 }
