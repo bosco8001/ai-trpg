@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { startCombat } from "../src/domain/combat.js";
+import { advanceCombatTurn, startCombat } from "../src/domain/combat.js";
 import { createGameState, type GameState } from "../src/domain/game.js";
 import { buildApp } from "../src/server/app.js";
 import { createCombatFixtureRoller } from "../src/server/combat/dice.js";
@@ -18,7 +18,7 @@ import { CombatPage } from "../src/web/CombatPage.js";
 import {
   applicationMode,
   disabledCombatCommands,
-  getTestPresentationLanes,
+  getCombatPresentationLanes,
   getTurnOrderEntries,
   initiativeDetail,
 } from "../src/web/combat-ui.js";
@@ -54,10 +54,10 @@ test("權威 activity 決定頁面模式；Combat UI 不自行排序 turn order"
   assert.equal(initiativeDetail(combat.state.combat!.participants[0]!), "12 + 2 = 14");
 });
 
-test("四排 TEST presentation fixture 不改 GameState 或 revision", () => {
+test("四排位置直接讀取權威 row，不改 GameState 或 revision", () => {
   const response = combatResponse();
   const before = structuredClone(response.state);
-  const lanes = getTestPresentationLanes(response.state.combat!.participants);
+  const lanes = getCombatPresentationLanes(response.state.combat!.participants);
   assert.deepEqual(lanes.map((lane) => [lane.id, lane.participants.map((participant) => participant.id)]), [
     ["enemy-back", ["TEST-enemy-2"]],
     ["enemy-front", ["TEST-enemy-1"]],
@@ -82,7 +82,33 @@ test("CombatPage 呈現權威 Round、actor、四排、唯讀技能與 disabled 
     assert.match(page, new RegExp(`data-command=\\"${command.id}\\"[^>]*disabled=\\"\\"`));
   }
   assert.match(page, /TEST：推進下一回合/);
+  assert.match(page, /目前是敵方回合/);
   assert.doesNotMatch(page, /HP\s*\d|MP\s*\d|選擇目標|攻擊成功/);
+});
+
+test("前端排位只使用 participant.side 與 participant.row，並在玩家回合啟用普通攻擊", () => {
+  const started = startCombat(seed(), { expectedRevision: 0 }, TEST_COMBAT_PARTICIPANTS, createCombatFixtureRoller("normal"));
+  assert.equal(started.ok, true);
+  if (!started.ok) return;
+  const playerTurn = advanceCombatTurn(started.state, { expectedRevision: 1 });
+  assert.equal(playerTurn.ok, true);
+  if (!playerTurn.ok) return;
+  const lanes = getCombatPresentationLanes(playerTurn.state.combat!.participants);
+  assert.deepEqual(lanes.map((lane) => [lane.id, lane.participants.map((participant) => participant.id)]), [
+    ["enemy-back", ["TEST-enemy-2"]],
+    ["enemy-front", ["TEST-enemy-1"]],
+    ["party-front", ["TEST-player"]],
+    ["party-back", []],
+  ]);
+  const page = renderToStaticMarkup(createElement(CombatPage, {
+    gameState: { sandbox: true, storage: "memory", state: playerTurn.state },
+    stateError: null,
+    onStateUpdate: () => undefined,
+    onRetryState: async () => combatResponse(),
+  }));
+  assert.match(page, /data-command="attack"/);
+  assert.doesNotMatch(page, /data-command="attack"[^>]*disabled=""/);
+  assert.doesNotMatch(page, /選擇此目標/);
 });
 
 test("sandbox 關閉時不呈現 TEST advance control；participant 卡不是 target button", () => {

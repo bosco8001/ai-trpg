@@ -8,7 +8,12 @@ import { FixtureInterpretationAdapter } from "./interpretation/fixture-adapter.j
 import { createExplorationNarrator } from "./narration/narrator.js";
 import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
-import { createCombatFixtureRoller, type CombatRollFixtureMode } from "./combat/dice.js";
+import {
+  createCombatActionFixtureRoller,
+  createCombatFixtureRoller,
+  type CombatActionRollFixtureMode,
+  type CombatRollFixtureMode,
+} from "./combat/dice.js";
 
 const port = Number(process.env.PORT ?? 3001);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -20,6 +25,7 @@ const combatSandbox = process.env.COMBAT_SANDBOX === "1" && process.env.NODE_ENV
 const storage = process.env.DOMAIN_STORAGE ?? "memory";
 const narrationMode = process.env.NARRATION_FIXTURE_MODE ?? "normal";
 const combatRollMode = process.env.COMBAT_ROLL_FIXTURE_MODE ?? "normal";
+const combatActionRollMode = process.env.COMBAT_ACTION_ROLL_FIXTURE_MODE;
 if (storage !== "memory" && storage !== "postgres") {
   throw new Error("DOMAIN_STORAGE 只接受 memory 或 postgres。");
 }
@@ -33,6 +39,14 @@ if (narrationMode !== "normal" && narrationMode !== "unavailable"
 if (combatSandbox && combatRollMode !== "normal" && combatRollMode !== "tie") {
   throw new Error("COMBAT_ROLL_FIXTURE_MODE 只接受 normal 或 tie。");
 }
+if (combatSandbox && combatActionRollMode !== undefined
+  && combatActionRollMode !== "hit" && combatActionRollMode !== "miss"
+  && combatActionRollMode !== "raw-one-hit") {
+  throw new Error("COMBAT_ACTION_ROLL_FIXTURE_MODE 只接受 hit、miss 或 raw-one-hit。");
+}
+if (process.env.NODE_ENV === "production" && combatActionRollMode !== undefined) {
+  throw new Error("正式服務不可啟用 COMBAT_ACTION_ROLL_FIXTURE_MODE。");
+}
 const pool = storage === "postgres"
   ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 3000 })
   : undefined;
@@ -43,6 +57,9 @@ const app = await buildApp({
   combatSandbox,
   combatRoller: combatSandbox
     ? createCombatFixtureRoller(combatRollMode as CombatRollFixtureMode)
+    : undefined,
+  combatActionRoller: combatSandbox && combatActionRollMode
+    ? createCombatActionFixtureRoller(combatActionRollMode as CombatActionRollFixtureMode)
     : undefined,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,

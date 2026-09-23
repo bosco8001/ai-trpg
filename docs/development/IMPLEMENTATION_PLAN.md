@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0–11 已由使用者確認。Phase 12 已完成工程實作，等待使用者手動確認；Phase 13 及其後尚未開始。
+Phase 0–12 已由使用者確認。Phase 13 工程實作已完成，等待使用者手動驗收；Phase 14 及其後尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -183,4 +183,16 @@ CombatState 沿用 `game_states` JSONB，不新增 migration；舊 snapshot 缺�
 
 新增 `src/shared/game-state.ts`、`src/server/game-state-route.ts`、`src/web/CombatPage.tsx`、`src/web/combat-ui.ts`、`tests/combat-ui.test.ts` 與 [Phase 12 文件](PHASE_12_COMBAT_UI.md)。修改 App、frontend API、server composition、樣式、README 與本計畫。沒有 migration、table 或 authoritative state schema 變更。
 
-工程檢查結果：`npm test` 共 103 項，100 項通過、3 項因未提供隔離的 `TEST_DATABASE_URL` 而安全略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有新 migration。Phase 12 等待使用者手動確認；不得開始 Phase 13。
+工程檢查結果：`npm test` 共 103 項，100 項通過、3 項因未提供隔離的 `TEST_DATABASE_URL` 而安全略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有新 migration。Phase 12 已由使用者確認。
+
+## Phase 13 交付紀錄
+
+Combat participant 現在將 `side + row` 作為權威位置，TEST 初始位置與普通攻擊 profile 僅是工程 fixture。已知 Phase 11／12 TEST snapshot 會依 exact shape 安全 hydration；未知 participant 缺少 row 時拒絕讀取。Combat UI 從 server state 排列參戰者，移除原有前端 TEST row placement。沒有 row movement。
+
+新增 domain legal-target calculation 與正式 read/action routes。玩家回合可讀取伺服器推導的合法目標；普通攻擊 request 僅接受 `expectedRevision` 與 `targetId`，攻擊者、骰值、結果及回合資訊均由 authoritative state／backend 決定。melee 受敵方前排阻擋，敵方前排空時可攻擊後排；ranged 可攻擊前後排。
+
+攻擊與閃避由注入的 D20 roller 擲骰，依 canonical Physical Attack、Evasion 公式與「攻擊總值大於或等於閃避總值即命中」判定。成功 action 將最近一次 mechanical resolution 寫入 CombatState.lastAction、消耗目前 Turn 並前進行動順序，整體 revision 只增加一次。PostgreSQL 在鎖定交易內檢查版本、擲骰並提交，因此同版本競爭請求的失敗者會在擲骰前拒絕。沒有 HP、傷害、critical multiplier、敘事或 LLM。JSONB snapshot 沿用既有 `game_states`，沒有新增 migration 或 gameplay table；active combat 的 Save／Load safeguard 保持不變。
+
+新增 `src/domain/combat-targeting.ts`、`tests/combat-actions.test.ts` 與 [Phase 13 文件](PHASE_13_NORMAL_ATTACK.md)，並修改 combat domain/state、server action routes/session/dice fixtures、shared runtime validation、Combat UI、README 與本計畫。
+
+工程檢查結果：`npm test` 共 129 項，125 項通過、4 項 PostgreSQL integration test 因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run build` 與 `git diff --check` 通過。沒有執行真實 PostgreSQL restart 或使用者手動 UI 驗收。Phase 13 等待使用者手動確認；Phase 14 尚未開始。

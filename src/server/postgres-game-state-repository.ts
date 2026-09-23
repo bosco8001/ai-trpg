@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { createGameState, createInitialTestExplorationState } from "../domain/game.js";
 import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
@@ -76,6 +76,14 @@ export class PostgresGameStateRepository implements GameStateRepository {
     }
   }
 
+  private async queryClient<T extends object>(client: PoolClient, sql: string, params: readonly unknown[] = []) {
+    try {
+      return await client.query<T>(sql, [...params]);
+    } catch (error) {
+      throw new PersistenceUnavailableError(error);
+    }
+  }
+
   async load(characterId: string): Promise<GameState | undefined> {
     const result = await this.query<StateRow>(
       "SELECT character_id, revision, snapshot FROM game_states WHERE character_id = $1",
@@ -107,5 +115,57 @@ export class PostgresGameStateRepository implements GameStateRepository {
       [state.character.id, expectedRevision, state.revision, JSON.stringify(snapshotOf(state))],
     );
     return result.rowCount === 1;
+  }
+
+  /** 讓 normal attack 在讀取、revision 驗證、擲骰與提交期間持有同一筆 row lock。 */
+  async withStateLocked<T>(
+    seed: GameState,
+    transition: (current: GameState) => { readonly result: T; readonly nextState?: GameState },
+  ): Promise<T> {
+    const initial = createGameState(seed);
+    await this.createIfAbsent(initial);
+    let client: PoolClient;
+    try {
+      client = await this.pool.connect();
+    } catch (error) {
+      throw new PersistenceUnavailableError(error);
+    }
+
+    let transactionOpen = false;
+    try {
+      await this.queryClient(client, "BEGIN");
+      transactionOpen = true;
+      const selected = await this.queryClient<StateRow>(client,
+        "SELECT character_id, revision, snapshot FROM game_states WHERE character_id = $1 FOR UPDATE",
+        [initial.character.id]);
+      const row = selected.rows[0];
+      if (!row) throw new InvalidPersistedStateError(new Error("鎖定後找不到遊戲狀態。"));
+      const current = hydrateStateRow(row);
+      const { result, nextState } = transition(current);
+      if (nextState) {
+        const next = createGameState(nextState);
+        if (next.character.id !== current.character.id || next.revision !== current.revision + 1) {
+          throw new Error("鎖定交易中的狀態版本不符合單次 transition 契約。");
+        }
+        const updated = await this.queryClient(client,
+          "UPDATE game_states SET revision = $3, snapshot = $4::jsonb WHERE character_id = $1 AND revision = $2",
+          [current.character.id, current.revision, next.revision, JSON.stringify(snapshotOf(next))]);
+        if (updated.rowCount !== 1) throw new Error("鎖定交易未能提交遊戲狀態。");
+      }
+      await this.queryClient(client, "COMMIT");
+      transactionOpen = false;
+      return result;
+    } catch (error) {
+      if (transactionOpen) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          // 保留原始錯誤；rollback failure 不會改變安全回應邊界。
+        }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

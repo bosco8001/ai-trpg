@@ -21,6 +21,7 @@ export class SequenceD20Roller implements DiceRoller {
 }
 
 export type CombatRollFixtureMode = "normal" | "tie";
+export type CombatActionRollFixtureMode = "hit" | "miss" | "raw-one-hit";
 
 /**
  * normal：12, 17, 8，依序給玩家、敵人 1、敵人 2。
@@ -30,4 +31,14 @@ export function createCombatFixtureRoller(mode: CombatRollFixtureMode): DiceRoll
   return new SequenceD20Roller(mode === "tie"
     ? [10, 11, 6, 7, 7, 4, 15]
     : [12, 17, 8]);
+}
+
+/** 固定攻擊測試骰與先攻骰分開，避免兩種 fixture 共用或消耗彼此的序列。 */
+export function createCombatActionFixtureRoller(mode: CombatActionRollFixtureMode): DiceRoller {
+  const sequence: Readonly<Record<CombatActionRollFixtureMode, readonly number[]>> = {
+    hit: [10, 8],
+    miss: [3, 15],
+    "raw-one-hit": [1, 1],
+  };
+  return new SequenceD20Roller(sequence[mode]);
 }

@@ -1,4 +1,17 @@
-import { createCombatState, type CombatSide, type CombatState } from "./combat-state.js";
+import {
+  createCombatState,
+  type CombatNormalAttackProfile,
+  type CombatRow,
+  type CombatSide,
+  type CombatState,
+  type NormalAttackActionResolution,
+} from "./combat-state.js";
+import {
+  getNormalAttackTargetOptions,
+  type NormalAttackTargetOptions,
+  checkNormalAttackTarget,
+  getLegalNormalAttackTargets,
+} from "./combat-targeting.js";
 import { createGameState, type GameState } from "./game.js";
 
 export interface DiceRoller {
@@ -9,7 +22,9 @@ export interface CombatParticipantSeed {
   readonly id: string;
   readonly displayName: string;
   readonly side: CombatSide;
+  readonly row: CombatRow;
   readonly dexterityModifier: number;
+  readonly normalAttack: CombatNormalAttackProfile | null;
 }
 
 export type CombatTransitionCode = "invalid-command" | "stale-revision" | "revision-limit"
@@ -23,11 +38,22 @@ export type CombatTransitionResult =
     }
   | { readonly ok: false; readonly code: CombatTransitionCode; readonly message: string };
 
-interface MutableInitiative {
-  readonly id: string;
-  readonly displayName: string;
-  readonly side: CombatSide;
-  readonly dexterityModifier: number;
+export type NormalAttackCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "not-player-turn" | "illegal-target" | "invalid-roll";
+
+export type NormalAttackResult =
+  | {
+      readonly ok: true;
+      readonly state: GameState;
+      readonly effect: { readonly type: "normal-attack-resolved"; readonly outcome: "hit" | "miss" };
+    }
+  | { readonly ok: false; readonly code: NormalAttackCode; readonly message: string };
+
+export type NormalAttackOptionsResult =
+  | { readonly ok: true; readonly revision: number; readonly options: NormalAttackTargetOptions }
+  | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
+
+interface MutableInitiative extends CombatParticipantSeed {
   readonly baseD20: number;
   readonly total: number;
   readonly tieBreakRolls: number[];
@@ -42,8 +68,22 @@ const messages: Record<CombatTransitionCode, string> = {
   "invalid-combat-setup": "TEST 戰鬥設定或骰子結果不符合規則。",
 };
 
+const attackMessages: Record<NormalAttackCode, string> = {
+  "invalid-command": "普通攻擊請求格式不正確。",
+  "stale-revision": "戰鬥狀態已更新，請重新讀取後再攻擊。",
+  "revision-limit": "狀態版本已達工程上限，無法執行普通攻擊。",
+  "not-in-combat": "目前沒有進行中的戰鬥。",
+  "not-player-turn": "目前不是玩家可行動的回合。",
+  "illegal-target": "目前無法合法指定這名目標。",
+  "invalid-roll": "普通攻擊骰子服務暫時無法使用。",
+};
+
 function reject(code: CombatTransitionCode): CombatTransitionResult {
   return { ok: false, code, message: messages[code] };
+}
+
+function rejectAttack(code: NormalAttackCode): NormalAttackResult {
+  return { ok: false, code, message: attackMessages[code] };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -55,6 +95,15 @@ function parseExpectedRevision(value: unknown): number | undefined {
     || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision)
     || value.expectedRevision < 0) return undefined;
   return value.expectedRevision;
+}
+
+function parseNormalAttackCommand(value: unknown): { readonly expectedRevision: number; readonly targetId: string } | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 2
+    || !Object.hasOwn(value, "expectedRevision") || !Object.hasOwn(value, "targetId")
+    || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision)
+    || value.expectedRevision < 0 || typeof value.targetId !== "string"
+    || value.targetId.length === 0 || value.targetId.trim() !== value.targetId) return undefined;
+  return { expectedRevision: value.expectedRevision, targetId: value.targetId };
 }
 
 function rollD20(roller: DiceRoller): number {
@@ -73,7 +122,13 @@ function validateSeeds(seeds: readonly CombatParticipantSeed[]): void {
     if (typeof seed.id !== "string" || seed.id.trim() !== seed.id || seed.id.length === 0
       || typeof seed.displayName !== "string" || seed.displayName.trim() !== seed.displayName
       || seed.displayName.length === 0 || (seed.side !== "party" && seed.side !== "enemy")
-      || !Number.isSafeInteger(seed.dexterityModifier)) {
+      || (seed.row !== "front" && seed.row !== "back")
+      || !Number.isSafeInteger(seed.dexterityModifier)
+      || (seed.normalAttack !== null && (typeof seed.normalAttack !== "object"
+        || (seed.normalAttack.range !== "melee" && seed.normalAttack.range !== "ranged")
+        || !Number.isSafeInteger(seed.normalAttack.perceptionModifier)
+        || !Number.isSafeInteger(seed.normalAttack.weaponMainStatModifier)
+        || !Number.isSafeInteger(seed.normalAttack.proficiencyModifier)))) {
       throw new Error("戰鬥參與者設定不正確。");
     }
   }
@@ -136,13 +191,16 @@ export function rollInitiative(
       id: participant.id,
       displayName: participant.displayName,
       side: participant.side,
+      row: participant.row,
       initiative: {
         baseD20: participant.baseD20,
         dexterityModifier: participant.dexterityModifier,
         total: participant.total,
         tieBreakRolls: participant.tieBreakRolls,
       },
+      normalAttack: participant.normalAttack,
     })),
+    lastAction: null,
   });
 }
 
@@ -192,5 +250,87 @@ export function advanceCombatTurn(state: GameState, input: unknown): CombatTrans
     ok: true,
     state: createGameState({ ...state, revision: state.revision + 1, combat }),
     effect: { type: "combat-turn-advanced" },
+  };
+}
+
+export function getCurrentNormalAttackOptions(state: GameState): NormalAttackOptionsResult {
+  if (state.activity !== "in-combat" || state.combat === null) {
+    return { ok: false, code: "not-in-combat", message: attackMessages["not-in-combat"] };
+  }
+  return {
+    ok: true,
+    revision: state.revision,
+    options: getNormalAttackTargetOptions(state.combat),
+  };
+}
+
+/** One attack, its checks, saved result, turn consumption and revision are one transition. */
+export function resolveNormalAttack(
+  state: GameState,
+  input: unknown,
+  roller: DiceRoller,
+): NormalAttackResult {
+  const command = parseNormalAttackCommand(input);
+  if (!command) return rejectAttack("invalid-command");
+  if (command.expectedRevision !== state.revision) return rejectAttack("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectAttack("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectAttack("not-in-combat");
+
+  const combat = state.combat;
+  const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!attacker || attacker.side !== "party" || attacker.normalAttack === null) {
+    return rejectAttack("not-player-turn");
+  }
+  const target = combat.participants.find((participant) => participant.id === command.targetId);
+  if (!target || !checkNormalAttackTarget(combat, attacker, target.id, attacker.normalAttack.range).legal
+    || !getLegalNormalAttackTargets(combat, attacker.id, attacker.normalAttack.range).includes(target.id)) {
+    return rejectAttack("illegal-target");
+  }
+
+  let attackD20: number;
+  let evasionD20: number;
+  try {
+    attackD20 = rollD20(roller);
+    evasionD20 = rollD20(roller);
+  } catch {
+    return rejectAttack("invalid-roll");
+  }
+  const attackTotal = attackD20 + attacker.normalAttack.perceptionModifier
+    + attacker.normalAttack.weaponMainStatModifier + attacker.normalAttack.proficiencyModifier;
+  const evasionModifier = target.initiative.dexterityModifier;
+  const evasionTotal = evasionD20 + evasionModifier;
+  const outcome = attackTotal >= evasionTotal ? "hit" : "miss";
+  const wrapsRound = combat.currentTurnIndex === combat.turnOrder.length - 1;
+  const currentTurnIndex = wrapsRound ? 0 : combat.currentTurnIndex + 1;
+  const lastAction: NormalAttackActionResolution = Object.freeze({
+    type: "normal-attack",
+    round: combat.round,
+    actorId: attacker.id,
+    targetId: target.id,
+    attack: Object.freeze({
+      rawD20: attackD20,
+      perceptionModifier: attacker.normalAttack.perceptionModifier,
+      weaponMainStatModifier: attacker.normalAttack.weaponMainStatModifier,
+      proficiencyModifier: attacker.normalAttack.proficiencyModifier,
+      total: attackTotal,
+    }),
+    evasion: Object.freeze({
+      rawD20: evasionD20,
+      dexterityModifier: evasionModifier,
+      total: evasionTotal,
+    }),
+    outcome,
+  });
+  const nextCombat = createCombatState({
+    ...combat,
+    round: wrapsRound ? combat.round + 1 : combat.round,
+    currentTurnIndex,
+    currentActorId: combat.turnOrder[currentTurnIndex],
+    lastAction,
+  });
+  return {
+    ok: true,
+    state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "normal-attack-resolved", outcome },
   };
 }

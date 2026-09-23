@@ -131,7 +131,7 @@ test("candidate 注入權威欄位、非法 command 與 stale revision 都不能
 
 test("戰鬥中禁止探索 transition，權威狀態維持不變", async () => {
   const started = startCombat(seed(), { expectedRevision: 0 }, [
-    { id: "TEST-player", displayName: "TEST 玩家", side: "party", dexterityModifier: 0 },
+    { id: "TEST-player", displayName: "TEST 玩家", side: "party", row: "front", dexterityModifier: 0, normalAttack: null },
   ], { d20: () => 10 });
   assert.equal(started.ok, true);
   if (!started.ok) return;

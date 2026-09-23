@@ -18,7 +18,7 @@ import type { DiceRoller } from "../domain/combat.js";
 import { RandomD20Roller } from "./combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "./combat/fixtures.js";
 import { createCombatService } from "./combat/service.js";
-import { registerCombatSandbox } from "./combat/routes.js";
+import { registerCombatActionRoutes, registerCombatSandbox } from "./combat/routes.js";
 import { registerGameStateRoute } from "./game-state-route.js";
 
 export async function buildApp(options: {
@@ -33,6 +33,7 @@ export async function buildApp(options: {
   saveGameRepository?: SaveGameRepository;
   combatSandbox?: boolean;
   combatRoller?: DiceRoller;
+  combatActionRoller?: DiceRoller;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
@@ -42,18 +43,21 @@ export async function buildApp(options: {
   const saveGameRepository = options.saveGameRepository
     ?? new InMemorySaveGameRepository(() => session.getState());
   const combatSandboxEnabled = options.combatSandbox === true && process.env.NODE_ENV !== "production";
+  const combatService = createCombatService(
+    session,
+    TEST_COMBAT_PARTICIPANTS,
+    options.combatRoller ?? new RandomD20Roller(),
+    options.combatActionRoller ?? new RandomD20Roller(),
+  );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
+  registerCombatActionRoutes(app, combatService, storage, combatSandboxEnabled);
 
   if (options.domainSandbox && process.env.NODE_ENV !== "production") {
     registerDomainSandbox(app, session, storage);
   }
   if (combatSandboxEnabled) {
-    registerCombatSandbox(app, createCombatService(
-      session,
-      TEST_COMBAT_PARTICIPANTS,
-      options.combatRoller ?? new RandomD20Roller(),
-    ), storage);
+    registerCombatSandbox(app, combatService, storage);
   }
   if (options.interpreter) {
     registerInterpretationRoute(app, options.interpreter);

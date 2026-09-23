@@ -1453,3 +1453,93 @@ h1 {
   .combat-participant,
   .combat-commands .ui-button { scroll-behavior: auto; }
 }
+
+/* Phase 13：target controls and deterministic combat ruling. */
+.combat-target-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  margin-block-end: var(--space-3);
+  border-inline-start: 3px solid var(--action-primary);
+  background: var(--surface-elevated);
+}
+
+.combat-target-mode h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+}
+
+.combat-target-mode p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.combat-target-mode .ui-button { min-height: 3rem; }
+
+.combat-target-button {
+  width: 100%;
+  min-height: 3rem;
+  margin-block-start: var(--space-3);
+}
+
+.combat-target-blocked p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.combat-participant[data-row="front"] { border-block-start-color: var(--action-primary); }
+.combat-participant[data-row="back"] { border-block-start-color: var(--border-interactive); }
+
+.combat-last-action__pair {
+  margin-block-end: var(--space-3) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+.combat-last-action__checks {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.combat-last-action__checks > div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.combat-last-action__checks dt {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.combat-last-action__checks dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.combat-last-action__outcome {
+  padding-block-start: var(--space-2);
+  margin-block-start: var(--space-3) !important;
+  border-block-start: var(--border-width) solid var(--border-ornament);
+  color: var(--text-primary) !important;
+  font-weight: 700;
+}
+
+.combat-last-action__outcome[data-outcome="hit"] { color: var(--state-success) !important; }
+.combat-last-action__outcome[data-outcome="miss"] { color: var(--text-muted) !important; }
+
+.combat-commands [data-command="attack"] { min-height: 3rem; }
+
+@media (max-width: 30rem) {
+  .combat-target-mode { align-items: stretch; }
+  .combat-target-mode .ui-button { width: 100%; }
+}

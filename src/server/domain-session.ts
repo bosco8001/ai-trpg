@@ -3,6 +3,8 @@ import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 import {
   advanceCombatTurn,
+  getCurrentNormalAttackOptions,
+  resolveNormalAttack,
   startCombat as startCombatTransition,
   type CombatParticipantSeed,
   type DiceRoller,
@@ -17,6 +19,10 @@ export interface GameStateSession {
     ReturnType<typeof startCombatTransition> | Promise<ReturnType<typeof startCombatTransition>>;
   advanceCombat(input: unknown): ReturnType<typeof advanceCombatTurn>
     | Promise<ReturnType<typeof advanceCombatTurn>>;
+  normalAttackOptions(): ReturnType<typeof getCurrentNormalAttackOptions>
+    | Promise<ReturnType<typeof getCurrentNormalAttackOptions>>;
+  normalAttack(input: unknown, roller: DiceRoller): ReturnType<typeof resolveNormalAttack>
+    | Promise<ReturnType<typeof resolveNormalAttack>>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -41,6 +47,12 @@ export function createDomainSession(initialState: GameState) {
     },
     advanceCombat(input: unknown) {
       const result = advanceCombatTurn(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    normalAttackOptions: () => getCurrentNormalAttackOptions(state),
+    normalAttack(input: unknown, roller: DiceRoller) {
+      const result = resolveNormalAttack(state, input, roller);
       if (result.ok) state = result.state;
       return result;
     },
@@ -94,6 +106,26 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
         ok: false as const,
         code: "stale-revision" as const,
         message: "狀態已更新，請重新讀取後再推進回合。",
+      };
+    },
+    async normalAttackOptions() {
+      return getCurrentNormalAttackOptions(await repository.createIfAbsent(seed));
+    },
+    async normalAttack(input: unknown, roller: DiceRoller) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = resolveNormalAttack(state, input, roller);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = resolveNormalAttack(state, input, roller);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : {
+        ok: false as const,
+        code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新讀取後再攻擊。",
       };
     },
   };

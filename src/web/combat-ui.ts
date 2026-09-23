@@ -1,4 +1,9 @@
-import type { AuthoritativeGameStateResponse, CombatParticipantView, CombatStateView } from "../shared/game-state.js";
+import type {
+  AuthoritativeGameStateResponse,
+  CombatParticipantView,
+  CombatStateView,
+  NormalAttackOptionsResponse,
+} from "../shared/game-state.js";
 
 export type CombatPresentationLaneId = "enemy-back" | "enemy-front" | "party-front" | "party-back";
 
@@ -14,19 +19,12 @@ export interface TurnOrderEntry {
 }
 
 export const disabledCombatCommands = Object.freeze([
-  { id: "attack", label: "普通攻擊" },
   { id: "defend", label: "防禦" },
   { id: "inventory", label: "背包" },
   { id: "party", label: "隊伍" },
   { id: "move", label: "站位／移動" },
   { id: "flee", label: "逃走" },
 ] as const);
-
-const presentationFixture: Readonly<Record<string, CombatPresentationLaneId>> = Object.freeze({
-  "TEST-player": "party-front",
-  "TEST-enemy-1": "enemy-front",
-  "TEST-enemy-2": "enemy-back",
-});
 
 const laneLabels: Readonly<Record<CombatPresentationLaneId, string>> = Object.freeze({
   "enemy-back": "敵方後排",
@@ -37,16 +35,15 @@ const laneLabels: Readonly<Record<CombatPresentationLaneId, string>> = Object.fr
 
 const laneOrder: readonly CombatPresentationLaneId[] = ["enemy-back", "enemy-front", "party-front", "party-back"];
 
-/** Phase 12 畫面 fixture；不讀寫 GameState，也不代表正式前後排規則。 */
-export function getTestPresentationLanes(
+/** Participant card placement comes only from authoritative side + row. */
+export function getCombatPresentationLanes(
   participants: readonly CombatParticipantView[],
 ): readonly CombatPresentationLane[] {
   const grouped: Record<CombatPresentationLaneId, CombatParticipantView[]> = {
     "enemy-back": [], "enemy-front": [], "party-front": [], "party-back": [],
   };
   for (const participant of participants) {
-    const lane = presentationFixture[participant.id]
-      ?? (participant.side === "enemy" ? "enemy-front" : "party-front");
+    const lane: CombatPresentationLaneId = participant.side + "-" + participant.row as CombatPresentationLaneId;
     grouped[lane].push(participant);
   }
   return laneOrder.map((id) => ({ id, label: laneLabels[id], participants: grouped[id] }));
@@ -67,6 +64,22 @@ export function initiativeDetail(participant: CombatParticipantView): string {
     ? `+ ${participant.initiative.dexterityModifier}`
     : `− ${Math.abs(participant.initiative.dexterityModifier)}`;
   return `${participant.initiative.baseD20} ${modifier} = ${participant.initiative.total}`;
+}
+
+export function canPlayerUseNormalAttack(combat: CombatStateView, requestInFlight: boolean): boolean {
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null;
+}
+
+/** UI may submit only a target that the backend listed as legal for this exact revision. */
+export function isServerListedLegalTarget(
+  options: NormalAttackOptionsResponse | null,
+  targetId: string,
+  expectedRevision: number,
+): boolean {
+  return options !== null && options.revision === expectedRevision && options.canPlayerAct
+    && options.legalTargetIds.includes(targetId)
+    && options.targets.some((target) => target.targetId === targetId && target.legal);
 }
 
 export function applicationMode(response: AuthoritativeGameStateResponse): "exploration" | "combat" {

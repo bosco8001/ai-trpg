@@ -15,9 +15,13 @@ import {
 } from "../shared/save-game.js";
 import {
   isAuthoritativeGameStateResponse,
+  isCombatNormalAttackResponse,
   isCombatSandboxAdvanceResponse,
+  isNormalAttackOptionsResponse,
   type AuthoritativeGameStateResponse,
+  type CombatNormalAttackResponse,
   type CombatSandboxAdvanceResponse,
+  type NormalAttackOptionsResponse,
 } from "../shared/game-state.js";
 
 export async function checkApiHealth(
@@ -114,6 +118,55 @@ export async function advanceTestCombatTurn(
     throw new Error("TEST 戰鬥回應格式不正確。");
   }
   if (!isCombatSandboxAdvanceResponse(body)) throw new Error("TEST 戰鬥回應格式不正確。");
+  return body;
+}
+
+/** Reads server-derived target options; the result is never treated as persistent state. */
+export async function loadNormalAttackOptions(
+  fetcher: typeof fetch = fetch,
+): Promise<NormalAttackOptionsResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/normal-attack/options", { cache: "no-store" });
+  } catch {
+    throw new Error("目前無法讀取合法攻擊目標，請確認服務後再試。");
+  }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取合法攻擊目標，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("合法攻擊目標回應格式不正確。");
+  }
+  if (!isNormalAttackOptionsResponse(body)) throw new Error("合法攻擊目標回應格式不正確。");
+  return body;
+}
+
+/** Sends only the expected revision and selected target; the server chooses the actor and rolls both checks. */
+export async function executeNormalAttack(
+  expectedRevision: number,
+  targetId: string,
+  fetcher: typeof fetch = fetch,
+): Promise<CombatNormalAttackResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/normal-attack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision, targetId }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("普通攻擊暫時無法使用，請重新讀取戰鬥狀態。");
+  }
+  if (!response.ok) throw await saveApiError(response, "普通攻擊暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("普通攻擊回應格式不正確。");
+  }
+  if (!isCombatNormalAttackResponse(body)) throw new Error("普通攻擊回應格式不正確。");
   return body;
 }
 
