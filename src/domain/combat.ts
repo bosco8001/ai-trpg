@@ -7,6 +7,7 @@ import {
   type NormalAttackActionResolution,
   type RowMoveActionResolution,
   type ItemUseActionResolution,
+  type DefendActionResolution,
 } from "./combat-state.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
 import { getCombatItemDefinition } from "./combat-items.js";
@@ -108,6 +109,24 @@ export type CombatItemUseResult =
       readonly effect: { readonly type: "combat-item-used" };
     }
   | { readonly ok: false; readonly code: CombatItemUseCode; readonly message: string };
+
+export type DefendCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat" | "not-player-turn";
+
+export type DefendResult =
+  | { readonly ok: true; readonly state: GameState; readonly effect: { readonly type: "defend-completed" } }
+  | { readonly ok: false; readonly code: DefendCode; readonly message: string };
+
+const defendMessages: Record<DefendCode, string> = {
+  "invalid-command": "防禦請求格式不正確。",
+  "stale-revision": "戰鬥狀態已更新，請重新讀取後再防禦。",
+  "revision-limit": "狀態版本已達工程上限，無法執行防禦。",
+  "not-in-combat": "目前沒有進行中的戰鬥。",
+  "not-player-turn": "目前不是可操作角色的回合。",
+};
+
+function rejectDefend(code: DefendCode): DefendResult {
+  return { ok: false, code, message: defendMessages[code] };
+}
 
 const itemUseMessages: Record<CombatItemUseCode, string> = {
   "invalid-command": "物品使用請求格式不正確。",
@@ -457,6 +476,28 @@ export function useCombatItem(state: GameState, input: unknown): CombatItemUseRe
     ok: true,
     state: createGameState({ ...state, revision: state.revision + 1, inventory, combat: nextCombat }),
     effect: { type: "combat-item-used" },
+  };
+}
+
+/** Records the action and consumes one full Turn; damage effects remain unresolved. */
+export function defendCombatTurn(state: GameState, input: unknown): DefendResult {
+  const expectedRevision = parseExpectedRevision(input);
+  if (expectedRevision === undefined) return rejectDefend("invalid-command");
+  if (expectedRevision !== state.revision) return rejectDefend("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectDefend("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectDefend("not-in-combat");
+
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor)) return rejectDefend("not-player-turn");
+  const lastAction: DefendActionResolution = Object.freeze({
+    type: "defend", actorId: actor.id, round: combat.round,
+  });
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), lastAction });
+  return {
+    ok: true,
+    state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "defend-completed" },
   };
 }
 

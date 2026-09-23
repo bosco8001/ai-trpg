@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–14 已由使用者確認。Phase 15「戰鬥背包與物品使用」工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–15 已由使用者確認。Phase 16「防禦行動」工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -363,8 +363,14 @@ DOMAIN_STORAGE=memory COMBAT_SANDBOX=1 COMBAT_ROLL_FIXTURE_MODE=normal COMBAT_AC
 
 ## Phase 15：戰鬥背包與物品使用手動驗收
 
-Phase 1–14 已由使用者確認。Phase 15 工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。完整記憶體、取消、耗盡、錯誤狀態、PostgreSQL、手機與鍵盤步驟見 [Phase 15 文件](docs/development/PHASE_15_COMBAT_ITEMS.md)。
+Phase 1–15 已由使用者確認。完整記憶體、取消、耗盡、錯誤狀態、PostgreSQL、手機與鍵盤步驟見 [Phase 15 文件](docs/development/PHASE_15_COMBAT_ITEMS.md)。
 
 本階段只提供 `TEST-combat-consumable × 2` 工程 fixture，沒有 HP、MP、治療、傷害或狀態效果。打開／關閉背包不改狀態；確認使用會扣一件、記錄 `item-use`，並結束目前 Turn。數量、recent action 和 combat state 保存在既有 `game_states.snapshot` JSONB，沒有新增 migration。
 
 唯讀選項 API：`GET /api/combat/items/options`。成功使用 API：`POST /api/combat/items/use`，request body 精確為 `expectedRevision` 與 `itemId`。後端每次重新驗證玩家行動者與數量；前端只採用成功回應中的權威狀態與 options。
+
+## Phase 16：防禦行動手動驗收
+
+Phase 16 工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。完整步驟見 [Phase 16 文件](docs/development/PHASE_16_DEFEND.md)。
+
+玩家回合的「防禦」先開確認；確認後呼叫 `POST /api/combat/defend`，body 精確只有 `expectedRevision`。後端決定 actor，記錄 `lastAction = defend`，消耗完整 Turn，revision 只增加一次。最近行動只顯示已發生的防禦，不顯示持續中的防禦狀態或減傷數值。既有 JSONB snapshot 保存行動、Round、actor 與 revision；沒有新 migration。

@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–14 已由使用者確認。Phase 15「戰鬥背包與物品使用」工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。
+Phase 1–15 已由使用者確認。Phase 16「防禦行動」工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -217,4 +217,16 @@ Combat UI 啟用背包入口，開關背包會關閉攻擊／換排 presentation
 
 工程檢查：`npm test` 共 155 項，149 項通過、0 項失敗、6 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有待執行 migration。工程階段未執行瀏覽器／手機／鍵盤手動驗收或 PostgreSQL restart；由使用者依 Phase 15 清單測試。
 
-Phase 1–14 已由使用者確認。Phase 15 工程實作完成，等待使用者手動確認。Phase 16 尚未開始。
+Phase 1–15 已由使用者確認。
+
+## Phase 16 交付紀錄
+
+新增 `POST /api/combat/defend`，request 只接受 `expectedRevision`。後端從目前 CombatState 取得 actor，驗證玩家操作邊界與 revision，記錄 `defend` lastAction，沿用 Phase 11 回合推進，於單一 transition 增加一次 revision。敵方回合、stale、無戰鬥、格式錯誤與額外欄位都不改狀態；防禦不擲骰。
+
+Combat UI 啟用「防禦」與確認／取消，只有確認才送 POST。最近行動只呈現機械事實。四種 lastAction 均維持 runtime validation 與既有 JSONB 保存。沒有傷害、減傷比例、持續狀態、到期欄位或 migration。未決的減傷量、生效與失效 timing 繼續列於 [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)。
+
+新增 `tests/combat-defend.test.ts` 與 [Phase 16 手動驗收文件](PHASE_16_DEFEND.md)。修改 combat domain/state、session、service、routes、shared response contract、前端 API／CombatPage／UI helper，以及 README、OPEN_QUESTIONS 和本計畫。
+
+工程檢查：`npm test` 共 163 項，156 項通過、0 項失敗、7 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過。Dry run 顯示沒有待執行 migration。瀏覽器／手機／鍵盤與 PostgreSQL restart 仍由使用者手動驗收。
+
+Phase 16 工程實作完成，等待使用者手動確認。Phase 17 尚未開始。

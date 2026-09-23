@@ -1,6 +1,6 @@
 # Phase 10：Manual Save / Load
 
-> Phase 1–14 已由使用者確認。Phase 15 工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。
+> Phase 1–15 已由使用者確認。Phase 16 工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。
 
 這一階段像拍下正式記分板的照片，再於需要時把照片內容重新寫到現在的記分板。拍照不改變比賽，所以 Save 不增加 revision；Load 是新的正式變更，所以只從目前 live revision 往前增加一次。
 

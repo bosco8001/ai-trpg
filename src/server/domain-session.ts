@@ -3,6 +3,7 @@ import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 import {
   advanceCombatTurn,
+  defendCombatTurn,
   getCurrentCombatItemOptions,
   getCurrentRowMoveOptions,
   getCurrentNormalAttackOptions,
@@ -35,6 +36,7 @@ export interface GameStateSession {
     | Promise<ReturnType<typeof moveCombatRow>>;
   combatItemOptions(): CombatItemOptionsResult | Promise<CombatItemOptionsResult>;
   useCombatItem(input: unknown): CombatItemUseResult | Promise<CombatItemUseResult>;
+  defend(input: unknown): ReturnType<typeof defendCombatTurn> | Promise<ReturnType<typeof defendCombatTurn>>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -77,6 +79,11 @@ export function createDomainSession(initialState: GameState) {
     combatItemOptions: () => getCurrentCombatItemOptions(state),
     useCombatItem(input: unknown) {
       const result = useCombatItemTransition(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    defend(input: unknown) {
+      const result = defendCombatTurn(state, input);
       if (result.ok) state = result.state;
       return result;
     },
@@ -190,6 +197,23 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
         ok: false as const,
         code: "stale-revision" as const,
         message: "戰鬥狀態已更新，請重新讀取後再使用物品。",
+      };
+    },
+    async defend(input: unknown) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = defendCombatTurn(state, input);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = defendCombatTurn(state, input);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : {
+        ok: false as const,
+        code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新讀取後再防禦。",
       };
     },
   };

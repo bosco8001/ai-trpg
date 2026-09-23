@@ -23,8 +23,9 @@
 - 正式物品效果與目標規則仍未定；Phase 15 的 TEST self-use fixture 只消耗數量，不代表世界物品或正式效果。
 - 戰鬥中是否允許 Save / Load 尚未決定。Phase 11 暫時安全拒絕戰鬥中的保存與載入，避免 Save Format v1 遺失 CombatState；這不是正式 gameplay rule。
 - 每排容量／擁擠、換排攔截、區域控制與 opportunity attack 尚未定義。Phase 14 只允許確定前後排換位，不加入容量限制或反擊。
-- 防禦的正式減傷百分比。
-- 防禦狀態精確持續 timing。
+- 防禦的正式減傷量／百分比尚未定案；Prototype 的 `-30%` 不是正式規則。Phase 16 只完成 Defend action plumbing，沒有減傷效果。
+- 防禦減傷何時開始生效尚未定案。
+- 防禦減傷何時失效、精確持續 timing 尚未定案；一次攻擊、一輪或直到下次自己的 Turn 等方案都未定。
 - 防禦是否對所有傷害類型完全相同。
 - 暴擊造成小數傷害時的統一取整規則。
 - 瀕死「2 回合」的精確倒數 timing。

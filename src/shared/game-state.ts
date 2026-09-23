@@ -65,7 +65,13 @@ export interface ItemUseResolutionView {
   readonly quantityAfter: number;
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView | ItemUseResolutionView;
+export interface DefendResolutionView {
+  readonly type: "defend";
+  readonly actorId: string;
+  readonly round: number;
+}
+
+export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView;
 
 export interface CombatStateView {
   readonly round: number;
@@ -129,6 +135,10 @@ export interface CombatRowMoveResponse extends AuthoritativeGameStateResponse {
 export interface CombatItemUseResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "combat-item-used" };
   readonly options: CombatItemOptionsResponse;
+}
+
+export interface CombatDefendResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "defend-completed" };
 }
 
 export interface AuthoritativeGameStateView {
@@ -250,6 +260,12 @@ function isItemUseResolution(value: unknown): value is ItemUseResolutionView {
     && isSafeInteger(value.quantityAfter) && value.quantityAfter === value.quantityBefore - 1;
 }
 
+function isDefendResolution(value: unknown): value is DefendResolutionView {
+  return isRecord(value) && exact(value, ["type", "actorId", "round"])
+    && value.type === "defend" && isId(value.actorId)
+    && isSafeInteger(value.round) && value.round > 0;
+}
+
 function resolveTieOrder(participants: readonly CombatParticipantView[], rollIndex: number): string[] | undefined {
   const groups = new Map<number, CombatParticipantView[]>();
   for (const participant of participants) {
@@ -311,7 +327,8 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   const expected = expectedTurnOrder(validatedParticipants);
   const lastAction = value.lastAction;
   if (lastAction !== null && !isNormalAttackResolution(lastAction)
-    && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)) return false;
+    && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)
+    && !isDefendResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
@@ -327,7 +344,8 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
       || (ids.includes(lastAction.targetId)
         && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"))
     && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow)
-    && (lastAction === null || lastAction.type !== "item-use" || actor?.normalAttack !== null);
+    && (lastAction === null || (lastAction.type !== "item-use" && lastAction.type !== "defend")
+      || actor?.normalAttack !== null);
 }
 
 export function isAuthoritativeGameStateView(value: unknown): value is AuthoritativeGameStateView {
@@ -468,4 +486,14 @@ export function isCombatItemUseResponse(value: unknown): value is CombatItemUseR
     && value.options.items.length === state.inventory.length
     && value.options.items.every((item) => state.inventory.some((stack) =>
       stack.itemId === item.itemId && stack.quantity === item.quantity));
+}
+
+export function isCombatDefendResponse(value: unknown): value is CombatDefendResponse {
+  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+    && typeof value.sandbox === "boolean"
+    && (value.storage === "memory" || value.storage === "postgres")
+    && isAuthoritativeGameStateView(value.state)
+    && isRecord(value.effect) && exact(value.effect, ["type"])
+    && value.effect.type === "defend-completed"
+    && value.state.combat?.lastAction?.type === "defend";
 }

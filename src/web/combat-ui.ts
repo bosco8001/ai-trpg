@@ -22,7 +22,6 @@ export interface TurnOrderEntry {
 }
 
 export const disabledCombatCommands = Object.freeze([
-  { id: "defend", label: "防禦" },
   { id: "party", label: "隊伍" },
   { id: "flee", label: "逃走" },
 ] as const);
@@ -70,6 +69,10 @@ export function initiativeDetail(participant: CombatParticipantView): string {
 export function canPlayerUseNormalAttack(combat: CombatStateView, requestInFlight: boolean): boolean {
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null;
+}
+
+export function canPlayerDefend(combat: CombatStateView, requestInFlight: boolean): boolean {
+  return canPlayerUseNormalAttack(combat, requestInFlight);
 }
 
 export function canPlayerUseRowMove(

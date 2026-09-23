@@ -71,7 +71,13 @@ export interface ItemUseActionResolution {
   readonly quantityAfter: number;
 }
 
-export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution | ItemUseActionResolution;
+export interface DefendActionResolution {
+  readonly type: "defend";
+  readonly actorId: string;
+  readonly round: number;
+}
+
+export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution;
 
 export interface CombatState {
   readonly round: number;
@@ -286,12 +292,19 @@ function parseItemUseAction(value: Record<string, unknown>): ItemUseActionResolu
   });
 }
 
+function parseDefendAction(value: Record<string, unknown>): DefendActionResolution | undefined {
+  if (!exact(value, ["type", "actorId", "round"])
+    || value.type !== "defend" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)) return undefined;
+  return Object.freeze({ type: "defend", actorId: value.actorId, round: value.round });
+}
+
 function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
   if (value.type === "normal-attack") return parseNormalAttackAction(value);
   if (value.type === "row-move") return parseRowMoveAction(value);
   if (value.type === "item-use") return parseItemUseAction(value);
+  if (value.type === "defend") return parseDefendAction(value);
   return undefined;
 }
 
@@ -328,7 +341,7 @@ export function createCombatState(value: unknown): CombatState {
         || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))
     || (lastAction?.type === "row-move"
       && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
-    || (lastAction?.type === "item-use"
+    || ((lastAction?.type === "item-use" || lastAction?.type === "defend")
       && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!))) {
     throw new Error("CombatState 行動順序或最近裁定不一致。");
   }

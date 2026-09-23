@@ -19,6 +19,7 @@ import {
   isCombatRowMoveResponse,
   isCombatItemOptionsResponse,
   isCombatItemUseResponse,
+  isCombatDefendResponse,
   isCombatSandboxAdvanceResponse,
   isNormalAttackOptionsResponse,
   isRowMoveOptionsResponse,
@@ -27,6 +28,7 @@ import {
   type CombatRowMoveResponse,
   type CombatItemOptionsResponse,
   type CombatItemUseResponse,
+  type CombatDefendResponse,
   type CombatSandboxAdvanceResponse,
   type NormalAttackOptionsResponse,
   type RowMoveOptionsResponse,
@@ -281,6 +283,35 @@ export async function executeCombatItemUse(
     || action?.type !== "item-use" || action.itemId !== itemId
     || body.options.revision !== expectedRevision + 1) {
     throw new Error("物品使用回應格式不正確。");
+  }
+  return body;
+}
+
+/** Sends the exact revision-only command; actor and Turn advancement are decided by the server. */
+export async function executeDefend(
+  expectedRevision: number,
+  fetcher: typeof fetch = fetch,
+): Promise<CombatDefendResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/defend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("防禦暫時無法使用，請重新讀取戰鬥狀態。");
+  }
+  if (!response.ok) throw await saveApiError(response, "防禦暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("防禦回應格式不正確。");
+  }
+  if (!isCombatDefendResponse(body) || body.state.revision !== expectedRevision + 1) {
+    throw new Error("防禦回應格式不正確。");
   }
   return body;
 }

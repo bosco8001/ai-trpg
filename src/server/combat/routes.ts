@@ -1,10 +1,11 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { createGameState } from "../../domain/game.js";
 import { getCurrentCombatItemOptions } from "../../domain/combat.js";
-import type { CombatItemUseResult, CombatTransitionResult, NormalAttackResult, RowMoveResult } from "../../domain/combat.js";
+import type { CombatItemUseResult, CombatTransitionResult, DefendResult, NormalAttackResult, RowMoveResult } from "../../domain/combat.js";
 import {
   isCombatItemOptionsResponse,
   isCombatItemUseResponse,
+  isCombatDefendResponse,
   isCombatNormalAttackResponse,
   isCombatRowMoveResponse,
   isNormalAttackOptionsResponse,
@@ -124,6 +125,21 @@ function safeItemUseFailure(app: FastifyInstance, reply: FastifyReply, error: un
     return reply.code(500).send({ error: "state-invalid", message: "已保存的戰鬥狀態無法安全讀取。" });
   }
   return reply.code(500).send({ error: "combat-item-use-failed", message: "目前無法使用物品，請重新讀取戰鬥狀態。" });
+}
+
+function defendStatus(result: Extract<DefendResult, { ok: false }>): number {
+  return result.code === "invalid-command" ? 400 : 409;
+}
+
+function safeDefendFailure(app: FastifyInstance, reply: FastifyReply, error: unknown) {
+  app.log.error({ err: error }, "戰鬥防禦操作失敗");
+  if (error instanceof PersistenceUnavailableError) {
+    return reply.code(503).send({ error: "state-unavailable", message: "戰鬥狀態暫時無法使用，請稍後再試。" });
+  }
+  if (error instanceof InvalidPersistedStateError) {
+    return reply.code(500).send({ error: "state-invalid", message: "已保存的戰鬥狀態無法安全讀取。" });
+  }
+  return reply.code(500).send({ error: "combat-defend-failed", message: "目前無法處理防禦，請重新讀取戰鬥狀態。" });
 }
 
 /** Formal read/action boundary. Legal targets are derived; only the attack transition writes state. */
@@ -250,6 +266,30 @@ export function registerCombatActionRoutes(
       return response;
     } catch (error) {
       return safeItemUseFailure(app, reply, error);
+    }
+  });
+
+  app.post<{ Body: unknown }>("/api/combat/defend", {
+    bodyLimit: 1024,
+    errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.code(400).send({ error: "invalid-request", message: "請送出有效的防禦請求。" });
+    },
+  }, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.defend(request.body);
+      if (!result.ok) return reply.code(defendStatus(result)).send({ error: result.code, message: result.message });
+      const response = {
+        sandbox,
+        storage,
+        effect: result.effect,
+        state: validatedState(result.state),
+      };
+      if (!isCombatDefendResponse(response)) throw new Error("防禦回應未通過 runtime validation。");
+      return response;
+    } catch (error) {
+      return safeDefendFailure(app, reply, error);
     }
   });
 }

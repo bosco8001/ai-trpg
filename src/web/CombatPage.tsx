@@ -12,6 +12,7 @@ import type {
 import {
   advanceTestCombatTurn,
   executeCombatItemUse,
+  executeDefend,
   executeNormalAttack,
   executeRowMove,
   loadCombatItemOptions,
@@ -25,6 +26,7 @@ import {
   initiativeDetail,
   canPlayerUseRowMove,
   canPlayerUseNormalAttack,
+  canPlayerDefend,
   isServerListedLegalTarget,
   isServerListedLegalTargetRow,
   isServerListedUsableCombatItem,
@@ -145,6 +147,17 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       </Panel>
     );
   }
+  if (action.type === "defend") {
+    return (
+      <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+        <p className="combat-eyebrow">最近行動・第 {action.round} 回合</p>
+        <h2 id="combat-last-action-heading">最近行動</h2>
+        <p className="combat-last-action__pair">{actor}</p>
+        <p className="combat-last-action__row-move">選擇：防禦</p>
+        <p className="combat-last-action__outcome">防禦行動已完成。實際減傷效果尚未接入。</p>
+      </Panel>
+    );
+  }
   const target = participants.get(action.targetId)?.displayName ?? action.targetId;
   return (
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
@@ -204,9 +217,15 @@ export function CombatPage({
   const [bagOptionsReloadId, setBagOptionsReloadId] = useState(0);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [isUsingItem, setIsUsingItem] = useState(false);
+  const [isDefendConfirmationOpen, setIsDefendConfirmationOpen] = useState(false);
+  const [isSubmittingDefend, setIsSubmittingDefend] = useState(false);
   const [targetOptions, setTargetOptions] = useState<NormalAttackOptionsResponse | null>(null);
   const [feedback, setFeedback] = useState(stateError ?? "");
   const attackButton = useRef<HTMLButtonElement>(null);
+  const defendButton = useRef<HTMLButtonElement>(null);
+  const defendHeading = useRef<HTMLHeadingElement>(null);
+  const restoreDefendFocus = useRef(false);
+  const defendRequestInFlight = useRef(false);
   const rowMoveButton = useRef<HTMLButtonElement>(null);
   const bagButton = useRef<HTMLButtonElement>(null);
   const bagHeading = useRef<HTMLHeadingElement>(null);
@@ -230,6 +249,14 @@ export function CombatPage({
       restoreAttackFocus.current = false;
     }
   }, [isTargeting]);
+  useEffect(() => {
+    if (isDefendConfirmationOpen) {
+      defendHeading.current?.focus();
+    } else if (restoreDefendFocus.current) {
+      defendButton.current?.focus();
+      restoreDefendFocus.current = false;
+    }
+  }, [isDefendConfirmationOpen]);
   useEffect(() => {
     if (isRowMoveMode) {
       rowMoveHeading.current?.focus();
@@ -334,10 +361,11 @@ export function CombatPage({
 
   const lanes = getCombatPresentationLanes(combat.participants);
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
-  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem;
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend;
   const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions;
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
+  const canDefend = canPlayerDefend(combat, mutationInFlight);
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
@@ -357,8 +385,51 @@ export function CombatPage({
     setIsRowMoveMode(false);
     setIsLoadingRowMoveOptions(false);
     setPendingItemId(null);
+    setIsDefendConfirmationOpen(false);
     setIsBagOpen(true);
     setFeedback("");
+  }
+
+  function beginDefendConfirmation() {
+    if (!canDefend || mutationInFlight) return;
+    setIsTargeting(false);
+    setTargetOptions(null);
+    setIsRowMoveMode(false);
+    setPendingItemId(null);
+    setIsBagOpen(false);
+    setIsDefendConfirmationOpen(true);
+    setFeedback("");
+  }
+
+  function cancelDefendConfirmation() {
+    if (isSubmittingDefend) return;
+    restoreDefendFocus.current = true;
+    setIsDefendConfirmationOpen(false);
+    setFeedback("已取消防禦；戰鬥狀態沒有改變。");
+  }
+
+  function confirmDefend() {
+    if (!isDefendConfirmationOpen || !canDefend || mutationInFlight || defendRequestInFlight.current) return;
+    defendRequestInFlight.current = true;
+    setIsSubmittingDefend(true);
+    setFeedback("正在提交防禦並結束目前回合……");
+    void executeDefend(gameState.state.revision).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setIsDefendConfirmationOpen(false);
+      setFeedback("防禦行動已完成；目前回合已結束。實際減傷效果尚未接入。");
+    }).catch(async (error: unknown) => {
+      setIsDefendConfirmationOpen(false);
+      setFeedback(error instanceof Error ? error.message : "防禦暫時無法使用，請重新讀取戰鬥狀態。");
+      try {
+        const latest = await onRetryState();
+        onStateUpdate(latest);
+      } catch {
+        // Keep the last server-confirmed state and the safe action error.
+      }
+    }).finally(() => {
+      defendRequestInFlight.current = false;
+      setIsSubmittingDefend(false);
+    });
   }
 
   function cancelItemConfirmation() {
@@ -480,10 +551,12 @@ export function CombatPage({
     void executeRowMove(gameState.state.revision, targetRow).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
       setIsRowMoveMode(false);
+      setIsDefendConfirmationOpen(false);
       setRowMoveOptions(null);
       setFeedback("換排完成；目前回合已結束。");
     }).catch(async (error: unknown) => {
       setIsRowMoveMode(false);
+      setIsDefendConfirmationOpen(false);
       setRowMoveOptions(null);
       setFeedback(error instanceof Error ? error.message : "移動暫時無法使用，請重新讀取戰鬥狀態。");
       try {
@@ -507,6 +580,7 @@ export function CombatPage({
       setIsTargeting(false);
       setTargetOptions(null);
       setIsRowMoveMode(false);
+      setIsDefendConfirmationOpen(false);
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
       setFeedback("TEST 回合已由權威戰鬥引擎推進。");
     }).catch(() => {
@@ -522,6 +596,7 @@ export function CombatPage({
       setIsTargeting(false);
       setTargetOptions(null);
       setIsRowMoveMode(false);
+      setIsDefendConfirmationOpen(false);
       setRowMoveOptionsReloadId((value) => value + 1);
       onStateUpdate(next);
       setFeedback("戰鬥狀態已重新讀取。");
@@ -680,6 +755,27 @@ export function CombatPage({
                 </div>
               </section>
             ) : null}
+            {isDefendConfirmationOpen ? (
+              <section id="combat-defend-panel" className="combat-row-move-mode" aria-labelledby="combat-defend-heading" aria-live="polite">
+                <div className="combat-row-move-mode__intro">
+                  <h3 id="combat-defend-heading" ref={defendHeading} tabIndex={-1}>確定要選擇防禦嗎？</h3>
+                  <p>防禦會消耗目前行動。實際減傷效果尚未接入。</p>
+                </div>
+                <div className="combat-row-move-mode__choices">
+                  <Button
+                    variant="primary"
+                    data-action="confirm-defend"
+                    disabled={mutationInFlight}
+                    loading={isSubmittingDefend}
+                    loadingLabel="正在防禦……"
+                    onClick={confirmDefend}
+                  >
+                    確認防禦
+                  </Button>
+                  <Button variant="secondary" disabled={isSubmittingDefend} onClick={cancelDefendConfirmation}>取消</Button>
+                </div>
+              </section>
+            ) : null}
             <div className="combat-lanes">
               {lanes.map((lane, index) => (
                 <section key={lane.id} className="combat-lane" data-lane={lane.id} aria-labelledby={"lane-" + lane.id}>
@@ -738,7 +834,7 @@ export function CombatPage({
             <Panel className="combat-rail__panel" aria-labelledby="combat-commands-heading">
               <p className="combat-eyebrow">指令</p>
               <h2 id="combat-commands-heading">基本指令</h2>
-              <p className="combat-rail__notice">普通攻擊與換排可用；其他指令仍由系統停用。</p>
+              <p className="combat-rail__notice">普通攻擊、移動、背包及防禦依目前回合開放。</p>
               <div className="combat-commands">
                 <Button
                   ref={attackButton}
@@ -773,6 +869,17 @@ export function CombatPage({
                 >
                   {isBagOpen ? "關閉背包" : "背包"}
                 </Button>
+                <Button
+                  ref={defendButton}
+                  variant="secondary"
+                  data-command="defend"
+                  disabled={!canDefend || mutationInFlight || isDefendConfirmationOpen}
+                  aria-expanded={isDefendConfirmationOpen}
+                  aria-controls="combat-defend-panel"
+                  onClick={beginDefendConfirmation}
+                >
+                  防禦
+                </Button>
                 {disabledCombatCommands.map((command) => (
                   <Button key={command.id} variant="secondary" disabled data-command={command.id}>{command.label}</Button>
                 ))}
@@ -790,7 +897,7 @@ export function CombatPage({
                   重新載入移動選項
                 </Button>
               ) : null}
-              {currentActor?.side === "enemy" ? <p className="combat-rail__notice">目前是敵方回合，玩家不能執行攻擊或移動。</p> : null}
+              {currentActor?.side === "enemy" ? <p className="combat-rail__notice">目前是敵方回合，玩家不能執行攻擊、移動或防禦。</p> : null}
             </Panel>
 
             {gameState.sandbox ? (
