@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–15 已由使用者確認。Phase 16「防禦行動」工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。
+Phase 1–16 已由使用者確認。Phase 17「逃跑行動」工程實作完成，等待使用者手動驗收；Phase 18 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -229,4 +229,12 @@ Combat UI 啟用「防禦」與確認／取消，只有確認才送 POST。最�
 
 工程檢查：`npm test` 共 163 項，156 項通過、0 項失敗、7 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過。Dry run 顯示沒有待執行 migration。瀏覽器／手機／鍵盤與 PostgreSQL restart 仍由使用者手動驗收。
 
-Phase 16 工程實作完成，等待使用者手動確認。Phase 17 尚未開始。
+Phase 16 已由使用者手動確認。
+
+## Phase 17 交付紀錄
+
+新增 `POST /api/combat/run`，request 只接受 `expectedRevision`。後端使用獨立的可注入 D20 擲骰、既有 participant 敏捷修正與種族修正，依 canonical DC 8 裁定。TEST 玩家種族修正 0；domain 支援龍裔 −2，測試使用同骰值驗證差異。成功在同一次 transition 將 CombatState 設為 `ended`／`escaped`，移除目前可行動 actor，不推進 Turn；失敗保留 `active` 並推進 Turn。兩者都只增加一次 revision，保存完整 `run` lastAction。
+
+舊 CombatState 缺少 lifecycle 欄位時安全 hydrate 為 `active`；PostgreSQL JSONB 保存 lifecycle、end reason、裁定及 revision，無新 migration。戰鬥已結束後攻擊、換排、物品、防禦、再次逃跑及 TEST advance 都由後端拒絕。Save／Load 防護維持。Combat UI 啟用逃跑確認與取消，成功呈現終止畫面並停用所有指令；失敗顯示機械結果與下一位行動者。沒有追逐、結算獎勵、探索改動或 LLM 敘事。
+
+新增 `tests/combat-run.test.ts` 與 [Phase 17 手動驗收文件](PHASE_17_RUN_ESCAPE.md)。工程檢查：`npm test` 共 174 項，166 項通過、0 項失敗、8 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build` 與 `git diff --check` 通過。瀏覽器／手機／鍵盤與 PostgreSQL restart 仍由使用者手動驗收。Phase 17 等待使用者手動確認。Phase 18 尚未開始。

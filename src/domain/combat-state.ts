@@ -25,6 +25,7 @@ export interface CombatParticipant {
   readonly row: CombatRow;
   readonly initiative: CombatInitiative;
   readonly normalAttack: CombatNormalAttackProfile | null;
+  readonly racialEscapeModifier: 0 | -2;
 }
 
 /** Existing player-action boundary: the controllable party actor has the player's action profile. */
@@ -77,16 +78,43 @@ export interface DefendActionResolution {
   readonly round: number;
 }
 
-export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution;
-
-export interface CombatState {
+export interface RunActionResolution {
+  readonly type: "run";
+  readonly actorId: string;
   readonly round: number;
-  readonly currentTurnIndex: number;
-  readonly currentActorId: string;
+  readonly rawD20: number;
+  readonly dexterityModifier: number;
+  readonly racialModifier: number;
+  readonly total: number;
+  readonly dc: 8;
+  readonly outcome: "success" | "failure";
+}
+
+export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution;
+
+interface CombatStateBase {
+  readonly round: number;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipant[];
   readonly lastAction: CombatLastAction | null;
 }
+
+export interface ActiveCombatState extends CombatStateBase {
+  readonly status: "active";
+  readonly endReason: null;
+  readonly currentTurnIndex: number;
+  readonly currentActorId: string;
+}
+
+export interface EndedCombatState extends CombatStateBase {
+  readonly status: "ended";
+  readonly endReason: "escaped";
+  readonly currentTurnIndex: null;
+  readonly currentActorId: null;
+  readonly lastAction: RunActionResolution & { readonly outcome: "success" };
+}
+
+export type CombatState = ActiveCombatState | EndedCombatState;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -117,14 +145,16 @@ const legacyTestPositions: Readonly<Record<string, {
   readonly side: CombatSide;
   readonly row: CombatRow;
   readonly normalAttack: CombatNormalAttackProfile | null;
+  readonly racialEscapeModifier: 0 | -2;
 }>> = Object.freeze({
-  "TEST-enemy-2": Object.freeze({ displayName: "TEST 敵人 2", side: "enemy", row: "back", normalAttack: null }),
-  "TEST-enemy-1": Object.freeze({ displayName: "TEST 敵人 1", side: "enemy", row: "front", normalAttack: null }),
+  "TEST-enemy-2": Object.freeze({ displayName: "TEST 敵人 2", side: "enemy", row: "back", normalAttack: null, racialEscapeModifier: 0 }),
+  "TEST-enemy-1": Object.freeze({ displayName: "TEST 敵人 1", side: "enemy", row: "front", normalAttack: null, racialEscapeModifier: 0 }),
   "TEST-player": Object.freeze({
     displayName: "TEST 玩家", side: "party", row: "front",
     normalAttack: Object.freeze({
       range: "melee", perceptionModifier: 1, weaponMainStatModifier: 2, proficiencyModifier: 1,
     }),
+    racialEscapeModifier: 0,
   }),
 });
 
@@ -146,14 +176,19 @@ function parseNormalAttackProfile(value: unknown): CombatNormalAttackProfile | n
 function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): CombatParticipant {
   if (!isRecord(value)) throw new Error("戰鬥參與者格式不正確。");
   let normalized: Record<string, unknown> = value;
-  if (allowKnownLegacyTest && exact(value, ["id", "displayName", "side", "initiative"])) {
+  if (allowKnownLegacyTest && (exact(value, ["id", "displayName", "side", "initiative"])
+    || exact(value, ["id", "displayName", "side", "initiative", "racialEscapeModifier"]))) {
     const known = typeof value.id === "string" ? legacyTestPositions[value.id] : undefined;
-    if (!known || value.displayName !== known.displayName || value.side !== known.side) {
+    if (!known || value.displayName !== known.displayName || value.side !== known.side
+      || (Object.hasOwn(value, "racialEscapeModifier") && value.racialEscapeModifier !== 0)) {
       throw new Error("未知舊版戰鬥參與者缺少權威 row。");
     }
-    normalized = { ...value, row: known.row, normalAttack: known.normalAttack };
+    normalized = { ...value, row: known.row, normalAttack: known.normalAttack, racialEscapeModifier: 0 };
   }
-  if (!exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack"])
+  if (exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack"])) {
+    normalized = { ...normalized, racialEscapeModifier: 0 };
+  }
+  if (!exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
     || !isId(normalized.id) || !isId(normalized.displayName)
     || (normalized.side !== "party" && normalized.side !== "enemy")
     || (normalized.row !== "front" && normalized.row !== "back")
@@ -163,7 +198,9 @@ function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): Combat
   }
   const normalAttack = parseNormalAttackProfile(normalized.normalAttack);
   const initiative = normalized.initiative;
-  if (normalAttack === undefined || !isD20(initiative.baseD20) || !isSafeInteger(initiative.dexterityModifier)
+  if (normalAttack === undefined || !isSafeInteger(normalized.racialEscapeModifier)
+    || (normalized.racialEscapeModifier !== 0 && normalized.racialEscapeModifier !== -2)
+    || !isD20(initiative.baseD20) || !isSafeInteger(initiative.dexterityModifier)
     || !isSafeInteger(initiative.total)
     || initiative.total !== initiative.baseD20 + initiative.dexterityModifier
     || !Array.isArray(initiative.tieBreakRolls) || !initiative.tieBreakRolls.every(isD20)) {
@@ -181,6 +218,7 @@ function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): Combat
       tieBreakRolls: Object.freeze([...initiative.tieBreakRolls]),
     }),
     normalAttack,
+    racialEscapeModifier: normalized.racialEscapeModifier as 0 | -2,
   });
 }
 
@@ -298,6 +336,20 @@ function parseDefendAction(value: Record<string, unknown>): DefendActionResoluti
   return Object.freeze({ type: "defend", actorId: value.actorId, round: value.round });
 }
 
+function parseRunAction(value: Record<string, unknown>): RunActionResolution | undefined {
+  if (!exact(value, ["type", "actorId", "round", "rawD20", "dexterityModifier", "racialModifier", "total", "dc", "outcome"])
+    || value.type !== "run" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)
+    || !isD20(value.rawD20) || !isSafeInteger(value.dexterityModifier)
+    || !isSafeInteger(value.racialModifier) || (value.racialModifier !== 0 && value.racialModifier !== -2)
+    || !isSafeInteger(value.total) || value.total !== value.rawD20 + value.dexterityModifier + value.racialModifier
+    || value.dc !== 8 || value.outcome !== (value.total >= 8 ? "success" : "failure")) return undefined;
+  return Object.freeze({
+    type: "run", actorId: value.actorId, round: value.round, rawD20: value.rawD20,
+    dexterityModifier: value.dexterityModifier, racialModifier: value.racialModifier,
+    total: value.total, dc: 8, outcome: value.outcome as "success" | "failure",
+  });
+}
+
 function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
@@ -305,6 +357,7 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value.type === "row-move") return parseRowMoveAction(value);
   if (value.type === "item-use") return parseItemUseAction(value);
   if (value.type === "defend") return parseDefendAction(value);
+  if (value.type === "run") return parseRunAction(value);
   return undefined;
 }
 
@@ -312,17 +365,23 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
 export function createCombatState(value: unknown): CombatState {
   if (!isRecord(value)) throw new Error("CombatState 格式不正確。");
   const legacyShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants"]);
-  const currentShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
-  if ((!legacyShape && !currentShape)
+  const previousShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
+  const currentShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
+  const status = legacyShape || previousShape ? "active" : value.status;
+  const endReason = legacyShape || previousShape ? null : value.endReason;
+  if ((!legacyShape && !previousShape && !currentShape)
     || !isPositiveSafeInteger(value.round)
-    || !isSafeInteger(value.currentTurnIndex) || value.currentTurnIndex < 0
-    || !isId(value.currentActorId)
+    || (status !== "active" && status !== "ended")
+    || (status === "active" && (endReason !== null || !isSafeInteger(value.currentTurnIndex)
+      || value.currentTurnIndex < 0 || !isId(value.currentActorId)))
+    || (status === "ended" && (endReason !== "escaped" || value.currentTurnIndex !== null
+      || value.currentActorId !== null))
     || !Array.isArray(value.turnOrder) || !value.turnOrder.every(isId)
     || !Array.isArray(value.participants) || value.participants.length === 0) {
     throw new Error("CombatState 格式不正確。");
   }
   const participants = value.participants.map((participant) => parseParticipant(participant, legacyShape));
-  const lastAction = currentShape ? parseLastAction(value.lastAction) : null;
+  const lastAction = legacyShape ? null : parseLastAction(value.lastAction);
   const ids = participants.map((participant) => participant.id);
   const expectedOrder = expectedTurnOrder(participants);
   if (lastAction === undefined
@@ -331,8 +390,11 @@ export function createCombatState(value: unknown): CombatState {
     || new Set(value.turnOrder).size !== value.turnOrder.length
     || value.turnOrder.some((id) => !ids.includes(id))
     || value.turnOrder.some((id, index) => id !== expectedOrder[index])
-    || value.currentTurnIndex >= value.turnOrder.length
-    || value.currentActorId !== value.turnOrder[value.currentTurnIndex]
+    || (status === "active" && ((value.currentTurnIndex as number) >= value.turnOrder.length
+      || value.currentActorId !== value.turnOrder[value.currentTurnIndex as number]))
+    || (status === "ended" && (lastAction?.type !== "run" || lastAction.outcome !== "success"
+      || lastAction.round !== value.round))
+    || (status === "active" && lastAction?.type === "run" && lastAction.outcome !== "failure")
     || (lastAction !== null && (lastAction.round > value.round
       || !ids.includes(lastAction.actorId)
       || participants.find((participant) => participant.id === lastAction.actorId)?.side !== "party"))
@@ -341,16 +403,24 @@ export function createCombatState(value: unknown): CombatState {
         || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))
     || (lastAction?.type === "row-move"
       && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
-    || ((lastAction?.type === "item-use" || lastAction?.type === "defend")
-      && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!))) {
+    || ((lastAction?.type === "item-use" || lastAction?.type === "defend" || lastAction?.type === "run")
+      && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!))
+    || (lastAction?.type === "run" && (lastAction.dexterityModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.initiative.dexterityModifier
+      || lastAction.racialModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.racialEscapeModifier))) {
     throw new Error("CombatState 行動順序或最近裁定不一致。");
   }
-  return Object.freeze({
+  const base = {
     round: value.round,
-    currentTurnIndex: value.currentTurnIndex,
-    currentActorId: value.currentActorId,
     turnOrder: Object.freeze([...value.turnOrder]),
     participants: Object.freeze(participants),
     lastAction,
+  };
+  if (status === "ended") return Object.freeze({
+    ...base, status: "ended", endReason: "escaped", currentTurnIndex: null, currentActorId: null,
+    lastAction: lastAction as EndedCombatState["lastAction"],
+  });
+  return Object.freeze({
+    ...base, status: "active", endReason: null,
+    currentTurnIndex: value.currentTurnIndex as number, currentActorId: value.currentActorId as string,
   });
 }

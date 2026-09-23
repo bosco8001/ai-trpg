@@ -11,8 +11,10 @@ import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
 import {
   createCombatActionFixtureRoller,
   createCombatFixtureRoller,
+  createCombatEscapeFixtureRoller,
   type CombatActionRollFixtureMode,
   type CombatRollFixtureMode,
+  type CombatEscapeRollFixtureMode,
 } from "./combat/dice.js";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -26,6 +28,7 @@ const storage = process.env.DOMAIN_STORAGE ?? "memory";
 const narrationMode = process.env.NARRATION_FIXTURE_MODE ?? "normal";
 const combatRollMode = process.env.COMBAT_ROLL_FIXTURE_MODE ?? "normal";
 const combatActionRollMode = process.env.COMBAT_ACTION_ROLL_FIXTURE_MODE;
+const combatEscapeRollMode = process.env.COMBAT_ESCAPE_ROLL_FIXTURE_MODE;
 if (storage !== "memory" && storage !== "postgres") {
   throw new Error("DOMAIN_STORAGE 只接受 memory 或 postgres。");
 }
@@ -47,6 +50,12 @@ if (combatSandbox && combatActionRollMode !== undefined
 if (process.env.NODE_ENV === "production" && combatActionRollMode !== undefined) {
   throw new Error("正式服務不可啟用 COMBAT_ACTION_ROLL_FIXTURE_MODE。");
 }
+if (combatEscapeRollMode !== undefined && combatEscapeRollMode !== "success" && combatEscapeRollMode !== "failure") {
+  throw new Error("COMBAT_ESCAPE_ROLL_FIXTURE_MODE 只接受 success 或 failure。");
+}
+if (process.env.NODE_ENV === "production" && combatEscapeRollMode !== undefined) {
+  throw new Error("正式服務不可啟用 COMBAT_ESCAPE_ROLL_FIXTURE_MODE。");
+}
 const pool = storage === "postgres"
   ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 3000 })
   : undefined;
@@ -60,6 +69,9 @@ const app = await buildApp({
     : undefined,
   combatActionRoller: combatSandbox && combatActionRollMode
     ? createCombatActionFixtureRoller(combatActionRollMode as CombatActionRollFixtureMode)
+    : undefined,
+  combatEscapeRoller: combatSandbox && combatEscapeRollMode
+    ? createCombatEscapeFixtureRoller(combatEscapeRollMode as CombatEscapeRollFixtureMode)
     : undefined,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,

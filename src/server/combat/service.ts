@@ -10,6 +10,7 @@ import type {
   CombatItemOptionsResult,
   CombatItemUseResult,
   DefendResult,
+  RunResult,
 } from "../../domain/combat.js";
 import type { GameStateSession } from "../domain-session.js";
 
@@ -24,6 +25,7 @@ export interface CombatService {
   combatItemOptions(): Promise<CombatItemOptionsResult>;
   useCombatItem(input: unknown): Promise<CombatItemUseResult>;
   defend(input: unknown): Promise<DefendResult>;
+  run(input: unknown): Promise<RunResult>;
 }
 
 /** 只協調 session 與骰子；不依賴 LLM、narration 或前端。 */
@@ -32,6 +34,7 @@ export function createCombatService(
   participants: readonly CombatParticipantSeed[],
   initiativeRoller: DiceRoller,
   actionRoller: DiceRoller = initiativeRoller,
+  escapeRoller: DiceRoller = initiativeRoller,
 ): CombatService {
   return {
     async getState() {
@@ -63,6 +66,9 @@ export function createCombatService(
     },
     async defend(input: unknown) {
       return session.defend(input);
+    },
+    async run(input: unknown) {
+      return session.run(input, escapeRoller);
     },
   };
 }

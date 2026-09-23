@@ -34,6 +34,7 @@ export async function buildApp(options: {
   combatSandbox?: boolean;
   combatRoller?: DiceRoller;
   combatActionRoller?: DiceRoller;
+  combatEscapeRoller?: DiceRoller;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
@@ -48,6 +49,7 @@ export async function buildApp(options: {
     TEST_COMBAT_PARTICIPANTS,
     options.combatRoller ?? new RandomD20Roller(),
     options.combatActionRoller ?? new RandomD20Roller(),
+    options.combatEscapeRoller ?? new RandomD20Roller(),
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);

@@ -9,6 +9,7 @@ import {
   getCurrentNormalAttackOptions,
   moveCombatRow,
   resolveNormalAttack,
+  runFromCombat,
   useCombatItem as useCombatItemTransition,
   startCombat as startCombatTransition,
   type CombatParticipantSeed,
@@ -37,6 +38,7 @@ export interface GameStateSession {
   combatItemOptions(): CombatItemOptionsResult | Promise<CombatItemOptionsResult>;
   useCombatItem(input: unknown): CombatItemUseResult | Promise<CombatItemUseResult>;
   defend(input: unknown): ReturnType<typeof defendCombatTurn> | Promise<ReturnType<typeof defendCombatTurn>>;
+  run(input: unknown, roller: DiceRoller): ReturnType<typeof runFromCombat> | Promise<ReturnType<typeof runFromCombat>>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -84,6 +86,11 @@ export function createDomainSession(initialState: GameState) {
     },
     defend(input: unknown) {
       const result = defendCombatTurn(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    run(input: unknown, roller: DiceRoller) {
+      const result = runFromCombat(state, input, roller);
       if (result.ok) state = result.state;
       return result;
     },
@@ -214,6 +221,23 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
         ok: false as const,
         code: "stale-revision" as const,
         message: "戰鬥狀態已更新，請重新讀取後再防禦。",
+      };
+    },
+    async run(input: unknown, roller: DiceRoller) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = runFromCombat(state, input, roller);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = runFromCombat(state, input, roller);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : {
+        ok: false as const,
+        code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新讀取後再逃跑。",
       };
     },
   };

@@ -1,6 +1,6 @@
 # Phase 16：防禦行動
 
-> Phase 1–15 已由使用者確認。Phase 16 工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。
+> Phase 1–16 已由使用者確認。Phase 17 工程實作完成，等待使用者手動驗收；Phase 18 尚未開始。
 
 ## 範圍與權威邊界
 
@@ -94,4 +94,4 @@ npm run db:migrate
 
 工程檢查結果見 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)；自動化檢查不代表使用者的瀏覽器、手機、鍵盤或 PostgreSQL 重啟驗收。
 
-Phase 16 不加入 HP、damage、真正減傷、比例、duration／expiry、持續狀態、護甲／盾牌／格擋、技能、魔法、AI、戰鬥敘事、死亡、勝敗、結算或戰鬥 Save／Load 政策。Phase 17「逃跑行動」尚未開始。
+Phase 16 不加入 HP、damage、真正減傷、比例、duration／expiry、持續狀態、護甲／盾牌／格擋、技能、魔法、AI、戰鬥敘事、死亡、勝敗、結算或戰鬥 Save／Load 政策。逃跑行動於 Phase 17 處理。

@@ -20,6 +20,7 @@ import {
   isCombatItemOptionsResponse,
   isCombatItemUseResponse,
   isCombatDefendResponse,
+  isCombatRunResponse,
   isCombatSandboxAdvanceResponse,
   isNormalAttackOptionsResponse,
   isRowMoveOptionsResponse,
@@ -29,6 +30,7 @@ import {
   type CombatItemOptionsResponse,
   type CombatItemUseResponse,
   type CombatDefendResponse,
+  type CombatRunResponse,
   type CombatSandboxAdvanceResponse,
   type NormalAttackOptionsResponse,
   type RowMoveOptionsResponse,
@@ -312,6 +314,35 @@ export async function executeDefend(
   }
   if (!isCombatDefendResponse(body) || body.state.revision !== expectedRevision + 1) {
     throw new Error("防禦回應格式不正確。");
+  }
+  return body;
+}
+
+/** Only revision crosses the boundary; the server chooses actor, D20 and DC. */
+export async function executeRun(
+  expectedRevision: number,
+  fetcher: typeof fetch = fetch,
+): Promise<CombatRunResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("逃跑暫時無法使用，請重新讀取戰鬥狀態。");
+  }
+  if (!response.ok) throw await saveApiError(response, "逃跑暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("逃跑回應格式不正確。");
+  }
+  if (!isCombatRunResponse(body) || body.state.revision !== expectedRevision + 1) {
+    throw new Error("逃跑回應格式不正確。");
   }
   return body;
 }

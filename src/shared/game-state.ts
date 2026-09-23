@@ -26,6 +26,7 @@ export interface CombatParticipantView {
   readonly row: CombatRow;
   readonly initiative: CombatInitiativeView;
   readonly normalAttack: CombatNormalAttackProfileView | null;
+  readonly racialEscapeModifier: number;
 }
 
 export interface NormalAttackResolutionView {
@@ -71,16 +72,43 @@ export interface DefendResolutionView {
   readonly round: number;
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView;
-
-export interface CombatStateView {
+export interface RunResolutionView {
+  readonly type: "run";
+  readonly actorId: string;
   readonly round: number;
-  readonly currentTurnIndex: number;
-  readonly currentActorId: string;
+  readonly rawD20: number;
+  readonly dexterityModifier: number;
+  readonly racialModifier: number;
+  readonly total: number;
+  readonly dc: 8;
+  readonly outcome: "success" | "failure";
+}
+
+export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView;
+
+interface CombatStateViewBase {
+  readonly round: number;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipantView[];
   readonly lastAction: CombatLastActionView | null;
 }
+
+export interface ActiveCombatStateView extends CombatStateViewBase {
+  readonly status: "active";
+  readonly endReason: null;
+  readonly currentTurnIndex: number;
+  readonly currentActorId: string;
+}
+
+export interface EndedCombatStateView extends CombatStateViewBase {
+  readonly status: "ended";
+  readonly endReason: "escaped";
+  readonly currentTurnIndex: null;
+  readonly currentActorId: null;
+  readonly lastAction: RunResolutionView & { readonly outcome: "success" };
+}
+
+export type CombatStateView = ActiveCombatStateView | EndedCombatStateView;
 
 export interface NormalAttackTargetOptionView {
   readonly targetId: string;
@@ -139,6 +167,10 @@ export interface CombatItemUseResponse extends AuthoritativeGameStateResponse {
 
 export interface CombatDefendResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "defend-completed" };
+}
+
+export interface CombatRunResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "run-resolved"; readonly outcome: "success" | "failure" };
 }
 
 export interface AuthoritativeGameStateView {
@@ -201,11 +233,12 @@ function isNormalAttackProfile(value: unknown): value is CombatNormalAttackProfi
 }
 
 function parseParticipant(value: unknown): CombatParticipantView | undefined {
-  if (!isRecord(value) || !exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack"])
+  if (!isRecord(value) || !exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
     || !isId(value.id) || !isId(value.displayName)
     || (value.side !== "party" && value.side !== "enemy")
     || (value.row !== "front" && value.row !== "back")
     || !isNormalAttackProfile(value.normalAttack)
+    || (value.racialEscapeModifier !== 0 && value.racialEscapeModifier !== -2)
     || !isRecord(value.initiative)
     || !exact(value.initiative, ["baseD20", "dexterityModifier", "total", "tieBreakRolls"])
     || !isD20(value.initiative.baseD20)
@@ -266,6 +299,17 @@ function isDefendResolution(value: unknown): value is DefendResolutionView {
     && isSafeInteger(value.round) && value.round > 0;
 }
 
+function isRunResolution(value: unknown): value is RunResolutionView {
+  return isRecord(value) && exact(value, [
+    "type", "actorId", "round", "rawD20", "dexterityModifier", "racialModifier", "total", "dc", "outcome",
+  ]) && value.type === "run" && isId(value.actorId) && isSafeInteger(value.round) && value.round > 0
+    && isD20(value.rawD20) && isSafeInteger(value.dexterityModifier)
+    && (value.racialModifier === 0 || value.racialModifier === -2)
+    && isSafeInteger(value.total)
+    && value.total === value.rawD20 + value.dexterityModifier + value.racialModifier
+    && value.dc === 8 && value.outcome === (value.total >= 8 ? "success" : "failure");
+}
+
 function resolveTieOrder(participants: readonly CombatParticipantView[], rollIndex: number): string[] | undefined {
   const groups = new Map<number, CombatParticipantView[]>();
   for (const participant of participants) {
@@ -314,11 +358,11 @@ function expectedTurnOrder(participants: readonly CombatParticipantView[]): stri
 
 export function isCombatStateView(value: unknown): value is CombatStateView {
   if (!isRecord(value) || !exact(value, [
-    "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction",
+    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction",
   ])
     || !isSafeInteger(value.round) || value.round < 1
-    || !isSafeInteger(value.currentTurnIndex) || value.currentTurnIndex < 0
-    || !isId(value.currentActorId) || !isIds(value.turnOrder)
+    || (value.status !== "active" && value.status !== "ended")
+    || !isIds(value.turnOrder)
     || !Array.isArray(value.participants) || value.participants.length === 0) return false;
   const participants = value.participants.map(parseParticipant);
   if (participants.some((participant) => participant === undefined)) return false;
@@ -328,7 +372,7 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   const lastAction = value.lastAction;
   if (lastAction !== null && !isNormalAttackResolution(lastAction)
     && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)
-    && !isDefendResolution(lastAction)) return false;
+    && !isDefendResolution(lastAction) && !isRunResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
@@ -336,16 +380,23 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
     && value.turnOrder.length === ids.length
     && new Set(value.turnOrder).size === value.turnOrder.length
     && value.turnOrder.every((id, index) => ids.includes(id) && id === expected?.[index])
-    && value.currentTurnIndex < value.turnOrder.length
-    && value.currentActorId === value.turnOrder[value.currentTurnIndex]
+    && (value.status === "active"
+      ? value.endReason === null && isSafeInteger(value.currentTurnIndex)
+        && value.currentTurnIndex >= 0 && value.currentTurnIndex < value.turnOrder.length
+        && isId(value.currentActorId) && value.currentActorId === value.turnOrder[value.currentTurnIndex]
+        && (lastAction?.type !== "run" || lastAction.outcome === "failure")
+      : value.endReason === "escaped" && value.currentTurnIndex === null && value.currentActorId === null
+        && lastAction?.type === "run" && lastAction.outcome === "success" && lastAction.round === value.round)
     && (lastAction === null || (lastAction.round <= value.round
       && ids.includes(lastAction.actorId) && actor?.side === "party"))
     && (lastAction === null || lastAction.type !== "normal-attack"
       || (ids.includes(lastAction.targetId)
         && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"))
     && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow)
-    && (lastAction === null || (lastAction.type !== "item-use" && lastAction.type !== "defend")
-      || actor?.normalAttack !== null);
+    && (lastAction === null || (lastAction.type !== "item-use" && lastAction.type !== "defend" && lastAction.type !== "run")
+      || actor?.normalAttack !== null)
+    && (lastAction?.type !== "run" || (lastAction.dexterityModifier === actor?.initiative.dexterityModifier
+      && lastAction.racialModifier === actor?.racialEscapeModifier));
 }
 
 export function isAuthoritativeGameStateView(value: unknown): value is AuthoritativeGameStateView {
@@ -496,4 +547,17 @@ export function isCombatDefendResponse(value: unknown): value is CombatDefendRes
     && isRecord(value.effect) && exact(value.effect, ["type"])
     && value.effect.type === "defend-completed"
     && value.state.combat?.lastAction?.type === "defend";
+}
+
+export function isCombatRunResponse(value: unknown): value is CombatRunResponse {
+  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+    && typeof value.sandbox === "boolean"
+    && (value.storage === "memory" || value.storage === "postgres")
+    && isAuthoritativeGameStateView(value.state)
+    && isRecord(value.effect) && exact(value.effect, ["type", "outcome"])
+    && value.effect.type === "run-resolved"
+    && (value.effect.outcome === "success" || value.effect.outcome === "failure")
+    && value.state.combat?.lastAction?.type === "run"
+    && value.state.combat.lastAction.outcome === value.effect.outcome
+    && value.state.combat.status === (value.effect.outcome === "success" ? "ended" : "active");
 }

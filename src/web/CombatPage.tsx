@@ -13,6 +13,7 @@ import {
   advanceTestCombatTurn,
   executeCombatItemUse,
   executeDefend,
+  executeRun,
   executeNormalAttack,
   executeRowMove,
   loadCombatItemOptions,
@@ -158,6 +159,19 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       </Panel>
     );
   }
+  if (action.type === "run") {
+    return (
+      <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+        <p className="combat-eyebrow">逃跑裁定・第 {action.round} 回合</p>
+        <h2 id="combat-last-action-heading">最近裁定</h2>
+        <p>{actor}</p>
+        <p>逃跑判定：{action.rawD20} {modifierTerm(action.dexterityModifier)}{action.racialModifier === 0 ? "" : ` ${modifierTerm(action.racialModifier)}`} = {action.total}</p>
+        <p>目標：{action.dc}</p>
+        <p>結果：逃跑{action.outcome === "success" ? "成功" : "失敗"}</p>
+        {action.outcome === "success" ? <p>戰鬥已結束</p> : null}
+      </Panel>
+    );
+  }
   const target = participants.get(action.targetId)?.displayName ?? action.targetId;
   return (
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
@@ -219,6 +233,8 @@ export function CombatPage({
   const [isUsingItem, setIsUsingItem] = useState(false);
   const [isDefendConfirmationOpen, setIsDefendConfirmationOpen] = useState(false);
   const [isSubmittingDefend, setIsSubmittingDefend] = useState(false);
+  const [isRunConfirmationOpen, setIsRunConfirmationOpen] = useState(false);
+  const [isSubmittingRun, setIsSubmittingRun] = useState(false);
   const [targetOptions, setTargetOptions] = useState<NormalAttackOptionsResponse | null>(null);
   const [feedback, setFeedback] = useState(stateError ?? "");
   const attackButton = useRef<HTMLButtonElement>(null);
@@ -226,6 +242,10 @@ export function CombatPage({
   const defendHeading = useRef<HTMLHeadingElement>(null);
   const restoreDefendFocus = useRef(false);
   const defendRequestInFlight = useRef(false);
+  const runButton = useRef<HTMLButtonElement>(null);
+  const runHeading = useRef<HTMLHeadingElement>(null);
+  const restoreRunFocus = useRef(false);
+  const runRequestInFlight = useRef(false);
   const rowMoveButton = useRef<HTMLButtonElement>(null);
   const bagButton = useRef<HTMLButtonElement>(null);
   const bagHeading = useRef<HTMLHeadingElement>(null);
@@ -257,6 +277,13 @@ export function CombatPage({
       restoreDefendFocus.current = false;
     }
   }, [isDefendConfirmationOpen]);
+  useEffect(() => {
+    if (isRunConfirmationOpen) runHeading.current?.focus();
+    else if (restoreRunFocus.current) {
+      runButton.current?.focus();
+      restoreRunFocus.current = false;
+    }
+  }, [isRunConfirmationOpen]);
   useEffect(() => {
     if (isRowMoveMode) {
       rowMoveHeading.current?.focus();
@@ -359,13 +386,49 @@ export function CombatPage({
     );
   }
 
+  if (combat.status === "ended") {
+    return (
+      <main id="main-content" className="combat-shell" tabIndex={-1}>
+        <div className="combat-shell__inner">
+          <header className="combat-header">
+            <div className="combat-header__identity">
+              <p className="combat-eyebrow">權威戰鬥狀態</p>
+              <h1>戰鬥已結束</h1>
+              <p>第 {combat.round} 回合・工程版本 {gameState.state.revision}</p>
+            </div>
+          </header>
+          <div className="combat-layout">
+            <Panel className="combat-rail__panel" aria-labelledby="combat-ended-heading">
+              <p className="combat-eyebrow">逃跑成功</p>
+              <h2 id="combat-ended-heading">你已成功逃離戰鬥。</h2>
+              <p>戰鬥結算與返回探索尚未接入。</p>
+              <p>目前沒有可行動的角色。</p>
+            </Panel>
+            <aside className="combat-rail" aria-label="戰鬥結束資訊">
+              <LastActionPanel combat={combat} />
+              <Panel className="combat-rail__panel" aria-labelledby="combat-ended-commands-heading">
+                <h2 id="combat-ended-commands-heading">基本指令</h2>
+                <div className="combat-commands">
+                  {(["普通攻擊", "移動", "背包", "防禦", "逃跑", ...(gameState.sandbox ? ["TEST：推進下一回合"] : [])]).map((label) => (
+                    <Button key={label} variant="secondary" disabled>{label}</Button>
+                  ))}
+                </div>
+              </Panel>
+            </aside>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const lanes = getCombatPresentationLanes(combat.participants);
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
-  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend;
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun;
   const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions;
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canDefend = canPlayerDefend(combat, mutationInFlight);
+  const canRun = canPlayerUseNormalAttack(combat, mutationInFlight);
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
@@ -399,6 +462,49 @@ export function CombatPage({
     setIsBagOpen(false);
     setIsDefendConfirmationOpen(true);
     setFeedback("");
+  }
+
+  function beginRunConfirmation() {
+    if (!canRun || mutationInFlight) return;
+    setIsTargeting(false);
+    setTargetOptions(null);
+    setIsRowMoveMode(false);
+    setPendingItemId(null);
+    setIsBagOpen(false);
+    setIsDefendConfirmationOpen(false);
+    setIsRunConfirmationOpen(true);
+    setFeedback("");
+  }
+
+  function cancelRunConfirmation() {
+    if (isSubmittingRun) return;
+    restoreRunFocus.current = true;
+    setIsRunConfirmationOpen(false);
+    setFeedback("已取消逃跑；戰鬥狀態沒有改變。");
+  }
+
+  function confirmRun() {
+    if (!isRunConfirmationOpen || !canRun || mutationInFlight || runRequestInFlight.current) return;
+    runRequestInFlight.current = true;
+    setIsSubmittingRun(true);
+    setFeedback("正在裁定逃跑……");
+    void executeRun(gameState.state.revision).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setIsRunConfirmationOpen(false);
+      setFeedback(response.effect.outcome === "success" ? "逃跑成功；戰鬥已結束。" : "逃跑失敗；目前回合已結束。");
+    }).catch(async (error: unknown) => {
+      setIsRunConfirmationOpen(false);
+      setFeedback(error instanceof Error ? error.message : "逃跑暫時無法使用，請重新讀取戰鬥狀態。");
+      try {
+        const latest = await onRetryState();
+        onStateUpdate(latest);
+      } catch {
+        // Keep the last confirmed state and safe error.
+      }
+    }).finally(() => {
+      runRequestInFlight.current = false;
+      setIsSubmittingRun(false);
+    });
   }
 
   function cancelDefendConfirmation() {
@@ -776,6 +882,20 @@ export function CombatPage({
                 </div>
               </section>
             ) : null}
+            {isRunConfirmationOpen ? (
+              <section id="combat-run-panel" className="combat-row-move-mode" aria-labelledby="combat-run-heading" aria-live="polite">
+                <div className="combat-row-move-mode__intro">
+                  <h3 id="combat-run-heading" ref={runHeading} tabIndex={-1}>確定要嘗試逃跑嗎？</h3>
+                  <p>逃跑會消耗目前行動。</p>
+                  <p>一般逃跑判定：D20 + 敏捷修正，DC 8。</p>
+                </div>
+                <div className="combat-row-move-mode__choices">
+                  <Button variant="primary" data-action="confirm-run" disabled={mutationInFlight}
+                    loading={isSubmittingRun} loadingLabel="正在逃跑……" onClick={confirmRun}>確認逃跑</Button>
+                  <Button variant="secondary" disabled={isSubmittingRun} onClick={cancelRunConfirmation}>取消</Button>
+                </div>
+              </section>
+            ) : null}
             <div className="combat-lanes">
               {lanes.map((lane, index) => (
                 <section key={lane.id} className="combat-lane" data-lane={lane.id} aria-labelledby={"lane-" + lane.id}>
@@ -834,7 +954,7 @@ export function CombatPage({
             <Panel className="combat-rail__panel" aria-labelledby="combat-commands-heading">
               <p className="combat-eyebrow">指令</p>
               <h2 id="combat-commands-heading">基本指令</h2>
-              <p className="combat-rail__notice">普通攻擊、移動、背包及防禦依目前回合開放。</p>
+              <p className="combat-rail__notice">普通攻擊、移動、背包、防禦及逃跑依目前回合開放。</p>
               <div className="combat-commands">
                 <Button
                   ref={attackButton}
@@ -879,6 +999,17 @@ export function CombatPage({
                   onClick={beginDefendConfirmation}
                 >
                   防禦
+                </Button>
+                <Button
+                  ref={runButton}
+                  variant="secondary"
+                  data-command="flee"
+                  disabled={!canRun || mutationInFlight || selectionModeActive}
+                  aria-expanded={isRunConfirmationOpen}
+                  aria-controls="combat-run-panel"
+                  onClick={beginRunConfirmation}
+                >
+                  逃跑
                 </Button>
                 {disabledCombatCommands.map((command) => (
                   <Button key={command.id} variant="secondary" disabled data-command={command.id}>{command.label}</Button>

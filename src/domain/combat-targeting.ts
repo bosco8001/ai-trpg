@@ -57,6 +57,9 @@ export function getLegalNormalAttackTargets(
 
 /** Builds a derived list for the current actor; this list is never stored in CombatState. */
 export function getNormalAttackTargetOptions(combat: CombatState): NormalAttackTargetOptions {
+  if (combat.status === "ended") return Object.freeze({
+    currentActorId: "", canPlayerAct: false, legalTargetIds: Object.freeze([]), targets: Object.freeze([]),
+  });
   const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!attacker || !isPlayerActionParticipant(attacker)) {
     return Object.freeze({

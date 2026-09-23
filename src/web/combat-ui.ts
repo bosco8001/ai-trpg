@@ -23,7 +23,6 @@ export interface TurnOrderEntry {
 
 export const disabledCombatCommands = Object.freeze([
   { id: "party", label: "隊伍" },
-  { id: "flee", label: "逃走" },
 ] as const);
 
 const laneLabels: Readonly<Record<CombatPresentationLaneId, string>> = Object.freeze({
@@ -67,6 +66,7 @@ export function initiativeDetail(participant: CombatParticipantView): string {
 }
 
 export function canPlayerUseNormalAttack(combat: CombatStateView, requestInFlight: boolean): boolean {
+  if (combat.status === "ended") return false;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null;
 }
@@ -81,6 +81,7 @@ export function canPlayerUseRowMove(
   revision: number,
   requestInFlight: boolean,
 ): boolean {
+  if (combat.status === "ended") return false;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null
     && options !== null && options.revision === revision
