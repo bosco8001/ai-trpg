@@ -3,13 +3,17 @@ import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 import {
   advanceCombatTurn,
+  getCurrentCombatItemOptions,
   getCurrentRowMoveOptions,
   getCurrentNormalAttackOptions,
   moveCombatRow,
   resolveNormalAttack,
+  useCombatItem as useCombatItemTransition,
   startCombat as startCombatTransition,
   type CombatParticipantSeed,
   type DiceRoller,
+  type CombatItemOptionsResult,
+  type CombatItemUseResult,
 } from "../domain/combat.js";
 
 export interface GameStateSession {
@@ -29,6 +33,8 @@ export interface GameStateSession {
     | Promise<ReturnType<typeof getCurrentRowMoveOptions>>;
   moveRow(input: unknown): ReturnType<typeof moveCombatRow>
     | Promise<ReturnType<typeof moveCombatRow>>;
+  combatItemOptions(): CombatItemOptionsResult | Promise<CombatItemOptionsResult>;
+  useCombatItem(input: unknown): CombatItemUseResult | Promise<CombatItemUseResult>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -65,6 +71,12 @@ export function createDomainSession(initialState: GameState) {
     rowMoveOptions: () => getCurrentRowMoveOptions(state),
     moveRow(input: unknown) {
       const result = moveCombatRow(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    combatItemOptions: () => getCurrentCombatItemOptions(state),
+    useCombatItem(input: unknown) {
+      const result = useCombatItemTransition(state, input);
       if (result.ok) state = result.state;
       return result;
     },
@@ -158,6 +170,26 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
         ok: false as const,
         code: "stale-revision" as const,
         message: "戰鬥狀態已更新，請重新讀取後再移動。",
+      };
+    },
+    async combatItemOptions() {
+      return getCurrentCombatItemOptions(await repository.createIfAbsent(seed));
+    },
+    async useCombatItem(input: unknown) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = useCombatItemTransition(state, input);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = useCombatItemTransition(state, input);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : {
+        ok: false as const,
+        code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新讀取後再使用物品。",
       };
     },
   };

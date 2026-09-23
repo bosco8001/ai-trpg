@@ -1,4 +1,5 @@
 import { createGameState, gameStateContents } from "../../domain/game.js";
+import { createTestCombatInventory } from "../../domain/combat-items.js";
 import type { GameState } from "../../domain/game.js";
 import type { ExplorationStateSummary } from "../../shared/exploration-action.js";
 import {
@@ -58,12 +59,23 @@ export function decodeSaveSnapshot(record: StoredSaveSlot): SaveSnapshotV1 {
   }
   if (record.formatVersion !== SAVE_FORMAT_VERSION) throw new SaveGameFailure("unsupported-format");
   if (!Number.isSafeInteger(record.sourceRevision) || record.sourceRevision < 0
-    || !isRecord(record.snapshot)
-    || !exact(record.snapshot, ["activity", "character", "exploration"])) {
+    || !isRecord(record.snapshot)) {
+    throw new SaveGameFailure("invalid-save");
+  }
+  const legacy = exact(record.snapshot, ["activity", "character", "exploration"]);
+  const current = exact(record.snapshot, ["activity", "character", "inventory", "exploration"]);
+  if (!legacy && !current) throw new SaveGameFailure("invalid-save");
+  const character = record.snapshot.character;
+  if (legacy && (!isRecord(character) || character.id !== "TEST-character")) {
     throw new SaveGameFailure("invalid-save");
   }
   try {
-    const validated = createGameState({ ...record.snapshot, revision: record.sourceRevision, combat: null });
+    const validated = createGameState({
+      ...record.snapshot,
+      ...(legacy ? { inventory: createTestCombatInventory() } : {}),
+      revision: record.sourceRevision,
+      combat: null,
+    });
     return {
       formatVersion: SAVE_FORMAT_VERSION,
       sourceRevision: record.sourceRevision,

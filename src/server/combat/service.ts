@@ -7,6 +7,8 @@ import type {
   NormalAttackResult,
   RowMoveOptionsResult,
   RowMoveResult,
+  CombatItemOptionsResult,
+  CombatItemUseResult,
 } from "../../domain/combat.js";
 import type { GameStateSession } from "../domain-session.js";
 
@@ -18,6 +20,8 @@ export interface CombatService {
   normalAttack(input: unknown): Promise<NormalAttackResult>;
   rowMoveOptions(): Promise<RowMoveOptionsResult>;
   moveRow(input: unknown): Promise<RowMoveResult>;
+  combatItemOptions(): Promise<CombatItemOptionsResult>;
+  useCombatItem(input: unknown): Promise<CombatItemUseResult>;
 }
 
 /** 只協調 session 與骰子；不依賴 LLM、narration 或前端。 */
@@ -48,6 +52,12 @@ export function createCombatService(
     },
     async moveRow(input: unknown) {
       return session.moveRow(input);
+    },
+    async combatItemOptions() {
+      return session.combatItemOptions();
+    },
+    async useCombatItem(input: unknown) {
+      return session.useCombatItem(input);
     },
   };
 }

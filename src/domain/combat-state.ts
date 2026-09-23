@@ -1,3 +1,5 @@
+import { getCombatItemDefinition } from "./combat-items.js";
+
 export type CombatSide = "party" | "enemy";
 export type CombatRow = "front" | "back";
 export type NormalAttackRange = "melee" | "ranged";
@@ -60,7 +62,16 @@ export interface RowMoveActionResolution {
   readonly toRow: CombatRow;
 }
 
-export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution;
+export interface ItemUseActionResolution {
+  readonly type: "item-use";
+  readonly actorId: string;
+  readonly round: number;
+  readonly itemId: string;
+  readonly quantityBefore: number;
+  readonly quantityAfter: number;
+}
+
+export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution | ItemUseActionResolution;
 
 export interface CombatState {
   readonly round: number;
@@ -259,11 +270,28 @@ function parseRowMoveAction(value: Record<string, unknown>): RowMoveActionResolu
   });
 }
 
+function parseItemUseAction(value: Record<string, unknown>): ItemUseActionResolution | undefined {
+  if (!exact(value, ["type", "actorId", "round", "itemId", "quantityBefore", "quantityAfter"])
+    || value.type !== "item-use" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)
+    || typeof value.itemId !== "string" || !getCombatItemDefinition(value.itemId)
+    || !isSafeInteger(value.quantityBefore) || value.quantityBefore < 1
+    || !isSafeInteger(value.quantityAfter) || value.quantityAfter !== value.quantityBefore - 1) return undefined;
+  return Object.freeze({
+    type: "item-use",
+    actorId: value.actorId,
+    round: value.round,
+    itemId: value.itemId,
+    quantityBefore: value.quantityBefore,
+    quantityAfter: value.quantityAfter,
+  });
+}
+
 function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
   if (value.type === "normal-attack") return parseNormalAttackAction(value);
   if (value.type === "row-move") return parseRowMoveAction(value);
+  if (value.type === "item-use") return parseItemUseAction(value);
   return undefined;
 }
 
@@ -299,7 +327,9 @@ export function createCombatState(value: unknown): CombatState {
       && (!ids.includes(lastAction.targetId)
         || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))
     || (lastAction?.type === "row-move"
-      && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)) {
+      && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
+    || (lastAction?.type === "item-use"
+      && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!))) {
     throw new Error("CombatState 行動順序或最近裁定不一致。");
   }
   return Object.freeze({

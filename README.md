@@ -2,9 +2,9 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–13 已由使用者確認。Phase 14「前後排換位」工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–14 已由使用者確認。Phase 15「戰鬥背包與物品使用」工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
-Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。前端仍是已確認的連線頁。
+Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 ## Phase 4：本機 PostgreSQL 與手動測試
 
@@ -349,7 +349,7 @@ curl -s http://127.0.0.1:3001/api/game-state
 
 ## Phase 14：前後排換位手動驗收
 
-Phase 1–13 已由使用者確認。Phase 14 工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。完整前後排、取消、stale、資料保存、手機、鍵盤與錯誤狀態步驟見 [Phase 14 文件](docs/development/PHASE_14_ROW_MOVEMENT.md)。
+Phase 1–14 已由使用者確認。Phase 14 前後排換位已驗收。詳細步驟見 [Phase 14 文件](docs/development/PHASE_14_ROW_MOVEMENT.md)。
 
 記憶體模式啟動：
 
@@ -360,3 +360,11 @@ DOMAIN_STORAGE=memory COMBAT_SANDBOX=1 COMBAT_ROLL_FIXTURE_MODE=normal COMBAT_AC
 開始 TEST combat 並重新整理瀏覽器後，使用「TEST：推進下一回合」到 TEST 玩家回合。先開啟「移動」確認前排只提供「移至後排」，取消後 state 不變；再次確認換排，應增加一次 revision、結束玩家 Turn，並把玩家卡片移到我方後排。之後再推進到 Round 2 玩家回合，確認「移至前排」可以將卡片移回我方前排。
 
 換排選項是唯讀 API：`GET /api/combat/row-move/options`。成功 action 使用 `POST /api/combat/row-move`，body 只有 `expectedRevision` 與 `targetRow`；同排選擇和舊 revision 應安全拒絕。Phase 14 不新增 database table 或 migration。
+
+## Phase 15：戰鬥背包與物品使用手動驗收
+
+Phase 1–14 已由使用者確認。Phase 15 工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。完整記憶體、取消、耗盡、錯誤狀態、PostgreSQL、手機與鍵盤步驟見 [Phase 15 文件](docs/development/PHASE_15_COMBAT_ITEMS.md)。
+
+本階段只提供 `TEST-combat-consumable × 2` 工程 fixture，沒有 HP、MP、治療、傷害或狀態效果。打開／關閉背包不改狀態；確認使用會扣一件、記錄 `item-use`，並結束目前 Turn。數量、recent action 和 combat state 保存在既有 `game_states.snapshot` JSONB，沒有新增 migration。
+
+唯讀選項 API：`GET /api/combat/items/options`。成功使用 API：`POST /api/combat/items/use`，request body 精確為 `expectedRevision` 與 `itemId`。後端每次重新驗證玩家行動者與數量；前端只採用成功回應中的權威狀態與 options。

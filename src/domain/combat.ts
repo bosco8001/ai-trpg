@@ -6,8 +6,10 @@ import {
   type CombatState,
   type NormalAttackActionResolution,
   type RowMoveActionResolution,
+  type ItemUseActionResolution,
 } from "./combat-state.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
+import { getCombatItemDefinition } from "./combat-items.js";
 import {
   getNormalAttackTargetOptions,
   type NormalAttackTargetOptions,
@@ -76,6 +78,50 @@ export type RowMoveResult =
       readonly effect: { readonly type: "row-move-completed" };
     }
   | { readonly ok: false; readonly code: RowMoveCode; readonly message: string };
+
+export type CombatItemUnavailableReason = "not-player-turn" | "quantity-depleted";
+
+export interface CombatItemOption {
+  readonly itemId: string;
+  readonly displayName: string;
+  readonly quantity: number;
+  readonly usable: boolean;
+  readonly unavailableReason?: CombatItemUnavailableReason;
+}
+
+export interface CombatItemOptions {
+  readonly currentActorId: string;
+  readonly items: readonly CombatItemOption[];
+}
+
+export type CombatItemOptionsResult =
+  | { readonly ok: true; readonly revision: number; readonly options: CombatItemOptions }
+  | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
+
+export type CombatItemUseCode = "invalid-command" | "stale-revision" | "revision-limit"
+  | "not-in-combat" | "not-player-turn" | "unsupported-item" | "item-unavailable";
+
+export type CombatItemUseResult =
+  | {
+      readonly ok: true;
+      readonly state: GameState;
+      readonly effect: { readonly type: "combat-item-used" };
+    }
+  | { readonly ok: false; readonly code: CombatItemUseCode; readonly message: string };
+
+const itemUseMessages: Record<CombatItemUseCode, string> = {
+  "invalid-command": "物品使用請求格式不正確。",
+  "stale-revision": "戰鬥狀態已更新，請重新讀取後再使用物品。",
+  "revision-limit": "狀態版本已達工程上限，無法使用物品。",
+  "not-in-combat": "目前沒有進行中的戰鬥。",
+  "not-player-turn": "目前不是可操作角色的回合。",
+  "unsupported-item": "目前不支援使用這件物品。",
+  "item-unavailable": "這件物品目前沒有可使用的數量。",
+};
+
+function rejectItemUse(code: CombatItemUseCode): CombatItemUseResult {
+  return { ok: false, code, message: itemUseMessages[code] };
+}
 
 interface MutableInitiative extends CombatParticipantSeed {
   readonly baseD20: number;
@@ -149,6 +195,15 @@ function parseRowMoveCommand(value: unknown): { readonly expectedRevision: numbe
     || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision)
     || value.expectedRevision < 0 || (value.targetRow !== "front" && value.targetRow !== "back")) return undefined;
   return { expectedRevision: value.expectedRevision, targetRow: value.targetRow };
+}
+
+function parseItemUseCommand(value: unknown): { readonly expectedRevision: number; readonly itemId: string } | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 2
+    || !Object.hasOwn(value, "expectedRevision") || !Object.hasOwn(value, "itemId")
+    || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision)
+    || value.expectedRevision < 0 || typeof value.itemId !== "string"
+    || value.itemId.length === 0 || value.itemId.trim() !== value.itemId) return undefined;
+  return { expectedRevision: value.expectedRevision, itemId: value.itemId };
 }
 
 function advanceToNextTurn(combat: CombatState): CombatState {
@@ -334,6 +389,74 @@ export function getCurrentRowMoveOptions(state: GameState): RowMoveOptionsResult
       canPlayerAct,
       legalTargetRows: Object.freeze([...legalTargetRows]),
     }),
+  };
+}
+
+/** Derived inventory usability for the current combat actor; this never changes GameState. */
+export function getCurrentCombatItemOptions(state: GameState): CombatItemOptionsResult {
+  if (state.activity !== "in-combat" || state.combat === null) {
+    return { ok: false, code: "not-in-combat", message: itemUseMessages["not-in-combat"] };
+  }
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor) return { ok: false, code: "not-in-combat", message: itemUseMessages["not-in-combat"] };
+  const canPlayerAct = isPlayerActionParticipant(actor);
+  const items = state.inventory.flatMap((stack): CombatItemOption[] => {
+    const definition = getCombatItemDefinition(stack.itemId);
+    if (!definition || !definition.consumable || definition.usage !== "self") return [];
+    const unavailableReason: CombatItemUnavailableReason | undefined = !canPlayerAct
+      ? "not-player-turn"
+      : stack.quantity === 0 ? "quantity-depleted" : undefined;
+    return [Object.freeze({
+      itemId: definition.itemId,
+      displayName: definition.displayName,
+      quantity: stack.quantity,
+      usable: unavailableReason === undefined,
+      ...(unavailableReason ? { unavailableReason } : {}),
+    })];
+  });
+  return {
+    ok: true,
+    revision: state.revision,
+    options: Object.freeze({ currentActorId: actor.id, items: Object.freeze(items) }),
+  };
+}
+
+/** Consumes one supported self-use item and the full current Turn in one state transition. */
+export function useCombatItem(state: GameState, input: unknown): CombatItemUseResult {
+  const command = parseItemUseCommand(input);
+  if (!command) return rejectItemUse("invalid-command");
+  if (command.expectedRevision !== state.revision) return rejectItemUse("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectItemUse("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectItemUse("not-in-combat");
+
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor)) return rejectItemUse("not-player-turn");
+  const definition = getCombatItemDefinition(command.itemId);
+  if (!definition || !definition.consumable || definition.usage !== "self") {
+    return rejectItemUse("unsupported-item");
+  }
+  const stack = state.inventory.find((entry) => entry.itemId === definition.itemId);
+  if (!stack || stack.quantity <= 0) return rejectItemUse("item-unavailable");
+
+  const quantityAfter = stack.quantity - 1;
+  const inventory = state.inventory.map((entry) => entry.itemId === stack.itemId
+    ? { ...entry, quantity: quantityAfter }
+    : entry);
+  const lastAction: ItemUseActionResolution = Object.freeze({
+    type: "item-use",
+    actorId: actor.id,
+    round: combat.round,
+    itemId: definition.itemId,
+    quantityBefore: stack.quantity,
+    quantityAfter,
+  });
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), lastAction });
+  return {
+    ok: true,
+    state: createGameState({ ...state, revision: state.revision + 1, inventory, combat: nextCombat }),
+    effect: { type: "combat-item-used" },
   };
 }
 

@@ -4,14 +4,17 @@ import type {
   CombatRow,
   CombatParticipantView,
   CombatStateView,
+  CombatItemOptionsResponse,
   NormalAttackOptionsResponse,
   NormalAttackTargetOptionView,
   RowMoveOptionsResponse,
 } from "../shared/game-state.js";
 import {
   advanceTestCombatTurn,
+  executeCombatItemUse,
   executeNormalAttack,
   executeRowMove,
+  loadCombatItemOptions,
   loadNormalAttackOptions,
   loadRowMoveOptions,
 } from "./api.js";
@@ -24,7 +27,9 @@ import {
   canPlayerUseNormalAttack,
   isServerListedLegalTarget,
   isServerListedLegalTargetRow,
+  isServerListedUsableCombatItem,
 } from "./combat-ui.js";
+import { getCombatItemDisplayName } from "../shared/combat-items.js";
 import { Button } from "./ui/Button.js";
 import { Panel } from "./ui/Panel.js";
 
@@ -127,6 +132,19 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       </Panel>
     );
   }
+  if (action.type === "item-use") {
+    const itemName = getCombatItemDisplayName(action.itemId) ?? action.itemId;
+    return (
+      <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+        <p className="combat-eyebrow">最近行動・第 {action.round} 回合</p>
+        <h2 id="combat-last-action-heading">最近行動</h2>
+        <p className="combat-last-action__pair">{actor}</p>
+        <p className="combat-last-action__row-move">使用：{itemName}</p>
+        <p className="combat-last-action__outcome">數量：{action.quantityBefore} → {action.quantityAfter}</p>
+        <p className="combat-last-action__outcome">結果：物品已使用</p>
+      </Panel>
+    );
+  }
   const target = participants.get(action.targetId)?.displayName ?? action.targetId;
   return (
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
@@ -179,13 +197,26 @@ export function CombatPage({
   const [isMovingRow, setIsMovingRow] = useState(false);
   const [rowMoveOptions, setRowMoveOptions] = useState<RowMoveOptionsResponse | null>(null);
   const [rowMoveOptionsReloadId, setRowMoveOptionsReloadId] = useState(0);
+  const [isBagOpen, setIsBagOpen] = useState(false);
+  const [isLoadingBagOptions, setIsLoadingBagOptions] = useState(false);
+  const [bagOptions, setBagOptions] = useState<CombatItemOptionsResponse | null>(null);
+  const [bagOptionsError, setBagOptionsError] = useState<string | null>(null);
+  const [bagOptionsReloadId, setBagOptionsReloadId] = useState(0);
+  const [pendingItemId, setPendingItemId] = useState<string | null>(null);
+  const [isUsingItem, setIsUsingItem] = useState(false);
   const [targetOptions, setTargetOptions] = useState<NormalAttackOptionsResponse | null>(null);
   const [feedback, setFeedback] = useState(stateError ?? "");
   const attackButton = useRef<HTMLButtonElement>(null);
   const rowMoveButton = useRef<HTMLButtonElement>(null);
+  const bagButton = useRef<HTMLButtonElement>(null);
+  const bagHeading = useRef<HTMLHeadingElement>(null);
+  const bagUseButton = useRef<HTMLButtonElement>(null);
+  const itemConfirmButton = useRef<HTMLButtonElement>(null);
   const rowMoveHeading = useRef<HTMLHeadingElement>(null);
   const restoreAttackFocus = useRef(false);
   const restoreRowMoveFocus = useRef(false);
+  const restoreBagFocus = useRef(false);
+  const restoreBagUseFocus = useRef(false);
   const rowMoveRequestInFlight = useRef(false);
   const retryStateRef = useRef(onRetryState);
   const stateUpdateRef = useRef(onStateUpdate);
@@ -209,6 +240,26 @@ export function CombatPage({
       restoreRowMoveFocus.current = false;
     }
   }, [isRowMoveMode]);
+  useEffect(() => {
+    if (isBagOpen) {
+      bagHeading.current?.focus();
+      return;
+    }
+    if (restoreBagFocus.current) {
+      bagButton.current?.focus();
+      restoreBagFocus.current = false;
+    }
+  }, [isBagOpen]);
+  useEffect(() => {
+    if (pendingItemId) {
+      itemConfirmButton.current?.focus();
+      return;
+    }
+    if (restoreBagUseFocus.current) {
+      bagUseButton.current?.focus();
+      restoreBagUseFocus.current = false;
+    }
+  }, [pendingItemId]);
   useEffect(() => {
     let active = true;
     setRowMoveOptions(null);
@@ -243,6 +294,36 @@ export function CombatPage({
     return () => { active = false; };
   }, [gameState.state.revision, currentActorId, currentActor?.row, hasPlayerActionActor, rowMoveOptionsReloadId]);
 
+  useEffect(() => {
+    let active = true;
+    if (!isBagOpen || !combat) {
+      setIsLoadingBagOptions(false);
+      return () => { active = false; };
+    }
+    setBagOptions(null);
+    setBagOptionsError(null);
+    setIsLoadingBagOptions(true);
+    void loadCombatItemOptions().then(async (options) => {
+      if (!active) return;
+      if (options.revision !== gameState.state.revision || options.currentActorId !== currentActorId) {
+        setBagOptionsError("戰鬥狀態已更新，請重新讀取背包。");
+        try {
+          const latest = await retryStateRef.current();
+          if (active) stateUpdateRef.current(latest);
+        } catch {
+          if (active) setBagOptionsError("目前無法確認最新背包狀態，請稍後重新讀取。");
+        }
+        return;
+      }
+      setBagOptions(options);
+    }).catch((error: unknown) => {
+      if (active) setBagOptionsError(error instanceof Error ? error.message : "目前無法讀取戰鬥背包，請稍後再試。");
+    }).finally(() => {
+      if (active) setIsLoadingBagOptions(false);
+    });
+    return () => { active = false; };
+  }, [isBagOpen, gameState.state.revision, currentActorId, bagOptionsReloadId, combat]);
+
   if (!combat) {
     return (
       <main id="main-content" className="combat-shell" tabIndex={-1}>
@@ -253,13 +334,63 @@ export function CombatPage({
 
   const lanes = getCombatPresentationLanes(combat.participants);
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
-  const requestInFlight = isAdvancing || isRetrying || isLoadingTargets || isResolving
-    || isLoadingRowMoveOptions || isMovingRow;
-  const selectionModeActive = isTargeting || isRowMoveMode;
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem;
+  const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
+
+  function toggleBag() {
+    if (mutationInFlight) return;
+    if (isBagOpen) {
+      restoreBagFocus.current = true;
+      setIsBagOpen(false);
+      setPendingItemId(null);
+      setFeedback("已關閉戰鬥背包；戰鬥狀態沒有改變。");
+      return;
+    }
+    setIsTargeting(false);
+    setIsLoadingTargets(false);
+    setTargetOptions(null);
+    setIsRowMoveMode(false);
+    setIsLoadingRowMoveOptions(false);
+    setPendingItemId(null);
+    setIsBagOpen(true);
+    setFeedback("");
+  }
+
+  function cancelItemConfirmation() {
+    restoreBagUseFocus.current = true;
+    setPendingItemId(null);
+    setFeedback("已取消使用物品；戰鬥狀態沒有改變。");
+  }
+
+  function confirmItemUse(itemId: string) {
+    if (!isBagOpen || pendingItemId !== itemId || requestInFlight
+      || !isServerListedUsableCombatItem(bagOptions, itemId, gameState.state.revision, currentActorId)) return;
+    setIsUsingItem(true);
+    setBagOptionsError(null);
+    setFeedback("正在提交物品使用並結束目前回合……");
+    void executeCombatItemUse(gameState.state.revision, itemId).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setBagOptions(response.options);
+      setPendingItemId(null);
+      bagHeading.current?.focus();
+      setFeedback("物品已使用；目前回合已結束。");
+    }).catch(async (error: unknown) => {
+      setPendingItemId(null);
+      setFeedback(error instanceof Error ? error.message : "物品暫時無法使用，請重新讀取戰鬥狀態。");
+      try {
+        const latest = await onRetryState();
+        onStateUpdate(latest);
+      } catch {
+        // Keep the safe action error and the last server-confirmed quantity.
+      }
+      setBagOptionsReloadId((value) => value + 1);
+    }).finally(() => setIsUsingItem(false));
+  }
 
   function cancelTargeting() {
     restoreAttackFocus.current = true;
@@ -423,6 +554,97 @@ export function CombatPage({
               <div><p className="combat-eyebrow">戰場</p><h2 id="battlefield-heading">參戰者位置</h2></div>
               <p>排位來自權威狀態；完成換排會消耗整個回合。</p>
             </div>
+            {isBagOpen ? (
+              <section id="combat-bag-panel" className="combat-bag-mode" aria-labelledby="combat-bag-heading" aria-live="polite">
+                <div className="combat-bag-mode__heading">
+                  <div>
+                    <p className="combat-eyebrow">只讀查看</p>
+                    <h3 id="combat-bag-heading" ref={bagHeading} tabIndex={-1}>戰鬥背包</h3>
+                  </div>
+                </div>
+                {isLoadingBagOptions ? <p className="combat-bag-mode__notice">正在讀取背包狀態……</p> : null}
+                {bagOptionsError ? (
+                  <div className="combat-bag-mode__error" role="alert">
+                    <p>{bagOptionsError}</p>
+                    <Button
+                      variant="secondary"
+                      disabled={isUsingItem || isLoadingBagOptions}
+                      onClick={() => setBagOptionsReloadId((value) => value + 1)}
+                    >
+                      重新讀取背包
+                    </Button>
+                  </div>
+                ) : null}
+                {gameState.state.inventory.length > 0 ? (
+                  <ul className="combat-bag-list">
+                    {gameState.state.inventory.map((stack) => {
+                      const item = bagOptions?.items.find((entry) => entry.itemId === stack.itemId);
+                      const optionsMatch = bagOptions?.revision === gameState.state.revision
+                        && bagOptions.currentActorId === currentActorId;
+                      const canUse = optionsMatch && item?.usable === true
+                        && isServerListedUsableCombatItem(
+                          bagOptions, stack.itemId, gameState.state.revision, currentActorId,
+                        );
+                      const disabledReason = item?.unavailableReason === "not-player-turn"
+                        ? "目前不是可操作角色的回合。"
+                        : item?.unavailableReason === "quantity-depleted"
+                          ? "數量為 0，無法使用。"
+                          : bagOptionsError ? "目前無法確認物品是否可使用。"
+                            : isLoadingBagOptions ? "正在確認物品是否可使用。"
+                                : !optionsMatch ? "戰鬥狀態已更新，正在確認物品。"
+                                  : !item ? "目前無法確認這件物品是否可使用。" : "";
+                      const itemName = item?.displayName ?? getCombatItemDisplayName(stack.itemId) ?? stack.itemId;
+                      const disabledReasonId = "combat-item-disabled-reason-" + stack.itemId;
+                      return (
+                        <li key={stack.itemId} className="combat-bag-item">
+                          <div className="combat-bag-item__summary">
+                            <h4>{itemName}</h4>
+                            <p>數量：{stack.quantity}</p>
+                          </div>
+                          {pendingItemId === stack.itemId ? (
+                            <div className="combat-item-confirm" role="group" aria-label="確認使用物品">
+                              <p>確定使用 {itemName}？</p>
+                              <div className="combat-item-confirm__buttons">
+                                <Button
+                                  ref={itemConfirmButton}
+                                  variant="primary"
+                                  disabled={!canUse || requestInFlight}
+                                  loading={isUsingItem}
+                                  loadingLabel="正在使用……"
+                                  onClick={() => confirmItemUse(stack.itemId)}
+                                >
+                                  確認使用
+                                </Button>
+                                <Button variant="secondary" disabled={isUsingItem} onClick={cancelItemConfirmation}>
+                                  取消
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="combat-bag-item__action">
+                              <Button
+                                ref={bagUseButton}
+                                variant="secondary"
+                                data-item-use={stack.itemId}
+                                disabled={!canUse || requestInFlight}
+                                aria-describedby={disabledReason ? disabledReasonId : undefined}
+                                onClick={() => setPendingItemId(stack.itemId)}
+                              >
+                                使用
+                              </Button>
+                              {disabledReason ? <p id={disabledReasonId}>{disabledReason}</p> : null}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : <p className="combat-bag-mode__notice">目前沒有物品。</p>}
+                <div className="combat-bag-mode__footer">
+                  <Button variant="secondary" disabled={isUsingItem} onClick={toggleBag}>關閉</Button>
+                </div>
+              </section>
+            ) : null}
             {isTargeting ? (
               <section className="combat-target-mode" aria-labelledby="combat-target-heading" aria-live="polite">
                 <div>
@@ -539,6 +761,17 @@ export function CombatPage({
                   onClick={beginRowMoveSelection}
                 >
                   移動
+                </Button>
+                <Button
+                  ref={bagButton}
+                  variant="primary"
+                  data-command="inventory"
+                  disabled={mutationInFlight}
+                  aria-expanded={isBagOpen}
+                  aria-controls="combat-bag-panel"
+                  onClick={toggleBag}
+                >
+                  {isBagOpen ? "關閉背包" : "背包"}
                 </Button>
                 {disabledCombatCommands.map((command) => (
                   <Button key={command.id} variant="secondary" disabled data-command={command.id}>{command.label}</Button>

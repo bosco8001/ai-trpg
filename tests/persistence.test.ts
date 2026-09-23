@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import pg from "pg";
 import { randomUUID } from "node:crypto";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import type { GameState } from "../src/domain/game.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { buildApp } from "../src/server/app.js";
@@ -22,6 +23,7 @@ function seed(id = "TEST-character"): GameState {
       learnedActiveSkillIds: ["TEST-skill-1", "TEST-skill-2"],
       equippedSkillIds: [],
     },
+    inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,
   };

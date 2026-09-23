@@ -6,6 +6,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import pg from "pg";
 import { createGameState, type GameState } from "../src/domain/game.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { buildApp } from "../src/server/app.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
 import { PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
@@ -37,6 +38,7 @@ function seed(overrides: Partial<GameState> = {}): GameState {
       learnedActiveSkillIds: ["TEST-skill-1", "TEST-skill-2"],
       equippedSkillIds: [],
     },
+    inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,
     ...overrides,
@@ -77,6 +79,7 @@ test("初始三槽皆空；Save 保存 v1 authoritative snapshot 且不增加 li
   assert.deepEqual(decodeSaveSnapshot(raw).state, {
     activity: "outside-combat",
     character: seed().character,
+    inventory: createTestCombatInventory(),
     exploration: seed().exploration,
   });
 });
@@ -94,7 +97,27 @@ test("Load 恢復內容但 live revision 從目前版本只增加一次", async 
   assert.equal(loaded.state.revision, 3);
   assert.equal(loaded.state.locationId, "TEST-forest-edge");
   assert.equal(loaded.state.lastObservationTargetId, null);
+  assert.equal((await session.getState()).inventory[0]?.quantity, 2);
   assert.equal((await session.getState()).revision, 3);
+});
+
+test("Phase 10 legacy Save Format v1 僅為已知 TEST-character 補工程 inventory", () => {
+  const legacy = {
+    slotId: 1 as const,
+    formatVersion: 1,
+    sourceRevision: 0,
+    snapshot: {
+      activity: "outside-combat" as const,
+      character: seed().character,
+      exploration: seed().exploration,
+    },
+    savedAt: "2026-09-22T12:34:56.000Z",
+  };
+  assert.equal(decodeSaveSnapshot(legacy).state.inventory[0]?.quantity, 2);
+  assert.throws(() => decodeSaveSnapshot({
+    ...legacy,
+    snapshot: { ...legacy.snapshot, character: { ...legacy.snapshot.character, id: "TEST-unknown-character" } },
+  }));
 });
 
 test("Overwrite 保存新的 authoritative state，但 Save 仍不增加 revision", async () => {

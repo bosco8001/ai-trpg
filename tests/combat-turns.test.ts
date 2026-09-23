@@ -6,6 +6,7 @@ import pg from "pg";
 import { advanceCombatTurn, startCombat } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
 import { createGameState, type GameState } from "../src/domain/game.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { buildApp } from "../src/server/app.js";
 import { createCombatFixtureRoller, RandomD20Roller, SequenceD20Roller } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
@@ -25,6 +26,7 @@ function seed(characterId = "TEST-character"): GameState {
       learnedActiveSkillIds: ["TEST-skill-1"],
       equippedSkillIds: [],
     },
+    inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,
   });

@@ -1513,6 +1513,111 @@ h1 {
 
 .combat-row-move-mode__choices .ui-button { min-height: 3rem; }
 
+.combat-bag-mode {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-block-end: var(--space-3);
+  border: var(--border-width) solid var(--border-ornament);
+  border-inline-start: 3px solid var(--action-primary);
+  background: var(--surface-elevated);
+  min-width: 0;
+}
+
+.combat-bag-mode__heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.combat-bag-mode__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.combat-bag-mode__heading h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+}
+
+.combat-bag-mode__heading .ui-button,
+.combat-bag-item__action .ui-button,
+.combat-item-confirm .ui-button { min-height: 3rem; }
+
+.combat-bag-mode__notice,
+.combat-bag-mode__error p,
+.combat-bag-item__summary p,
+.combat-bag-item__action p,
+.combat-item-confirm p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.combat-bag-mode__error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.combat-bag-mode__error p { color: var(--state-danger); }
+
+.combat-bag-list {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.combat-bag-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, auto);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-interactive);
+  background: var(--surface-panel);
+  min-width: 0;
+}
+
+.combat-bag-item__summary { min-width: 0; }
+
+.combat-bag-item__summary h4 {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.combat-bag-item__action,
+.combat-item-confirm {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.combat-item-confirm {
+  grid-column: 1 / -1;
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width) solid var(--border-ornament);
+}
+
+.combat-item-confirm__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.combat-item-confirm__buttons .ui-button { flex: 1 1 9rem; }
+
+.combat-bag-item__action p { max-width: 15rem; }
+
 .combat-target-button {
   width: 100%;
   min-height: 3rem;
@@ -1585,4 +1690,13 @@ h1 {
   .combat-target-mode .ui-button,
   .combat-row-move-mode__choices,
   .combat-row-move-mode__choices .ui-button { width: 100%; }
+  .combat-bag-mode__heading { align-items: stretch; }
+  .combat-bag-mode__heading .ui-button,
+  .combat-bag-mode__footer .ui-button,
+  .combat-bag-mode__error .ui-button,
+  .combat-bag-item,
+  .combat-bag-item__action .ui-button,
+  .combat-item-confirm__buttons,
+  .combat-item-confirm__buttons .ui-button { width: 100%; }
+  .combat-bag-item { grid-template-columns: minmax(0, 1fr); }
 }

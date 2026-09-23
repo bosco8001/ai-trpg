@@ -5,11 +5,13 @@ import type { GameState } from "../src/domain/game.js";
 import { startCombat } from "../src/domain/combat.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { buildApp } from "../src/server/app.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 
 const learned = Array.from({ length: 7 }, (_, i) => `TEST-skill-${i + 1}`);
 const seed = (): GameState => ({
   revision: 0, activity: "outside-combat",
   character: { id: "TEST-character", learnedActiveSkillIds: [...learned], equippedSkillIds: [] },
+  inventory: createTestCombatInventory(),
   exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
   combat: null,
 });

@@ -1,3 +1,5 @@
+import { TEST_COMBAT_CONSUMABLE_ID, TEST_COMBAT_CONSUMABLE_NAME } from "./combat-items.js";
+
 /** 前端讀取的最小權威狀態快照。所有資料仍必須經 runtime validation。 */
 export type CombatSide = "party" | "enemy";
 export type CombatRow = "front" | "back";
@@ -54,7 +56,16 @@ export interface RowMoveResolutionView {
   readonly toRow: CombatRow;
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView;
+export interface ItemUseResolutionView {
+  readonly type: "item-use";
+  readonly actorId: string;
+  readonly round: number;
+  readonly itemId: string;
+  readonly quantityBefore: number;
+  readonly quantityAfter: number;
+}
+
+export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView | ItemUseResolutionView;
 
 export interface CombatStateView {
   readonly round: number;
@@ -88,12 +99,36 @@ export interface RowMoveOptionsResponse {
   readonly legalTargetRows: readonly CombatRow[];
 }
 
+export interface InventoryStackView {
+  readonly itemId: typeof TEST_COMBAT_CONSUMABLE_ID;
+  readonly quantity: number;
+}
+
+export interface CombatItemOptionView {
+  readonly itemId: typeof TEST_COMBAT_CONSUMABLE_ID;
+  readonly displayName: typeof TEST_COMBAT_CONSUMABLE_NAME;
+  readonly quantity: number;
+  readonly usable: boolean;
+  readonly unavailableReason?: "not-player-turn" | "quantity-depleted";
+}
+
+export interface CombatItemOptionsResponse {
+  readonly revision: number;
+  readonly currentActorId: string;
+  readonly items: readonly CombatItemOptionView[];
+}
+
 export interface CombatNormalAttackResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "normal-attack-resolved"; readonly outcome: "hit" | "miss" };
 }
 
 export interface CombatRowMoveResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "row-move-completed" };
+}
+
+export interface CombatItemUseResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "combat-item-used" };
+  readonly options: CombatItemOptionsResponse;
 }
 
 export interface AuthoritativeGameStateView {
@@ -104,6 +139,7 @@ export interface AuthoritativeGameStateView {
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
   };
+  readonly inventory: readonly InventoryStackView[];
   readonly exploration: {
     readonly locationId: "TEST-forest-edge" | "TEST-ruin-entrance";
     readonly lastObservationTargetId: "TEST-stone-door" | null;
@@ -204,6 +240,16 @@ function isRowMoveResolution(value: unknown): value is RowMoveResolutionView {
     && value.fromRow !== value.toRow;
 }
 
+function isItemUseResolution(value: unknown): value is ItemUseResolutionView {
+  return isRecord(value)
+    && exact(value, ["type", "actorId", "round", "itemId", "quantityBefore", "quantityAfter"])
+    && value.type === "item-use" && isId(value.actorId)
+    && isSafeInteger(value.round) && value.round > 0
+    && value.itemId === TEST_COMBAT_CONSUMABLE_ID
+    && isSafeInteger(value.quantityBefore) && value.quantityBefore > 0
+    && isSafeInteger(value.quantityAfter) && value.quantityAfter === value.quantityBefore - 1;
+}
+
 function resolveTieOrder(participants: readonly CombatParticipantView[], rollIndex: number): string[] | undefined {
   const groups = new Map<number, CombatParticipantView[]>();
   for (const participant of participants) {
@@ -264,7 +310,8 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   const ids = validatedParticipants.map((participant) => participant.id);
   const expected = expectedTurnOrder(validatedParticipants);
   const lastAction = value.lastAction;
-  if (lastAction !== null && !isNormalAttackResolution(lastAction) && !isRowMoveResolution(lastAction)) return false;
+  if (lastAction !== null && !isNormalAttackResolution(lastAction)
+    && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
@@ -279,24 +326,37 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
     && (lastAction === null || lastAction.type !== "normal-attack"
       || (ids.includes(lastAction.targetId)
         && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"))
-    && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow);
+    && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow)
+    && (lastAction === null || lastAction.type !== "item-use" || actor?.normalAttack !== null);
 }
 
 export function isAuthoritativeGameStateView(value: unknown): value is AuthoritativeGameStateView {
-  if (!isRecord(value) || !exact(value, ["revision", "activity", "character", "exploration", "combat"])
+  if (!isRecord(value) || !exact(value, ["revision", "activity", "character", "inventory", "exploration", "combat"])
     || !isSafeInteger(value.revision) || value.revision < 0
     || (value.activity !== "outside-combat" && value.activity !== "in-combat")
     || !isRecord(value.character)
     || !exact(value.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
     || !isId(value.character.id) || !isIds(value.character.learnedActiveSkillIds)
     || !isIds(value.character.equippedSkillIds)
+    || !Array.isArray(value.inventory)
+    || !value.inventory.every((entry) => isRecord(entry)
+      && exact(entry, ["itemId", "quantity"])
+      && entry.itemId === TEST_COMBAT_CONSUMABLE_ID
+      && isSafeInteger(entry.quantity) && entry.quantity >= 0)
+    || new Set(value.inventory.map((entry) => (entry as Record<string, unknown>).itemId)).size !== value.inventory.length
     || !isRecord(value.exploration)
     || !exact(value.exploration, ["locationId", "lastObservationTargetId"])
     || (value.exploration.locationId !== "TEST-forest-edge" && value.exploration.locationId !== "TEST-ruin-entrance")
     || (value.exploration.lastObservationTargetId !== null && value.exploration.lastObservationTargetId !== "TEST-stone-door")) {
     return false;
   }
-  return value.activity === "outside-combat" ? value.combat === null : isCombatStateView(value.combat);
+  if (value.activity === "outside-combat") return value.combat === null;
+  if (!isCombatStateView(value.combat)) return false;
+  const lastAction = value.combat.lastAction;
+  if (lastAction?.type !== "item-use") return true;
+  const stack = value.inventory.find((entry) => (entry as Record<string, unknown>).itemId === lastAction.itemId) as
+    | Record<string, unknown> | undefined;
+  return stack?.quantity === lastAction.quantityAfter;
 }
 
 export function isAuthoritativeGameStateResponse(value: unknown): value is AuthoritativeGameStateResponse {
@@ -371,4 +431,41 @@ export function isCombatRowMoveResponse(value: unknown): value is CombatRowMoveR
     && isRecord(value.effect) && exact(value.effect, ["type"])
     && value.effect.type === "row-move-completed"
     && value.state.combat?.lastAction?.type === "row-move";
+}
+
+export function isCombatItemOptionsResponse(value: unknown): value is CombatItemOptionsResponse {
+  if (!isRecord(value) || !exact(value, ["revision", "currentActorId", "items"])
+    || !isSafeInteger(value.revision) || value.revision < 0 || !isId(value.currentActorId)
+    || !Array.isArray(value.items)) return false;
+  const validItems = value.items.every((item) => isRecord(item)
+    && (exact(item, ["itemId", "displayName", "quantity", "usable"])
+      || exact(item, ["itemId", "displayName", "quantity", "usable", "unavailableReason"]))
+    && item.itemId === TEST_COMBAT_CONSUMABLE_ID
+    && item.displayName === TEST_COMBAT_CONSUMABLE_NAME
+    && isSafeInteger(item.quantity) && item.quantity >= 0
+    && typeof item.usable === "boolean"
+    && (item.usable
+      ? item.quantity > 0 && item.unavailableReason === undefined
+      : item.unavailableReason === "not-player-turn"
+        || (item.unavailableReason === "quantity-depleted" && item.quantity === 0)));
+  return validItems && new Set(value.items.map((item) => (item as Record<string, unknown>).itemId)).size === value.items.length;
+}
+
+export function isCombatItemUseResponse(value: unknown): value is CombatItemUseResponse {
+  if (!isRecord(value) || !exact(value, ["sandbox", "storage", "effect", "state", "options"])
+    || typeof value.sandbox !== "boolean"
+    || (value.storage !== "memory" && value.storage !== "postgres")
+    || !isAuthoritativeGameStateView(value.state)
+    || !isRecord(value.effect) || !exact(value.effect, ["type"])
+    || value.effect.type !== "combat-item-used"
+    || !isCombatItemOptionsResponse(value.options)) return false;
+  const state = value.state;
+  const action = state.combat?.lastAction;
+  return action?.type === "item-use"
+    && state.revision > 0
+    && value.options.revision === state.revision
+    && value.options.currentActorId === state.combat?.currentActorId
+    && value.options.items.length === state.inventory.length
+    && value.options.items.every((item) => state.inventory.some((stack) =>
+      stack.itemId === item.itemId && stack.quantity === item.quantity));
 }

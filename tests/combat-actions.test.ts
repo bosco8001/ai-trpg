@@ -14,6 +14,7 @@ import {
 import { checkNormalAttackTarget, getLegalNormalAttackTargets } from "../src/domain/combat-targeting.js";
 import { createCombatState } from "../src/domain/combat-state.js";
 import { createGameState, type GameState } from "../src/domain/game.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { buildApp } from "../src/server/app.js";
 import {
@@ -63,6 +64,7 @@ function seed(characterId = "TEST-character"): GameState {
       learnedActiveSkillIds: ["TEST-skill-1"],
       equippedSkillIds: [],
     },
+    inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,
   });

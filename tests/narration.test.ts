@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createGameState, type GameState } from "../src/domain/game.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { createExplorationActionService } from "../src/server/exploration/action-service.js";
 import { createLanguageModel } from "../src/server/llm/language-model.js";
@@ -21,6 +22,7 @@ function seed(locationId: GameState["exploration"]["locationId"] = "TEST-forest-
     revision: 0,
     activity: "outside-combat",
     character: { id: "TEST-character", learnedActiveSkillIds: [], equippedSkillIds: [] },
+    inventory: createTestCombatInventory(),
     exploration: { locationId, lastObservationTargetId: null },
     combat: null,
   });

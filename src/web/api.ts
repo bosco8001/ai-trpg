@@ -17,12 +17,16 @@ import {
   isAuthoritativeGameStateResponse,
   isCombatNormalAttackResponse,
   isCombatRowMoveResponse,
+  isCombatItemOptionsResponse,
+  isCombatItemUseResponse,
   isCombatSandboxAdvanceResponse,
   isNormalAttackOptionsResponse,
   isRowMoveOptionsResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
+  type CombatItemOptionsResponse,
+  type CombatItemUseResponse,
   type CombatSandboxAdvanceResponse,
   type NormalAttackOptionsResponse,
   type RowMoveOptionsResponse,
@@ -224,6 +228,59 @@ export async function executeRowMove(
     || body.state.combat?.lastAction?.type !== "row-move"
     || body.state.combat.lastAction.toRow !== targetRow) {
     throw new Error("移動回應格式不正確。");
+  }
+  return body;
+}
+
+/** Loads server-derived inventory options; reading the bag has no mutation endpoint. */
+export async function loadCombatItemOptions(fetcher: typeof fetch = fetch): Promise<CombatItemOptionsResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/items/options", { cache: "no-store" });
+  } catch {
+    throw new Error("目前無法讀取戰鬥背包，請確認服務後再試。");
+  }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取戰鬥背包，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("戰鬥背包回應格式不正確。");
+  }
+  if (!isCombatItemOptionsResponse(body)) throw new Error("戰鬥背包回應格式不正確。");
+  return body;
+}
+
+/** Only the server can select the current actor, consume quantity, and advance the Turn. */
+export async function executeCombatItemUse(
+  expectedRevision: number,
+  itemId: string,
+  fetcher: typeof fetch = fetch,
+): Promise<CombatItemUseResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/items/use", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision, itemId }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("物品暫時無法使用，請重新讀取戰鬥狀態。");
+  }
+  if (!response.ok) throw await saveApiError(response, "物品暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("物品使用回應格式不正確。");
+  }
+  if (!isCombatItemUseResponse(body)) throw new Error("物品使用回應格式不正確。");
+  const action = body.state.combat?.lastAction;
+  if (body.state.revision !== expectedRevision + 1
+    || action?.type !== "item-use" || action.itemId !== itemId
+    || body.options.revision !== expectedRevision + 1) {
+    throw new Error("物品使用回應格式不正確。");
   }
   return body;
 }

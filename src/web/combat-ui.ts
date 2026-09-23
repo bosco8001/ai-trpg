@@ -3,6 +3,7 @@ import type {
   CombatParticipantView,
   CombatRow,
   CombatStateView,
+  CombatItemOptionsResponse,
   NormalAttackOptionsResponse,
   RowMoveOptionsResponse,
 } from "../shared/game-state.js";
@@ -22,7 +23,6 @@ export interface TurnOrderEntry {
 
 export const disabledCombatCommands = Object.freeze([
   { id: "defend", label: "防禦" },
-  { id: "inventory", label: "背包" },
   { id: "party", label: "隊伍" },
   { id: "flee", label: "逃走" },
 ] as const);
@@ -106,6 +106,17 @@ export function isServerListedLegalTargetRow(
   return options !== null && options.revision === expectedRevision
     && options.currentActorId === currentActorId && options.currentRow === currentRow
     && options.canPlayerAct && options.legalTargetRows.includes(targetRow);
+}
+
+export function isServerListedUsableCombatItem(
+  options: CombatItemOptionsResponse | null,
+  itemId: string,
+  expectedRevision: number,
+  currentActorId: string,
+): boolean {
+  return options !== null && options.revision === expectedRevision
+    && options.currentActorId === currentActorId
+    && options.items.some((item) => item.itemId === itemId && item.usable);
 }
 
 export function applicationMode(response: AuthoritativeGameStateResponse): "exploration" | "combat" {

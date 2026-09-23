@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { advanceCombatTurn, startCombat } from "../src/domain/combat.js";
 import { createGameState, type GameState } from "../src/domain/game.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { buildApp } from "../src/server/app.js";
 import { createCombatFixtureRoller } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
@@ -32,6 +33,7 @@ function seed(): GameState {
       learnedActiveSkillIds: ["TEST-skill-1", "TEST-skill-2"],
       equippedSkillIds: ["TEST-skill-1"],
     },
+    inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,
   });

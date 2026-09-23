@@ -1,7 +1,10 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { createGameState } from "../../domain/game.js";
-import type { CombatTransitionResult, NormalAttackResult, RowMoveResult } from "../../domain/combat.js";
+import { getCurrentCombatItemOptions } from "../../domain/combat.js";
+import type { CombatItemUseResult, CombatTransitionResult, NormalAttackResult, RowMoveResult } from "../../domain/combat.js";
 import {
+  isCombatItemOptionsResponse,
+  isCombatItemUseResponse,
   isCombatNormalAttackResponse,
   isCombatRowMoveResponse,
   isNormalAttackOptionsResponse,
@@ -108,6 +111,21 @@ function safeRowMoveFailure(app: FastifyInstance, reply: FastifyReply, error: un
   return reply.code(500).send({ error: "combat-row-move-failed", message: "目前無法處理移動，請重新讀取戰鬥狀態。" });
 }
 
+function itemUseStatus(result: Extract<CombatItemUseResult, { ok: false }>): number {
+  return result.code === "invalid-command" ? 400 : 409;
+}
+
+function safeItemUseFailure(app: FastifyInstance, reply: FastifyReply, error: unknown) {
+  app.log.error({ err: error }, "戰鬥物品使用失敗");
+  if (error instanceof PersistenceUnavailableError) {
+    return reply.code(503).send({ error: "state-unavailable", message: "戰鬥狀態暫時無法使用，請稍後再試。" });
+  }
+  if (error instanceof InvalidPersistedStateError) {
+    return reply.code(500).send({ error: "state-invalid", message: "已保存的戰鬥狀態無法安全讀取。" });
+  }
+  return reply.code(500).send({ error: "combat-item-use-failed", message: "目前無法使用物品，請重新讀取戰鬥狀態。" });
+}
+
 /** Formal read/action boundary. Legal targets are derived; only the attack transition writes state. */
 export function registerCombatActionRoutes(
   app: FastifyInstance,
@@ -192,6 +210,46 @@ export function registerCombatActionRoutes(
       return response;
     } catch (error) {
       return safeRowMoveFailure(app, reply, error);
+    }
+  });
+
+  app.get("/api/combat/items/options", async (_request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.combatItemOptions();
+      if (!result.ok) return reply.code(409).send({ error: result.code, message: result.message });
+      const response = { revision: result.revision, ...result.options };
+      if (!isCombatItemOptionsResponse(response)) throw new Error("戰鬥物品選項未通過 runtime validation。");
+      return response;
+    } catch (error) {
+      return safeItemUseFailure(app, reply, error);
+    }
+  });
+
+  app.post<{ Body: unknown }>("/api/combat/items/use", {
+    bodyLimit: 1024,
+    errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.code(400).send({ error: "invalid-request", message: "請送出有效的物品使用請求。" });
+    },
+  }, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.useCombatItem(request.body);
+      if (!result.ok) return reply.code(itemUseStatus(result)).send({ error: result.code, message: result.message });
+      const derived = getCurrentCombatItemOptions(result.state);
+      if (!derived.ok) throw new Error("已提交的戰鬥物品狀態無法建立 options。");
+      const response = {
+        sandbox,
+        storage,
+        effect: result.effect,
+        state: validatedState(result.state),
+        options: { revision: derived.revision, ...derived.options },
+      };
+      if (!isCombatItemUseResponse(response)) throw new Error("戰鬥物品回應未通過 runtime validation。");
+      return response;
+    } catch (error) {
+      return safeItemUseFailure(app, reply, error);
     }
   });
 }

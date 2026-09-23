@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–13 已由使用者確認。Phase 14「前後排換位」工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。
+Phase 1–14 已由使用者確認。Phase 15「戰鬥背包與物品使用」工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -203,4 +203,18 @@ Combat participant 現在將 `side + row` 作為權威位置，TEST 初始位置
 
 新增 `tests/combat-row-movement.test.ts` 與 [Phase 14 手動驗收文件](PHASE_14_ROW_MOVEMENT.md)。修改 combat domain/state、session 與 routes、PostgreSQL repository 註解、shared GameState contract、CombatPage／API／UI helpers／style、Phase 13 測試與 README。更新 canonical combat system／UI、未解問題，以及 Phase 10–13 與本計畫的階段狀態。沒有資料庫 schema 或 migration 變更。
 
-工程檢查：`npm test` 共 144 項，139 項通過、0 項失敗、5 項 PostgreSQL 整合測試因未提供隔離 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過，dry-run 顯示沒有待執行 migration。工程階段未執行瀏覽器／mobile／keyboard 手動驗收或 PostgreSQL restart。Phase 14 工程實作完成，等待使用者手動確認；Phase 1–13 已由使用者確認。Phase 15 尚未開始。
+工程檢查：`npm test` 共 144 項，139 項通過、0 項失敗、5 項 PostgreSQL 整合測試因未提供隔離 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過，dry-run 顯示沒有待執行 migration。工程階段未執行瀏覽器／mobile／keyboard 手動驗收或 PostgreSQL restart。使用者其後確認 Phase 14 手動驗收完成；Phase 1–14 已由使用者確認。
+
+## Phase 15 交付紀錄
+
+GameState 加入最小 authoritative inventory stacks，TEST 工程角色有 `TEST-combat-consumable × 2`。靜態 catalog 只定義 TEST 名稱、可消耗與 self-use；沒有 item lore 或效果。runtime validation 僅接受已知 fixture、唯一 stack 與非負安全整數。舊 JSONB 與 Save Format v1 snapshot 只對 exact `TEST-character` 補上工程 fixture inventory；其他角色舊資料缺欄位會 safe reject。
+
+新增 server-derived `GET /api/combat/items/options` 與 exact-body `POST /api/combat/items/use`。GET options 不寫狀態；敵方回合可查看但不可使用。POST 會重新驗證 active combat、expectedRevision、player-action boundary、catalog、self-use consumable 及正數 quantity。成功在單一 transition 扣一件、保存 `item-use` lastAction、沿用 Phase 11 Turn advance，revision 只增加一次。PostgreSQL 使用既有 `withStateLocked` row transaction；GameState／inventory／combat action 繼續放在 JSONB。
+
+Combat UI 啟用背包入口，開關背包會關閉攻擊／換排 presentation mode，但不改 authoritative state。使用需第二步確認；取消不提交；前端沒有 optimistic decrement。最近行動只顯示 actor、TEST 物品名稱、數量前後與固定結果。沒有呼叫 LLM，也沒有加入 HP、MP、治療、傷害、buff、debuff 或 status effect。Save／Load 在 active combat 的 safeguard 保持原狀。
+
+新增 `src/shared/combat-items.ts`、`src/domain/combat-items.ts`、`tests/combat-items.test.ts` 與 [Phase 15 手動驗收文件](PHASE_15_COMBAT_ITEMS.md)。修改 GameState／CombatState、combat transition、session、service、routes、PostgreSQL／Save snapshot hydration、shared runtime contracts、CombatPage、API、UI helper／樣式，以及 README、OPEN_QUESTIONS 與 Phase 10–14 文件狀態。沒有新增 migration、table 或 item-history table。
+
+工程檢查：`npm test` 共 155 項，149 項通過、0 項失敗、6 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過。Dry run 顯示沒有待執行 migration。工程階段未執行瀏覽器／手機／鍵盤手動驗收或 PostgreSQL restart；由使用者依 Phase 15 清單測試。
+
+Phase 1–14 已由使用者確認。Phase 15 工程實作完成，等待使用者手動確認。Phase 16 尚未開始。

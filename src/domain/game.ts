@@ -1,4 +1,5 @@
 import { createCombatState, type CombatState } from "./combat-state.js";
+import { isInventory, normalizeInventory, type InventoryStack } from "./combat-items.js";
 
 export type ExplorationLocationId = "TEST-forest-edge" | "TEST-ruin-entrance";
 
@@ -22,6 +23,8 @@ export interface GameState {
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
   };
+  /** Authoritative item stacks; item definitions live in the static domain catalog. */
+  readonly inventory: readonly InventoryStack[];
   readonly exploration: ExplorationState;
   readonly combat: CombatState | null;
 }
@@ -30,6 +33,7 @@ export interface GameState {
 export interface GameStateContents {
   readonly activity: "outside-combat";
   readonly character: GameState["character"];
+  readonly inventory: GameState["inventory"];
   readonly exploration: ExplorationState;
 }
 
@@ -41,6 +45,7 @@ export function gameStateContents(state: GameState): GameStateContents {
   return Object.freeze({
     activity: "outside-combat",
     character: validated.character,
+    inventory: validated.inventory,
     exploration: validated.exploration,
   });
 }
@@ -163,7 +168,7 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
-  if (!hasExactKeys(seed, ["revision", "activity", "character", "exploration", "combat"])
+  if (!hasExactKeys(seed, ["revision", "activity", "character", "inventory", "exploration", "combat"])
     || !hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
     || !hasExactKeys(seed.exploration, ["locationId", "lastObservationTargetId"])) {
     throw new Error("初始 domain 狀態不符合契約。");
@@ -182,12 +187,18 @@ export function createGameState(seed: unknown): GameState {
     || !isId(character.id)
     || !isIds(character.learnedActiveSkillIds)
     || !isIds(character.equippedSkillIds)
+    || !isInventory(seed.inventory)
     || new Set(character.learnedActiveSkillIds).size !== character.learnedActiveSkillIds.length
     || loadoutError(character.learnedActiveSkillIds, character.equippedSkillIds)
     || (exploration.locationId !== "TEST-forest-edge" && exploration.locationId !== "TEST-ruin-entrance")
     || (exploration.lastObservationTargetId !== null
       && exploration.lastObservationTargetId !== "TEST-stone-door")) {
     throw new Error("初始 domain 狀態不符合契約。");
+  }
+  const lastAction = combat?.lastAction;
+  if (lastAction?.type === "item-use"
+    && seed.inventory.find((stack) => stack.itemId === lastAction.itemId)?.quantity !== lastAction.quantityAfter) {
+    throw new Error("CombatState 最近物品行動與權威 inventory 數量不一致。");
   }
   return Object.freeze({
     revision: seed.revision,
@@ -197,6 +208,7 @@ export function createGameState(seed: unknown): GameState {
       learnedActiveSkillIds: Object.freeze([...character.learnedActiveSkillIds]),
       equippedSkillIds: Object.freeze([...character.equippedSkillIds]),
     }),
+    inventory: normalizeInventory(seed.inventory),
     exploration: Object.freeze({
       locationId: exploration.locationId,
       lastObservationTargetId: exploration.lastObservationTargetId,

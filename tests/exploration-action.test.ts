@@ -12,6 +12,7 @@ import type { CandidateAction } from "../src/shared/interpretation.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { PersistenceUnavailableError } from "../src/server/postgres-game-state-repository.js";
 import { startCombat } from "../src/domain/combat.js";
+import { createTestCombatInventory } from "../src/domain/combat-items.js";
 
 function seed(overrides: Partial<GameState["exploration"]> = {}): GameState {
   return createGameState({
@@ -22,6 +23,7 @@ function seed(overrides: Partial<GameState["exploration"]> = {}): GameState {
       learnedActiveSkillIds: ["TEST-skill-1"],
       equippedSkillIds: [],
     },
+    inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null, ...overrides },
     combat: null,
   });

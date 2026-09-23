@@ -1,6 +1,6 @@
 # Phase 10：Manual Save / Load
 
-> Phase 1–13 已由使用者確認。Phase 14 工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。
+> Phase 1–14 已由使用者確認。Phase 15 工程實作完成，等待使用者手動驗收；Phase 16 尚未開始。
 
 這一階段像拍下正式記分板的照片，再於需要時把照片內容重新寫到現在的記分板。拍照不改變比賽，所以 Save 不增加 revision；Load 是新的正式變更，所以只從目前 live revision 往前增加一次。
 
@@ -50,14 +50,15 @@ Application contract：
   formatVersion: 1;
   sourceRevision: number;
   state: {
-    activity: GameState["activity"];
+    activity: "outside-combat";
     character: GameState["character"];
+    inventory: GameState["inventory"];
     exploration: GameState["exploration"];
   };
 }
 ```
 
-Restorable `state` 刻意不含 live `revision`。資料庫讀回的 metadata 與 snapshot 都視為不可信資料；必須檢查 slot、format version、source revision、時間與完整 GameState 結構。未知版本只回安全的「此存檔版本目前無法讀取」，目前沒有虛構 v0／v2 migration。
+Restorable `state` 刻意不含 live `revision` 或 combat。Phase 15 將 authoritative inventory 加入現有 Save Format v1 snapshot，沒有新增資料表。Phase 10 舊 snapshot 沒有 inventory 時，只為 exact `TEST-character` 套用明確 TEST fixture compatibility；未知角色缺少 inventory 會 safe reject。資料庫讀回的 metadata 與 snapshot 都視為不可信資料；必須檢查 slot、format version、source revision、時間與完整 GameState 結構。
 
 ## PostgreSQL schema
 
@@ -94,6 +95,6 @@ PostgreSQL integration test 只在明確提供隔離 `TEST_DATABASE_URL` 且已�
 
 ## 尚未處理
 
-本階段沒有 autosave、quicksave、刪除、匯出／匯入、cloud save、多 campaign、帳號、縮圖、conversation／narration history persistence、正式 LLM provider、正式 inventory／equipment／party 或 combat。Phase 11 加入 CombatState 後，戰鬥中的 Save／Load 暫時由工程防護拒絕；是否正式允許仍未定案，Save Format v1 的意義沒有改變。
+本階段沒有 autosave、quicksave、刪除、匯出／匯入、cloud save、多 campaign、帳號、縮圖、conversation／narration history persistence、正式 LLM provider、完整 inventory／equipment／party 或 combat。Phase 11 加入 CombatState 後，戰鬥中的 Save／Load 暫時由工程防護拒絕；是否正式允許仍未定案。
 
 完整手動測試步驟見 [README](../../README.md#phase-10manual-save--load-手動測試)。
