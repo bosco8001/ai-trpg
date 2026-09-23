@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–12 已由使用者確認。Phase 13「普通攻擊與合法目標」工程實作完成，等待使用者手動驗收；Phase 14 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–13 已由使用者確認。Phase 14「前後排換位」工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的範圍、契約與終端機操作步驟見 [Phase 3 手動測試](docs/development/PHASE_3_DOMAIN.md)。前端仍是已確認的連線頁。
 
@@ -178,7 +178,7 @@ npm start
 
 ## Phase 13：普通攻擊與合法目標手動驗收
 
-Phase 1–12 已由使用者確認。Phase 13 工程實作完成，等待使用者手動驗收；Phase 14 尚未開始。詳細狀態資料、API 與相容規則見 [Phase 13 文件](docs/development/PHASE_13_NORMAL_ATTACK.md)。戰鬥判定仍以 canonical [combat_system.md](docs/gameplay/combat_system.md) 為準。
+Phase 1–13 已由使用者確認。詳細狀態資料、API 與相容規則見 [Phase 13 文件](docs/development/PHASE_13_NORMAL_ATTACK.md)。戰鬥判定仍以 canonical [combat_system.md](docs/gameplay/combat_system.md) 為準。
 
 本階段的攻擊只判定命中或未命中，不計傷害、不建立 HP，也不呼叫 LLM。TEST 玩家修正值只供工程測試使用。
 
@@ -346,3 +346,17 @@ curl -s http://127.0.0.1:3001/api/game-state
 - 操作時焦點清楚可見。
 
 停止 backend 後重試讀取或攻擊，畫面應顯示繁體中文安全訊息；不得顯示 stack trace、SQL、內部路徑或資料庫細節。
+
+## Phase 14：前後排換位手動驗收
+
+Phase 1–13 已由使用者確認。Phase 14 工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。完整前後排、取消、stale、資料保存、手機、鍵盤與錯誤狀態步驟見 [Phase 14 文件](docs/development/PHASE_14_ROW_MOVEMENT.md)。
+
+記憶體模式啟動：
+
+~~~sh
+DOMAIN_STORAGE=memory COMBAT_SANDBOX=1 COMBAT_ROLL_FIXTURE_MODE=normal COMBAT_ACTION_ROLL_FIXTURE_MODE=hit NARRATION_FIXTURE_MODE=normal npm run dev
+~~~
+
+開始 TEST combat 並重新整理瀏覽器後，使用「TEST：推進下一回合」到 TEST 玩家回合。先開啟「移動」確認前排只提供「移至後排」，取消後 state 不變；再次確認換排，應增加一次 revision、結束玩家 Turn，並把玩家卡片移到我方後排。之後再推進到 Round 2 玩家回合，確認「移至前排」可以將卡片移回我方前排。
+
+換排選項是唯讀 API：`GET /api/combat/row-move/options`。成功 action 使用 `POST /api/combat/row-move`，body 只有 `expectedRevision` 與 `targetRow`；同排選擇和舊 revision 應安全拒絕。Phase 14 不新增 database table 或 migration。

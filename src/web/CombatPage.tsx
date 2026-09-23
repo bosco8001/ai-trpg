@@ -1,19 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import type {
   AuthoritativeGameStateResponse,
+  CombatRow,
   CombatParticipantView,
   CombatStateView,
   NormalAttackOptionsResponse,
   NormalAttackTargetOptionView,
+  RowMoveOptionsResponse,
 } from "../shared/game-state.js";
-import { advanceTestCombatTurn, executeNormalAttack, loadNormalAttackOptions } from "./api.js";
+import {
+  advanceTestCombatTurn,
+  executeNormalAttack,
+  executeRowMove,
+  loadNormalAttackOptions,
+  loadRowMoveOptions,
+} from "./api.js";
 import {
   disabledCombatCommands,
   getCombatPresentationLanes,
   getTurnOrderEntries,
   initiativeDetail,
+  canPlayerUseRowMove,
   canPlayerUseNormalAttack,
   isServerListedLegalTarget,
+  isServerListedLegalTargetRow,
 } from "./combat-ui.js";
 import { Button } from "./ui/Button.js";
 import { Panel } from "./ui/Panel.js";
@@ -98,11 +108,25 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       <Panel className="combat-rail__panel" aria-labelledby="combat-last-action-heading">
         <p className="combat-eyebrow">戰鬥裁定</p>
         <h2 id="combat-last-action-heading">最近裁定</h2>
-        <p>尚無已完成的普通攻擊裁定。</p>
+        <p>尚無已完成的戰鬥行動。</p>
       </Panel>
     );
   }
   const actor = participants.get(action.actorId)?.displayName ?? action.actorId;
+  if (action.type === "row-move") {
+    const rowLabel = (row: CombatRow) => `我方${row === "front" ? "前排" : "後排"}`;
+    return (
+      <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+        <p className="combat-eyebrow">最近行動・第 {action.round} 回合</p>
+        <h2 id="combat-last-action-heading">最近行動</h2>
+        <p className="combat-last-action__pair">{actor}</p>
+        <p className="combat-last-action__row-move">
+          {rowLabel(action.fromRow)} → {rowLabel(action.toRow)}
+        </p>
+        <p className="combat-last-action__outcome">結果：換排完成</p>
+      </Panel>
+    );
+  }
   const target = participants.get(action.targetId)?.displayName ?? action.targetId;
   return (
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
@@ -142,15 +166,31 @@ export function CombatPage({
   onRetryState: () => Promise<AuthoritativeGameStateResponse>;
 }) {
   const combat = gameState.state.combat;
+  const currentActor = combat?.participants.find((participant) => participant.id === combat.currentActorId);
+  const currentActorId = combat?.currentActorId ?? "";
+  const hasPlayerActionActor = currentActor?.side === "party" && currentActor.normalAttack !== null;
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isTargeting, setIsTargeting] = useState(false);
   const [isLoadingTargets, setIsLoadingTargets] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [isRowMoveMode, setIsRowMoveMode] = useState(false);
+  const [isLoadingRowMoveOptions, setIsLoadingRowMoveOptions] = useState(false);
+  const [isMovingRow, setIsMovingRow] = useState(false);
+  const [rowMoveOptions, setRowMoveOptions] = useState<RowMoveOptionsResponse | null>(null);
+  const [rowMoveOptionsReloadId, setRowMoveOptionsReloadId] = useState(0);
   const [targetOptions, setTargetOptions] = useState<NormalAttackOptionsResponse | null>(null);
   const [feedback, setFeedback] = useState(stateError ?? "");
   const attackButton = useRef<HTMLButtonElement>(null);
+  const rowMoveButton = useRef<HTMLButtonElement>(null);
+  const rowMoveHeading = useRef<HTMLHeadingElement>(null);
   const restoreAttackFocus = useRef(false);
+  const restoreRowMoveFocus = useRef(false);
+  const rowMoveRequestInFlight = useRef(false);
+  const retryStateRef = useRef(onRetryState);
+  const stateUpdateRef = useRef(onStateUpdate);
+  retryStateRef.current = onRetryState;
+  stateUpdateRef.current = onStateUpdate;
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
   useEffect(() => {
@@ -159,6 +199,49 @@ export function CombatPage({
       restoreAttackFocus.current = false;
     }
   }, [isTargeting]);
+  useEffect(() => {
+    if (isRowMoveMode) {
+      rowMoveHeading.current?.focus();
+      return;
+    }
+    if (!isRowMoveMode && restoreRowMoveFocus.current) {
+      rowMoveButton.current?.focus();
+      restoreRowMoveFocus.current = false;
+    }
+  }, [isRowMoveMode]);
+  useEffect(() => {
+    let active = true;
+    setRowMoveOptions(null);
+    if (!combat || !hasPlayerActionActor) {
+      setIsLoadingRowMoveOptions(false);
+      return () => { active = false; };
+    }
+    setIsLoadingRowMoveOptions(true);
+    void loadRowMoveOptions().then(async (options) => {
+      if (!active) return;
+      if (options.revision !== gameState.state.revision
+        || options.currentActorId !== currentActorId
+        || options.currentRow !== currentActor?.row
+        || !options.canPlayerAct) {
+        setFeedback("戰鬥狀態已更新，正在重新讀取。");
+        try {
+          const latest = await retryStateRef.current();
+          if (active) stateUpdateRef.current(latest);
+        } catch {
+          if (active) setFeedback("目前無法確認最新戰鬥狀態，請稍後重新讀取。");
+        }
+        return;
+      }
+      setRowMoveOptions(options);
+    }).catch((error: unknown) => {
+      if (active) {
+        setFeedback(error instanceof Error ? error.message : "目前無法讀取合法換排選項，請重新讀取戰鬥狀態。");
+      }
+    }).finally(() => {
+      if (active) setIsLoadingRowMoveOptions(false);
+    });
+    return () => { active = false; };
+  }, [gameState.state.revision, currentActorId, currentActor?.row, hasPlayerActionActor, rowMoveOptionsReloadId]);
 
   if (!combat) {
     return (
@@ -168,12 +251,15 @@ export function CombatPage({
     );
   }
 
-  const currentActor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  const currentActorId = combat.currentActorId;
   const lanes = getCombatPresentationLanes(combat.participants);
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
-  const requestInFlight = isAdvancing || isRetrying || isLoadingTargets || isResolving;
+  const requestInFlight = isAdvancing || isRetrying || isLoadingTargets || isResolving
+    || isLoadingRowMoveOptions || isMovingRow;
+  const selectionModeActive = isTargeting || isRowMoveMode;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
+  const canPlayerMoveRow = canPlayerUseRowMove(
+    combat, rowMoveOptions, gameState.state.revision, requestInFlight,
+  );
 
   function cancelTargeting() {
     restoreAttackFocus.current = true;
@@ -184,7 +270,7 @@ export function CombatPage({
   }
 
   function beginTargetSelection() {
-    if (!canPlayerAttack || requestInFlight) return;
+    if (!canPlayerAttack || requestInFlight || isRowMoveMode) return;
     setIsTargeting(true);
     setTargetOptions(null);
     setIsLoadingTargets(true);
@@ -213,7 +299,7 @@ export function CombatPage({
   function selectTarget(targetId: string) {
     const option = targetOptionsById.get(targetId);
     if (!option?.legal || !isServerListedLegalTarget(targetOptions, targetId, gameState.state.revision)
-      || requestInFlight) return;
+      || requestInFlight || isRowMoveMode) return;
     setIsResolving(true);
     setIsTargeting(false);
     setTargetOptions(null);
@@ -236,6 +322,52 @@ export function CombatPage({
     }).finally(() => setIsResolving(false));
   }
 
+  function beginRowMoveSelection() {
+    if (!canPlayerMoveRow || requestInFlight || isTargeting) return;
+    setIsRowMoveMode(true);
+    setFeedback("");
+  }
+
+  function cancelRowMove() {
+    restoreRowMoveFocus.current = true;
+    setIsRowMoveMode(false);
+    setFeedback("已取消換排；戰鬥狀態沒有改變。");
+  }
+
+  function confirmRowMove(targetRow: CombatRow) {
+    if (!isRowMoveMode || !currentActor || requestInFlight || rowMoveRequestInFlight.current
+      || !isServerListedLegalTargetRow(
+        rowMoveOptions,
+        targetRow,
+        gameState.state.revision,
+        currentActorId,
+        currentActor.row,
+      )) return;
+    rowMoveRequestInFlight.current = true;
+    setIsMovingRow(true);
+    setFeedback("正在提交換排並結束目前回合……");
+    void executeRowMove(gameState.state.revision, targetRow).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setIsRowMoveMode(false);
+      setRowMoveOptions(null);
+      setFeedback("換排完成；目前回合已結束。");
+    }).catch(async (error: unknown) => {
+      setIsRowMoveMode(false);
+      setRowMoveOptions(null);
+      setFeedback(error instanceof Error ? error.message : "移動暫時無法使用，請重新讀取戰鬥狀態。");
+      try {
+        const latest = await onRetryState();
+        onStateUpdate(latest);
+      } catch {
+        // Keep the safe action error; the refresh control remains available.
+      }
+      setRowMoveOptionsReloadId((value) => value + 1);
+    }).finally(() => {
+      rowMoveRequestInFlight.current = false;
+      setIsMovingRow(false);
+    });
+  }
+
   function advanceTestTurn() {
     if (!gameState.sandbox || requestInFlight) return;
     setIsAdvancing(true);
@@ -243,6 +375,7 @@ export function CombatPage({
     void advanceTestCombatTurn(gameState.state.revision).then((response) => {
       setIsTargeting(false);
       setTargetOptions(null);
+      setIsRowMoveMode(false);
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
       setFeedback("TEST 回合已由權威戰鬥引擎推進。");
     }).catch(() => {
@@ -257,6 +390,8 @@ export function CombatPage({
     void onRetryState().then((next) => {
       setIsTargeting(false);
       setTargetOptions(null);
+      setIsRowMoveMode(false);
+      setRowMoveOptionsReloadId((value) => value + 1);
       onStateUpdate(next);
       setFeedback("戰鬥狀態已重新讀取。");
     }).catch(() => {
@@ -286,7 +421,7 @@ export function CombatPage({
           <section className="combat-battlefield" aria-labelledby="battlefield-heading">
             <div className="combat-section-heading">
               <div><p className="combat-eyebrow">戰場</p><h2 id="battlefield-heading">參戰者位置</h2></div>
-              <p>排位來自權威狀態；目前不支援換排。</p>
+              <p>排位來自權威狀態；完成換排會消耗整個回合。</p>
             </div>
             {isTargeting ? (
               <section className="combat-target-mode" aria-labelledby="combat-target-heading" aria-live="polite">
@@ -295,6 +430,32 @@ export function CombatPage({
                   <p>{isLoadingTargets ? "正在讀取合法目標……" : "只有伺服器列出的合法敵人可以選擇。"}</p>
                 </div>
                 <Button variant="secondary" disabled={isResolving} onClick={cancelTargeting}>取消</Button>
+              </section>
+            ) : null}
+            {isRowMoveMode && rowMoveOptions ? (
+              <section className="combat-row-move-mode" aria-labelledby="combat-row-move-heading" aria-live="polite">
+                <div className="combat-row-move-mode__intro">
+                  <h3 id="combat-row-move-heading" ref={rowMoveHeading} tabIndex={-1}>
+                    目前位置：我方{rowMoveOptions.currentRow === "front" ? "前排" : "後排"}
+                  </h3>
+                  <p>確認後會移動排位並結束目前回合。</p>
+                </div>
+                <div className="combat-row-move-mode__choices">
+                  {rowMoveOptions.legalTargetRows.map((targetRow) => (
+                    <Button
+                      key={targetRow}
+                      variant="primary"
+                      data-target-row={targetRow}
+                      disabled={requestInFlight}
+                      loading={isMovingRow}
+                      loadingLabel="正在移動……"
+                      onClick={() => confirmRowMove(targetRow)}
+                    >
+                      移至{targetRow === "front" ? "前排" : "後排"}
+                    </Button>
+                  ))}
+                  <Button variant="secondary" disabled={isMovingRow} onClick={cancelRowMove}>取消</Button>
+                </div>
               </section>
             ) : null}
             <div className="combat-lanes">
@@ -355,24 +516,48 @@ export function CombatPage({
             <Panel className="combat-rail__panel" aria-labelledby="combat-commands-heading">
               <p className="combat-eyebrow">指令</p>
               <h2 id="combat-commands-heading">基本指令</h2>
-              <p className="combat-rail__notice">普通攻擊可用；其他指令仍由系統停用。</p>
+              <p className="combat-rail__notice">普通攻擊與換排可用；其他指令仍由系統停用。</p>
               <div className="combat-commands">
                 <Button
                   ref={attackButton}
                   variant="primary"
                   data-command="attack"
-                  disabled={!canPlayerAttack || requestInFlight || isTargeting}
+                  disabled={!canPlayerAttack || requestInFlight || selectionModeActive}
                   loading={isResolving}
                   loadingLabel="正在裁定……"
                   onClick={beginTargetSelection}
                 >
                   普通攻擊
                 </Button>
+                <Button
+                  ref={rowMoveButton}
+                  variant="primary"
+                  data-command="move"
+                  disabled={!canPlayerMoveRow || requestInFlight || selectionModeActive}
+                  loading={isLoadingRowMoveOptions}
+                  loadingLabel="讀取移動選項……"
+                  onClick={beginRowMoveSelection}
+                >
+                  移動
+                </Button>
                 {disabledCombatCommands.map((command) => (
                   <Button key={command.id} variant="secondary" disabled data-command={command.id}>{command.label}</Button>
                 ))}
               </div>
-              {currentActor?.side === "enemy" ? <p className="combat-rail__notice">目前是敵方回合，玩家不能執行普通攻擊。</p> : null}
+              {hasPlayerActionActor && !rowMoveOptions && !isLoadingRowMoveOptions ? (
+                <Button
+                  variant="secondary"
+                  data-command="move-options-retry"
+                  disabled={requestInFlight || selectionModeActive}
+                  onClick={() => {
+                    setFeedback("正在重新取得伺服器提供的換排選項……");
+                    setRowMoveOptionsReloadId((value) => value + 1);
+                  }}
+                >
+                  重新載入移動選項
+                </Button>
+              ) : null}
+              {currentActor?.side === "enemy" ? <p className="combat-rail__notice">目前是敵方回合，玩家不能執行攻擊或移動。</p> : null}
             </Panel>
 
             {gameState.sandbox ? (
@@ -380,7 +565,7 @@ export function CombatPage({
                 <p className="combat-eyebrow">工程測試</p>
                 <h2 id="combat-test-heading">TEST 控制</h2>
                 <p>此控制只在 COMBAT_SANDBOX 開啟時出現，並由後端決定下一回合。</p>
-                <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
+                <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight || selectionModeActive} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
               </Panel>
             ) : null}
           </aside>

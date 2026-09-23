@@ -1,8 +1,10 @@
 import type {
   AuthoritativeGameStateResponse,
   CombatParticipantView,
+  CombatRow,
   CombatStateView,
   NormalAttackOptionsResponse,
+  RowMoveOptionsResponse,
 } from "../shared/game-state.js";
 
 export type CombatPresentationLaneId = "enemy-back" | "enemy-front" | "party-front" | "party-back";
@@ -22,7 +24,6 @@ export const disabledCombatCommands = Object.freeze([
   { id: "defend", label: "防禦" },
   { id: "inventory", label: "背包" },
   { id: "party", label: "隊伍" },
-  { id: "move", label: "站位／移動" },
   { id: "flee", label: "逃走" },
 ] as const);
 
@@ -71,6 +72,19 @@ export function canPlayerUseNormalAttack(combat: CombatStateView, requestInFligh
   return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null;
 }
 
+export function canPlayerUseRowMove(
+  combat: CombatStateView,
+  options: RowMoveOptionsResponse | null,
+  revision: number,
+  requestInFlight: boolean,
+): boolean {
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null
+    && options !== null && options.revision === revision
+    && options.currentActorId === actor.id && options.currentRow === actor.row
+    && options.canPlayerAct && options.legalTargetRows.length > 0;
+}
+
 /** UI may submit only a target that the backend listed as legal for this exact revision. */
 export function isServerListedLegalTarget(
   options: NormalAttackOptionsResponse | null,
@@ -80,6 +94,18 @@ export function isServerListedLegalTarget(
   return options !== null && options.revision === expectedRevision && options.canPlayerAct
     && options.legalTargetIds.includes(targetId)
     && options.targets.some((target) => target.targetId === targetId && target.legal);
+}
+
+export function isServerListedLegalTargetRow(
+  options: RowMoveOptionsResponse | null,
+  targetRow: CombatRow,
+  expectedRevision: number,
+  currentActorId: string,
+  currentRow: CombatRow,
+): boolean {
+  return options !== null && options.revision === expectedRevision
+    && options.currentActorId === currentActorId && options.currentRow === currentRow
+    && options.canPlayerAct && options.legalTargetRows.includes(targetRow);
 }
 
 export function applicationMode(response: AuthoritativeGameStateResponse): "exploration" | "combat" {

@@ -5,7 +5,9 @@ import {
   type CombatSide,
   type CombatState,
   type NormalAttackActionResolution,
+  type RowMoveActionResolution,
 } from "./combat-state.js";
+import { isPlayerActionParticipant } from "./combat-state.js";
 import {
   getNormalAttackTargetOptions,
   type NormalAttackTargetOptions,
@@ -41,6 +43,9 @@ export type CombatTransitionResult =
 export type NormalAttackCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
   | "not-player-turn" | "illegal-target" | "invalid-roll";
 
+export type RowMoveCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "not-player-turn" | "illegal-row-move";
+
 export type NormalAttackResult =
   | {
       readonly ok: true;
@@ -52,6 +57,25 @@ export type NormalAttackResult =
 export type NormalAttackOptionsResult =
   | { readonly ok: true; readonly revision: number; readonly options: NormalAttackTargetOptions }
   | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
+
+export interface RowMoveOptions {
+  readonly currentActorId: string;
+  readonly currentRow: CombatRow;
+  readonly canPlayerAct: boolean;
+  readonly legalTargetRows: readonly CombatRow[];
+}
+
+export type RowMoveOptionsResult =
+  | { readonly ok: true; readonly revision: number; readonly options: RowMoveOptions }
+  | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
+
+export type RowMoveResult =
+  | {
+      readonly ok: true;
+      readonly state: GameState;
+      readonly effect: { readonly type: "row-move-completed" };
+    }
+  | { readonly ok: false; readonly code: RowMoveCode; readonly message: string };
 
 interface MutableInitiative extends CombatParticipantSeed {
   readonly baseD20: number;
@@ -78,12 +102,25 @@ const attackMessages: Record<NormalAttackCode, string> = {
   "invalid-roll": "普通攻擊骰子服務暫時無法使用。",
 };
 
+const rowMoveMessages: Record<RowMoveCode, string> = {
+  "invalid-command": "移動請求格式不正確。",
+  "stale-revision": "戰鬥狀態已更新，請重新讀取後再移動。",
+  "revision-limit": "狀態版本已達工程上限，無法執行移動。",
+  "not-in-combat": "目前沒有進行中的戰鬥。",
+  "not-player-turn": "目前不是玩家可行動的回合。",
+  "illegal-row-move": "目前無法移至所選排位。",
+};
+
 function reject(code: CombatTransitionCode): CombatTransitionResult {
   return { ok: false, code, message: messages[code] };
 }
 
 function rejectAttack(code: NormalAttackCode): NormalAttackResult {
   return { ok: false, code, message: attackMessages[code] };
+}
+
+function rejectRowMove(code: RowMoveCode): RowMoveResult {
+  return { ok: false, code, message: rowMoveMessages[code] };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -104,6 +141,25 @@ function parseNormalAttackCommand(value: unknown): { readonly expectedRevision: 
     || value.expectedRevision < 0 || typeof value.targetId !== "string"
     || value.targetId.length === 0 || value.targetId.trim() !== value.targetId) return undefined;
   return { expectedRevision: value.expectedRevision, targetId: value.targetId };
+}
+
+function parseRowMoveCommand(value: unknown): { readonly expectedRevision: number; readonly targetRow: CombatRow } | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 2
+    || !Object.hasOwn(value, "expectedRevision") || !Object.hasOwn(value, "targetRow")
+    || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision)
+    || value.expectedRevision < 0 || (value.targetRow !== "front" && value.targetRow !== "back")) return undefined;
+  return { expectedRevision: value.expectedRevision, targetRow: value.targetRow };
+}
+
+function advanceToNextTurn(combat: CombatState): CombatState {
+  const wrapsRound = combat.currentTurnIndex === combat.turnOrder.length - 1;
+  const currentTurnIndex = wrapsRound ? 0 : combat.currentTurnIndex + 1;
+  return createCombatState({
+    ...combat,
+    round: wrapsRound ? combat.round + 1 : combat.round,
+    currentTurnIndex,
+    currentActorId: combat.turnOrder[currentTurnIndex],
+  });
 }
 
 function rollD20(roller: DiceRoller): number {
@@ -238,14 +294,7 @@ export function advanceCombatTurn(state: GameState, input: unknown): CombatTrans
   if (expectedRevision !== state.revision) return reject("stale-revision");
   if (state.revision === Number.MAX_SAFE_INTEGER) return reject("revision-limit");
   if (state.activity !== "in-combat" || state.combat === null) return reject("not-in-combat");
-  const wrapsRound = state.combat.currentTurnIndex === state.combat.turnOrder.length - 1;
-  const currentTurnIndex = wrapsRound ? 0 : state.combat.currentTurnIndex + 1;
-  const combat = createCombatState({
-    ...state.combat,
-    round: wrapsRound ? state.combat.round + 1 : state.combat.round,
-    currentTurnIndex,
-    currentActorId: state.combat.turnOrder[currentTurnIndex],
-  });
+  const combat = advanceToNextTurn(state.combat);
   return {
     ok: true,
     state: createGameState({ ...state, revision: state.revision + 1, combat }),
@@ -264,6 +313,68 @@ export function getCurrentNormalAttackOptions(state: GameState): NormalAttackOpt
   };
 }
 
+/** Builds row movement options from the latest authoritative combat snapshot. */
+export function getCurrentRowMoveOptions(state: GameState): RowMoveOptionsResult {
+  if (state.activity !== "in-combat" || state.combat === null) {
+    return { ok: false, code: "not-in-combat", message: rowMoveMessages["not-in-combat"] };
+  }
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor) return { ok: false, code: "not-in-combat", message: rowMoveMessages["not-in-combat"] };
+  const canPlayerAct = isPlayerActionParticipant(actor);
+  const legalTargetRows: readonly CombatRow[] = canPlayerAct
+    ? [actor.row === "front" ? "back" : "front"]
+    : [];
+  return {
+    ok: true,
+    revision: state.revision,
+    options: Object.freeze({
+      currentActorId: actor.id,
+      currentRow: actor.row,
+      canPlayerAct,
+      legalTargetRows: Object.freeze([...legalTargetRows]),
+    }),
+  };
+}
+
+/** One deterministic row change, Turn consumption and revision are one transition. */
+export function moveCombatRow(state: GameState, input: unknown): RowMoveResult {
+  const command = parseRowMoveCommand(input);
+  if (!command) return rejectRowMove("invalid-command");
+  if (command.expectedRevision !== state.revision) return rejectRowMove("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectRowMove("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectRowMove("not-in-combat");
+
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor)) return rejectRowMove("not-player-turn");
+  const options = getCurrentRowMoveOptions(state);
+  if (!options.ok || !options.options.legalTargetRows.includes(command.targetRow)) {
+    return rejectRowMove("illegal-row-move");
+  }
+
+  const lastAction: RowMoveActionResolution = Object.freeze({
+    type: "row-move",
+    actorId: actor.id,
+    round: combat.round,
+    fromRow: actor.row,
+    toRow: command.targetRow,
+  });
+  const movedCombat = createCombatState({
+    ...combat,
+    participants: combat.participants.map((participant) => participant.id === actor.id
+      ? { ...participant, row: command.targetRow }
+      : participant),
+    lastAction,
+  });
+  const nextCombat = advanceToNextTurn(movedCombat);
+  return {
+    ok: true,
+    state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "row-move-completed" },
+  };
+}
+
 /** One attack, its checks, saved result, turn consumption and revision are one transition. */
 export function resolveNormalAttack(
   state: GameState,
@@ -278,7 +389,7 @@ export function resolveNormalAttack(
 
   const combat = state.combat;
   const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!attacker || attacker.side !== "party" || attacker.normalAttack === null) {
+  if (!attacker || !isPlayerActionParticipant(attacker)) {
     return rejectAttack("not-player-turn");
   }
   const target = combat.participants.find((participant) => participant.id === command.targetId);
@@ -300,8 +411,6 @@ export function resolveNormalAttack(
   const evasionModifier = target.initiative.dexterityModifier;
   const evasionTotal = evasionD20 + evasionModifier;
   const outcome = attackTotal >= evasionTotal ? "hit" : "miss";
-  const wrapsRound = combat.currentTurnIndex === combat.turnOrder.length - 1;
-  const currentTurnIndex = wrapsRound ? 0 : combat.currentTurnIndex + 1;
   const lastAction: NormalAttackActionResolution = Object.freeze({
     type: "normal-attack",
     round: combat.round,
@@ -321,13 +430,7 @@ export function resolveNormalAttack(
     }),
     outcome,
   });
-  const nextCombat = createCombatState({
-    ...combat,
-    round: wrapsRound ? combat.round + 1 : combat.round,
-    currentTurnIndex,
-    currentActorId: combat.turnOrder[currentTurnIndex],
-    lastAction,
-  });
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), lastAction });
   return {
     ok: true,
     state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),

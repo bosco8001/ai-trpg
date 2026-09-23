@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 0–12 已由使用者確認。Phase 13 工程實作已完成，等待使用者手動驗收；Phase 14 及其後尚未開始。
+Phase 1–13 已由使用者確認。Phase 14「前後排換位」工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -195,4 +195,12 @@ Combat participant 現在將 `side + row` 作為權威位置，TEST 初始位置
 
 新增 `src/domain/combat-targeting.ts`、`tests/combat-actions.test.ts` 與 [Phase 13 文件](PHASE_13_NORMAL_ATTACK.md)，並修改 combat domain/state、server action routes/session/dice fixtures、shared runtime validation、Combat UI、README 與本計畫。
 
-工程檢查結果：`npm test` 共 129 項，125 項通過、4 項 PostgreSQL integration test 因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run build` 與 `git diff --check` 通過。沒有執行真實 PostgreSQL restart 或使用者手動 UI 驗收。Phase 13 等待使用者手動確認；Phase 14 尚未開始。
+工程檢查結果：`npm test` 共 129 項，125 項通過、4 項 PostgreSQL integration test 因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run build` 與 `git diff --check` 通過。工程實作階段沒有執行真實 PostgreSQL restart 或使用者手動 UI 驗收。使用者其後完成 Phase 13 手動驗收，涵蓋 HIT、MISS、raw D20 1 命中、melee 前排阻擋、非法後排目標、stale revision、取消、browser refresh、mobile／keyboard 與 PostgreSQL persistence。Phase 13 已由使用者確認。
+
+## Phase 14 交付紀錄
+
+完成 authoritative front／back row movement。伺服器依目前 CombatState 即時計算合法換排行；Mutation 嚴格只接收 `expectedRevision` 與 `targetRow`，重新驗證目前玩家操作邊界及合法目標，再更新既有 `participant.row`。換排 deterministic、不擲骰，消耗完整 Turn，沿用 Phase 11 回合推進 helper，GameState revision 只增加一次。前端只採用成功 response 的權威狀態，不做 optimistic movement；取消選擇不送 mutation。`lastAction` runtime union 保留既有 normal-attack snapshot，新增 row-move facts。沒有新增 migration、table、row capacity、opportunity attack 或後排近戰限制。
+
+新增 `tests/combat-row-movement.test.ts` 與 [Phase 14 手動驗收文件](PHASE_14_ROW_MOVEMENT.md)。修改 combat domain/state、session 與 routes、PostgreSQL repository 註解、shared GameState contract、CombatPage／API／UI helpers／style、Phase 13 測試與 README。更新 canonical combat system／UI、未解問題，以及 Phase 10–13 與本計畫的階段狀態。沒有資料庫 schema 或 migration 變更。
+
+工程檢查：`npm test` 共 144 項，139 項通過、0 項失敗、5 項 PostgreSQL 整合測試因未提供隔離 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 均通過，dry-run 顯示沒有待執行 migration。工程階段未執行瀏覽器／mobile／keyboard 手動驗收或 PostgreSQL restart。Phase 14 工程實作完成，等待使用者手動確認；Phase 1–13 已由使用者確認。Phase 15 尚未開始。

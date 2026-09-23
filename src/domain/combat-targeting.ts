@@ -3,6 +3,7 @@ import type {
   CombatState,
   NormalAttackRange,
 } from "./combat-state.js";
+import { isPlayerActionParticipant } from "./combat-state.js";
 
 export type IllegalTargetReason = "target-not-found" | "self" | "ally" | "front-row-blocked";
 
@@ -57,7 +58,7 @@ export function getLegalNormalAttackTargets(
 /** Builds a derived list for the current actor; this list is never stored in CombatState. */
 export function getNormalAttackTargetOptions(combat: CombatState): NormalAttackTargetOptions {
   const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!attacker || attacker.side !== "party" || attacker.normalAttack === null) {
+  if (!attacker || !isPlayerActionParticipant(attacker)) {
     return Object.freeze({
       currentActorId: combat.currentActorId,
       canPlayerAct: false,

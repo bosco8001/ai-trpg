@@ -16,12 +16,16 @@ import {
 import {
   isAuthoritativeGameStateResponse,
   isCombatNormalAttackResponse,
+  isCombatRowMoveResponse,
   isCombatSandboxAdvanceResponse,
   isNormalAttackOptionsResponse,
+  isRowMoveOptionsResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
+  type CombatRowMoveResponse,
   type CombatSandboxAdvanceResponse,
   type NormalAttackOptionsResponse,
+  type RowMoveOptionsResponse,
 } from "../shared/game-state.js";
 
 export async function checkApiHealth(
@@ -167,6 +171,60 @@ export async function executeNormalAttack(
     throw new Error("普通攻擊回應格式不正確。");
   }
   if (!isCombatNormalAttackResponse(body)) throw new Error("普通攻擊回應格式不正確。");
+  return body;
+}
+
+/** Reads server-derived row options; this request never mutates combat state. */
+export async function loadRowMoveOptions(
+  fetcher: typeof fetch = fetch,
+): Promise<RowMoveOptionsResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/row-move/options", { cache: "no-store" });
+  } catch {
+    throw new Error("目前無法讀取合法換排選項，請確認服務後再試。");
+  }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取合法換排選項，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("換排選項回應格式不正確。");
+  }
+  if (!isRowMoveOptionsResponse(body)) throw new Error("換排選項回應格式不正確。");
+  return body;
+}
+
+/** Sends only the selected row and expected revision; the server chooses the actor. */
+export async function executeRowMove(
+  expectedRevision: number,
+  targetRow: "front" | "back",
+  fetcher: typeof fetch = fetch,
+): Promise<CombatRowMoveResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/row-move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision, targetRow }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("移動暫時無法使用，請重新讀取戰鬥狀態。");
+  }
+  if (!response.ok) throw await saveApiError(response, "移動暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("移動回應格式不正確。");
+  }
+  if (!isCombatRowMoveResponse(body)
+    || body.state.revision !== expectedRevision + 1
+    || body.state.combat?.lastAction?.type !== "row-move"
+    || body.state.combat.lastAction.toRow !== targetRow) {
+    throw new Error("移動回應格式不正確。");
+  }
   return body;
 }
 

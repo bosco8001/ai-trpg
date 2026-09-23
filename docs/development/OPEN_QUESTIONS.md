@@ -21,6 +21,7 @@
 
 ## Combat
 - 戰鬥中是否允許 Save / Load 尚未決定。Phase 11 暫時安全拒絕戰鬥中的保存與載入，避免 Save Format v1 遺失 CombatState；這不是正式 gameplay rule。
+- 每排容量／擁擠、換排攔截、區域控制與 opportunity attack 尚未定義。Phase 14 只允許確定前後排換位，不加入容量限制或反擊。
 - 防禦的正式減傷百分比。
 - 防禦狀態精確持續 timing。
 - 防禦是否對所有傷害類型完全相同。

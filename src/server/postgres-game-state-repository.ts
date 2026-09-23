@@ -117,7 +117,7 @@ export class PostgresGameStateRepository implements GameStateRepository {
     return result.rowCount === 1;
   }
 
-  /** 讓 normal attack 在讀取、revision 驗證、擲骰與提交期間持有同一筆 row lock。 */
+  /** 讓權威戰鬥 action 在讀取、revision 驗證與提交期間持有同一筆 row lock。 */
   async withStateLocked<T>(
     seed: GameState,
     transition: (current: GameState) => { readonly result: T; readonly nextState?: GameState },

@@ -46,13 +46,23 @@ export interface NormalAttackResolutionView {
   readonly outcome: "hit" | "miss";
 }
 
+export interface RowMoveResolutionView {
+  readonly type: "row-move";
+  readonly actorId: string;
+  readonly round: number;
+  readonly fromRow: CombatRow;
+  readonly toRow: CombatRow;
+}
+
+export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView;
+
 export interface CombatStateView {
   readonly round: number;
   readonly currentTurnIndex: number;
   readonly currentActorId: string;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipantView[];
-  readonly lastAction: NormalAttackResolutionView | null;
+  readonly lastAction: CombatLastActionView | null;
 }
 
 export interface NormalAttackTargetOptionView {
@@ -70,8 +80,20 @@ export interface NormalAttackOptionsResponse {
   readonly targets: readonly NormalAttackTargetOptionView[];
 }
 
+export interface RowMoveOptionsResponse {
+  readonly revision: number;
+  readonly currentActorId: string;
+  readonly currentRow: CombatRow;
+  readonly canPlayerAct: boolean;
+  readonly legalTargetRows: readonly CombatRow[];
+}
+
 export interface CombatNormalAttackResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "normal-attack-resolved"; readonly outcome: "hit" | "miss" };
+}
+
+export interface CombatRowMoveResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "row-move-completed" };
 }
 
 export interface AuthoritativeGameStateView {
@@ -172,6 +194,16 @@ function isNormalAttackResolution(value: unknown): value is NormalAttackResoluti
     && value.outcome === (value.attack.total >= value.evasion.total ? "hit" : "miss");
 }
 
+function isRowMoveResolution(value: unknown): value is RowMoveResolutionView {
+  return isRecord(value)
+    && exact(value, ["type", "actorId", "round", "fromRow", "toRow"])
+    && value.type === "row-move" && isId(value.actorId)
+    && isSafeInteger(value.round) && value.round > 0
+    && (value.fromRow === "front" || value.fromRow === "back")
+    && (value.toRow === "front" || value.toRow === "back")
+    && value.fromRow !== value.toRow;
+}
+
 function resolveTieOrder(participants: readonly CombatParticipantView[], rollIndex: number): string[] | undefined {
   const groups = new Map<number, CombatParticipantView[]>();
   for (const participant of participants) {
@@ -232,7 +264,10 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   const ids = validatedParticipants.map((participant) => participant.id);
   const expected = expectedTurnOrder(validatedParticipants);
   const lastAction = value.lastAction;
-  if (lastAction !== null && !isNormalAttackResolution(lastAction)) return false;
+  if (lastAction !== null && !isNormalAttackResolution(lastAction) && !isRowMoveResolution(lastAction)) return false;
+  const actor = lastAction === null
+    ? undefined
+    : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
   return new Set(ids).size === ids.length
     && value.turnOrder.length === ids.length
     && new Set(value.turnOrder).size === value.turnOrder.length
@@ -240,9 +275,11 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
     && value.currentTurnIndex < value.turnOrder.length
     && value.currentActorId === value.turnOrder[value.currentTurnIndex]
     && (lastAction === null || (lastAction.round <= value.round
-      && ids.includes(lastAction.actorId) && ids.includes(lastAction.targetId)
-      && validatedParticipants.find((participant) => participant.id === lastAction.actorId)?.side === "party"
-      && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"));
+      && ids.includes(lastAction.actorId) && actor?.side === "party"))
+    && (lastAction === null || lastAction.type !== "normal-attack"
+      || (ids.includes(lastAction.targetId)
+        && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"))
+    && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow);
 }
 
 export function isAuthoritativeGameStateView(value: unknown): value is AuthoritativeGameStateView {
@@ -309,5 +346,29 @@ export function isCombatNormalAttackResponse(value: unknown): value is CombatNor
     && isRecord(value.effect) && exact(value.effect, ["type", "outcome"])
     && value.effect.type === "normal-attack-resolved"
     && (value.effect.outcome === "hit" || value.effect.outcome === "miss")
-    && value.state.combat?.lastAction?.outcome === value.effect.outcome;
+    && value.state.combat?.lastAction?.type === "normal-attack"
+    && value.state.combat.lastAction.outcome === value.effect.outcome;
+}
+
+export function isRowMoveOptionsResponse(value: unknown): value is RowMoveOptionsResponse {
+  if (!isRecord(value) || !exact(value, [
+    "revision", "currentActorId", "currentRow", "canPlayerAct", "legalTargetRows",
+  ]) || !isSafeInteger(value.revision) || value.revision < 0 || !isId(value.currentActorId)
+    || (value.currentRow !== "front" && value.currentRow !== "back")
+    || typeof value.canPlayerAct !== "boolean" || !Array.isArray(value.legalTargetRows)
+    || !value.legalTargetRows.every((row) => row === "front" || row === "back")
+    || new Set(value.legalTargetRows).size !== value.legalTargetRows.length) return false;
+  return value.canPlayerAct
+    ? value.legalTargetRows.length === 1 && value.legalTargetRows[0] !== value.currentRow
+    : value.legalTargetRows.length === 0;
+}
+
+export function isCombatRowMoveResponse(value: unknown): value is CombatRowMoveResponse {
+  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+    && typeof value.sandbox === "boolean"
+    && (value.storage === "memory" || value.storage === "postgres")
+    && isAuthoritativeGameStateView(value.state)
+    && isRecord(value.effect) && exact(value.effect, ["type"])
+    && value.effect.type === "row-move-completed"
+    && value.state.combat?.lastAction?.type === "row-move";
 }

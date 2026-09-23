@@ -1481,6 +1481,38 @@ h1 {
 
 .combat-target-mode .ui-button { min-height: 3rem; }
 
+.combat-row-move-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  margin-block-end: var(--space-3);
+  border-inline-start: 3px solid var(--action-primary);
+  background: var(--surface-elevated);
+}
+
+.combat-row-move-mode h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+}
+
+.combat-row-move-mode p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.combat-row-move-mode__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.combat-row-move-mode__choices .ui-button { min-height: 3rem; }
+
 .combat-target-button {
   width: 100%;
   min-height: 3rem;
@@ -1500,6 +1532,14 @@ h1 {
   margin-block-end: var(--space-3) !important;
   color: var(--text-primary) !important;
   font-weight: 600;
+}
+
+.combat-last-action__row-move {
+  margin-block: 0 var(--space-2) !important;
+  color: var(--text-primary) !important;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .combat-last-action__checks {
@@ -1540,6 +1580,9 @@ h1 {
 .combat-commands [data-command="attack"] { min-height: 3rem; }
 
 @media (max-width: 30rem) {
-  .combat-target-mode { align-items: stretch; }
-  .combat-target-mode .ui-button { width: 100%; }
+  .combat-target-mode,
+  .combat-row-move-mode { align-items: stretch; }
+  .combat-target-mode .ui-button,
+  .combat-row-move-mode__choices,
+  .combat-row-move-mode__choices .ui-button { width: 100%; }
 }

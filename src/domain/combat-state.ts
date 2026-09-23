@@ -25,6 +25,13 @@ export interface CombatParticipant {
   readonly normalAttack: CombatNormalAttackProfile | null;
 }
 
+/** Existing player-action boundary: the controllable party actor has the player's action profile. */
+export function isPlayerActionParticipant(
+  participant: Pick<CombatParticipant, "side" | "normalAttack">,
+): participant is Pick<CombatParticipant, "side"> & { readonly normalAttack: CombatNormalAttackProfile } {
+  return participant.side === "party" && participant.normalAttack !== null;
+}
+
 export interface NormalAttackActionResolution {
   readonly type: "normal-attack";
   readonly round: number;
@@ -45,13 +52,23 @@ export interface NormalAttackActionResolution {
   readonly outcome: "hit" | "miss";
 }
 
+export interface RowMoveActionResolution {
+  readonly type: "row-move";
+  readonly actorId: string;
+  readonly round: number;
+  readonly fromRow: CombatRow;
+  readonly toRow: CombatRow;
+}
+
+export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution;
+
 export interface CombatState {
   readonly round: number;
   readonly currentTurnIndex: number;
   readonly currentActorId: string;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipant[];
-  readonly lastAction: NormalAttackActionResolution | null;
+  readonly lastAction: CombatLastAction | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -189,9 +206,8 @@ function expectedTurnOrder(participants: readonly CombatParticipant[]): string[]
   });
 }
 
-function parseLastAction(value: unknown): NormalAttackActionResolution | null | undefined {
-  if (value === null) return null;
-  if (!isRecord(value) || !exact(value, ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
+function parseNormalAttackAction(value: Record<string, unknown>): NormalAttackActionResolution | undefined {
+  if (!exact(value, ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
     || value.type !== "normal-attack" || !isPositiveSafeInteger(value.round)
     || !isId(value.actorId) || !isId(value.targetId)
     || (value.outcome !== "hit" && value.outcome !== "miss")
@@ -229,6 +245,28 @@ function parseLastAction(value: unknown): NormalAttackActionResolution | null | 
   });
 }
 
+function parseRowMoveAction(value: Record<string, unknown>): RowMoveActionResolution | undefined {
+  if (!exact(value, ["type", "actorId", "round", "fromRow", "toRow"])
+    || value.type !== "row-move" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)
+    || (value.fromRow !== "front" && value.fromRow !== "back")
+    || (value.toRow !== "front" && value.toRow !== "back") || value.fromRow === value.toRow) return undefined;
+  return Object.freeze({
+    type: "row-move",
+    actorId: value.actorId,
+    round: value.round,
+    fromRow: value.fromRow,
+    toRow: value.toRow,
+  });
+}
+
+function parseLastAction(value: unknown): CombatLastAction | null | undefined {
+  if (value === null) return null;
+  if (!isRecord(value)) return undefined;
+  if (value.type === "normal-attack") return parseNormalAttackAction(value);
+  if (value.type === "row-move") return parseRowMoveAction(value);
+  return undefined;
+}
+
 /** PostgreSQL 與 domain 建立狀態時共用的完整 runtime validation。 */
 export function createCombatState(value: unknown): CombatState {
   if (!isRecord(value)) throw new Error("CombatState 格式不正確。");
@@ -255,9 +293,13 @@ export function createCombatState(value: unknown): CombatState {
     || value.currentTurnIndex >= value.turnOrder.length
     || value.currentActorId !== value.turnOrder[value.currentTurnIndex]
     || (lastAction !== null && (lastAction.round > value.round
-      || !ids.includes(lastAction.actorId) || !ids.includes(lastAction.targetId)
-      || participants.find((participant) => participant.id === lastAction.actorId)?.side !== "party"
-      || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))) {
+      || !ids.includes(lastAction.actorId)
+      || participants.find((participant) => participant.id === lastAction.actorId)?.side !== "party"))
+    || (lastAction?.type === "normal-attack"
+      && (!ids.includes(lastAction.targetId)
+        || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))
+    || (lastAction?.type === "row-move"
+      && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)) {
     throw new Error("CombatState 行動順序或最近裁定不一致。");
   }
   return Object.freeze({

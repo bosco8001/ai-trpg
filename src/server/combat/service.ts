@@ -5,6 +5,8 @@ import type {
   DiceRoller,
   NormalAttackOptionsResult,
   NormalAttackResult,
+  RowMoveOptionsResult,
+  RowMoveResult,
 } from "../../domain/combat.js";
 import type { GameStateSession } from "../domain-session.js";
 
@@ -14,6 +16,8 @@ export interface CombatService {
   advance(input: unknown): Promise<CombatTransitionResult>;
   normalAttackOptions(): Promise<NormalAttackOptionsResult>;
   normalAttack(input: unknown): Promise<NormalAttackResult>;
+  rowMoveOptions(): Promise<RowMoveOptionsResult>;
+  moveRow(input: unknown): Promise<RowMoveResult>;
 }
 
 /** 只協調 session 與骰子；不依賴 LLM、narration 或前端。 */
@@ -38,6 +42,12 @@ export function createCombatService(
     },
     async normalAttack(input: unknown) {
       return session.normalAttack(input, actionRoller);
+    },
+    async rowMoveOptions() {
+      return session.rowMoveOptions();
+    },
+    async moveRow(input: unknown) {
+      return session.moveRow(input);
     },
   };
 }

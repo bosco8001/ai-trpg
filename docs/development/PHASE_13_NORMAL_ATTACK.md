@@ -1,6 +1,6 @@
 # Phase 13：普通攻擊與合法目標
 
-> Phase 1–12 已由使用者確認。Phase 13 工程實作完成，等待使用者手動驗收；Phase 14 尚未開始。
+> Phase 1–13 已由使用者確認。Phase 14 工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。
 
 ## 範圍與 canonical 規則
 
@@ -166,8 +166,10 @@ PostgreSQL 的普通攻擊會在同一筆 `SELECT ... FOR UPDATE` transaction �
 - npm test：129 項，125 項通過；4 項 PostgreSQL integration test 因未提供隔離的 TEST_DATABASE_URL 而略過。
 - npm run build：通過，包含 TypeScript typecheck、Vite build 與 server TypeScript build。
 - git diff --check：通過。
-- 沒有執行真實 PostgreSQL restart 手動驗收；這項測試留給使用者在本機執行。
+- 工程實作階段沒有執行真實 PostgreSQL restart 或使用者手動 UI 驗收。
 
 ## 手動驗收
 
 完整啟動指令與 HIT、MISS、raw-one-hit、target cancel、illegal target、stale revision、refresh、PostgreSQL restart、mobile、keyboard 與 backend unavailable 步驟見 [README Phase 13 手動驗收](../../README.md#phase-13普通攻擊與合法目標手動驗收)。
+
+使用者其後確認 Phase 13 手動驗收完成，涵蓋 HIT、MISS、raw D20 1 仍可命中、melee 前排阻擋、非法後排目標、stale revision、取消選目標、browser refresh、mobile／keyboard 與 PostgreSQL persistence。

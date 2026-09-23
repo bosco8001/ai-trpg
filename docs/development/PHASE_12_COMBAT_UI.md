@@ -1,6 +1,6 @@
 # Phase 12：Responsive Combat UI Skeleton
 
-> Phase 1–11 已由使用者手動確認。Phase 12 已完成工程實作，等待使用者手動確認；不得開始 Phase 13。
+> Phase 1–13 已由使用者確認。Phase 14 工程實作完成，等待使用者手動驗收；Phase 15 尚未開始。
 
 本階段像把 Phase 11 裁判桌上的正式戰鬥記錄表變成玩家可閱讀的畫面。UI 只顯示已確定的 state；它不新增任何戰鬥裁定、攻擊或敘事。
 

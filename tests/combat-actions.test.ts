@@ -92,6 +92,12 @@ function combatParticipants(state: GameState) {
   return state.combat.participants;
 }
 
+function normalAttackAction(state: GameState) {
+  const action = state.combat?.lastAction;
+  assert.ok(action && action.type === "normal-attack");
+  return action;
+}
+
 function customTargetingCombat(seeds: readonly CombatParticipantSeed[], rolls: readonly number[]) {
   return startCombat(seed(), { expectedRevision: 0 }, seeds, new SequenceD20Roller(rolls));
 }
@@ -150,10 +156,11 @@ test("Attack total 大於、等於或低於 Evasion total 時分別命中、命�
       new SequenceD20Roller(scenario.rolls),
     );
     requireOk(result);
+    const action = normalAttackAction(result.state);
     assert.deepEqual([
-      result.state.combat?.lastAction?.attack.total,
-      result.state.combat?.lastAction?.evasion.total,
-      result.state.combat?.lastAction?.outcome,
+      action.attack.total,
+      action.evasion.total,
+      action.outcome,
     ], [...scenario.totals, scenario.outcome]);
   }
 });
@@ -165,11 +172,12 @@ test("raw D20 1 不會自動失敗，修正後較高仍可命中", () => {
     createCombatActionFixtureRoller("raw-one-hit"),
   );
   requireOk(result);
-  assert.equal(result.state.combat?.lastAction?.attack.rawD20, 1);
-  assert.equal(result.state.combat?.lastAction?.attack.total, 5);
-  assert.equal(result.state.combat?.lastAction?.evasion.rawD20, 1);
-  assert.equal(result.state.combat?.lastAction?.evasion.total, 2);
-  assert.equal(result.state.combat?.lastAction?.outcome, "hit");
+  const action = normalAttackAction(result.state);
+  assert.equal(action.attack.rawD20, 1);
+  assert.equal(action.attack.total, 5);
+  assert.equal(action.evasion.rawD20, 1);
+  assert.equal(action.evasion.total, 2);
+  assert.equal(action.outcome, "hit");
 });
 
 test("request 不接受 caller 的 attacker、骰值、total、結果、damage 或回合欄位", () => {
@@ -363,7 +371,7 @@ test("hit 與 miss 各只增加一次 revision，並自動消耗玩家 Turn", ()
     assert.equal(result.state.combat?.currentActorId, "TEST-enemy-2");
     assert.equal(result.state.combat?.currentTurnIndex, 2);
     assert.equal(result.effect.outcome, mode);
-    assert.equal(result.state.combat?.lastAction?.outcome, mode);
+    assert.equal(normalAttackAction(result.state).outcome, mode);
     assert.deepEqual(result.state.combat?.participants.map((participant) => participant.row),
       initial.combat?.participants.map((participant) => participant.row));
     assert.equal("hp" in result.state.combat!.participants[1]!, false);
@@ -485,7 +493,10 @@ test("重讀 game-state 可取回持久化裁定，shared runtime validation 驗
   const current = firstRead.json() as AuthoritativeGameStateResponse;
   assert.equal(isAuthoritativeGameStateResponse(current), true);
   assert.deepEqual(secondRead.json().state, current.state);
-  assert.equal(current.state.combat?.lastAction?.outcome, "miss");
+  assert.equal(current.state.combat?.lastAction?.type, "normal-attack");
+  if (current.state.combat?.lastAction?.type === "normal-attack") {
+    assert.equal(current.state.combat.lastAction.outcome, "miss");
+  }
   assert.equal(current.state.combat?.participants.find((item) => item.id === "TEST-enemy-2")?.row, "back");
   assert.equal(isAuthoritativeGameStateResponse({
     ...current,
@@ -655,12 +666,14 @@ test("legacy known Phase 11 TEST snapshot 可補 row；未知缺 row participant
   }), InvalidPersistedStateError);
 });
 
-test("Phase 13 沒有 row mutation action；combat-ui 不持有合法目標規則", async () => {
+test("前端不直接修改 participant row，並消費 server 提供的 attack／move options", async () => {
   const ui = await readFile(new URL("../src/web/combat-ui.ts", import.meta.url), "utf8");
   const page = await readFile(new URL("../src/web/CombatPage.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(ui + page, /moveParticipant|setParticipantRow|front-row.*action|row.*revision/i);
+  assert.doesNotMatch(ui + page, /moveParticipant|setParticipantRow|participant\.row\s*=(?!=)/i);
   assert.doesNotMatch(ui + page, /getLegalNormalAttackTargets|checkNormalAttackTarget/);
   assert.match(ui, /participant\.side \+ "-" \+ participant\.row/);
+  assert.match(ui, /options\.legalTargetRows\.includes\(targetRow\)/);
+  assert.match(page, /executeRowMove/);
 });
 
 test("PostgreSQL round-trip 保存攻擊權威狀態，並讓競爭的過期攻擊在擲骰前拒絕", {
@@ -686,14 +699,15 @@ test("PostgreSQL round-trip 保存攻擊權威狀態，並讓競爭的過期攻�
     requireOk(attack);
     const saved = await repository.load(characterId);
     assert.ok(saved);
+    const savedAttack = normalAttackAction(saved);
     assert.deepEqual([
       saved.revision,
       saved.combat?.round,
       saved.combat?.currentActorId,
       saved.combat?.participants.find((participant) => participant.id === "TEST-enemy-2")?.row,
-      saved.combat?.lastAction?.attack.rawD20,
-      saved.combat?.lastAction?.evasion.rawD20,
-      saved.combat?.lastAction?.outcome,
+      savedAttack.attack.rawD20,
+      savedAttack.evasion.rawD20,
+      savedAttack.outcome,
     ], [3, 1, "TEST-enemy-2", "back", 10, 8, "hit"]);
     const restartedPool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 1 });
     try {

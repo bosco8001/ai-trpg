@@ -3,7 +3,9 @@ import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 import {
   advanceCombatTurn,
+  getCurrentRowMoveOptions,
   getCurrentNormalAttackOptions,
+  moveCombatRow,
   resolveNormalAttack,
   startCombat as startCombatTransition,
   type CombatParticipantSeed,
@@ -23,6 +25,10 @@ export interface GameStateSession {
     | Promise<ReturnType<typeof getCurrentNormalAttackOptions>>;
   normalAttack(input: unknown, roller: DiceRoller): ReturnType<typeof resolveNormalAttack>
     | Promise<ReturnType<typeof resolveNormalAttack>>;
+  rowMoveOptions(): ReturnType<typeof getCurrentRowMoveOptions>
+    | Promise<ReturnType<typeof getCurrentRowMoveOptions>>;
+  moveRow(input: unknown): ReturnType<typeof moveCombatRow>
+    | Promise<ReturnType<typeof moveCombatRow>>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -53,6 +59,12 @@ export function createDomainSession(initialState: GameState) {
     normalAttackOptions: () => getCurrentNormalAttackOptions(state),
     normalAttack(input: unknown, roller: DiceRoller) {
       const result = resolveNormalAttack(state, input, roller);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    rowMoveOptions: () => getCurrentRowMoveOptions(state),
+    moveRow(input: unknown) {
+      const result = moveCombatRow(state, input);
       if (result.ok) state = result.state;
       return result;
     },
@@ -126,6 +138,26 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
         ok: false as const,
         code: "stale-revision" as const,
         message: "戰鬥狀態已更新，請重新讀取後再攻擊。",
+      };
+    },
+    async rowMoveOptions() {
+      return getCurrentRowMoveOptions(await repository.createIfAbsent(seed));
+    },
+    async moveRow(input: unknown) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = moveCombatRow(state, input);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = moveCombatRow(state, input);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : {
+        ok: false as const,
+        code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新讀取後再移動。",
       };
     },
   };
