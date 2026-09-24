@@ -13,6 +13,7 @@ import {
   isRowMoveOptionsResponse,
   isPhysicalSkillOptionsResponse,
   isPhysicalSkillUseResponse,
+  isCastingResponse,
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
@@ -156,6 +157,17 @@ function safeRunFailure(app: FastifyInstance, reply: FastifyReply, error: unknow
   return reply.code(500).send({ error: "combat-run-failed", message: "目前無法處理逃跑，請重新讀取戰鬥狀態。" });
 }
 
+function safeCastingFailure(app: FastifyInstance, reply: FastifyReply, error: unknown) {
+  app.log.error({ err: error }, "戰鬥詠唱操作失敗");
+  if (error instanceof PersistenceUnavailableError) {
+    return reply.code(503).send({ error: "state-unavailable", message: "戰鬥狀態暫時無法使用，請稍後再試。" });
+  }
+  if (error instanceof InvalidPersistedStateError) {
+    return reply.code(500).send({ error: "state-invalid", message: "已保存的戰鬥狀態無法安全讀取。" });
+  }
+  return reply.code(500).send({ error: "casting-failed", message: "目前無法處理詠唱，請重新讀取戰鬥狀態。" });
+}
+
 /** Formal read/action boundary. Legal targets are derived; only the attack transition writes state. */
 export function registerCombatActionRoutes(
   app: FastifyInstance,
@@ -163,6 +175,29 @@ export function registerCombatActionRoutes(
   storage: "memory" | "postgres",
   sandbox: boolean,
 ) {
+  for (const kind of ["start", "continue", "cancel"] as const) {
+    app.post<{ Body: unknown }>(`/api/combat/casting/${kind}`, {
+      bodyLimit: 1024,
+      errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => {
+        reply.header("Cache-Control", "no-store");
+        return reply.code(400).send({ error: "invalid-request", message: "請送出有效的詠唱請求。" });
+      },
+    }, async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      try {
+        const result = kind === "start" ? await service.startCasting(request.body)
+          : kind === "continue" ? await service.continueCasting(request.body)
+            : await service.cancelCasting(request.body);
+        if (!result.ok) return reply.code(result.code === "invalid-command" ? 400 : 409)
+          .send({ error: result.code, message: result.message });
+        const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+        if (!isCastingResponse(response)) throw new Error("詠唱回應未通過 runtime validation。");
+        return response;
+      } catch (error) {
+        return safeCastingFailure(app, reply, error);
+      }
+    });
+  }
   app.get("/api/combat/physical-skills/options", async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
     try {

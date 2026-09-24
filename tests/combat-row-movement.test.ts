@@ -42,7 +42,7 @@ function seed(characterId = "TEST-character"): GameState {
   return createGameState({
     revision: 0,
     activity: "outside-combat",
-    character: { id: characterId, learnedActiveSkillIds: ["TEST-skill-1"], equippedSkillIds: [] },
+    character: { id: characterId, learnedActiveSkillIds: ["TEST-skill-1"], equippedSkillIds: [], currentMp: 24 },
     inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,

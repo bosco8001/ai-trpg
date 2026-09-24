@@ -166,7 +166,7 @@ test("戰鬥 ended 後所有 action 與 TEST advance 都拒絕，不會再次擲
 
 test("舊 CombatState hydrate active；新 terminal 狀態及裁定必須一致", () => {
   const state = playerState();
-  const { status: _status, endReason: _reason, ...oldCombat } = state.combat!;
+  const { status: _status, endReason: _reason, activeCastings: _castings, ...oldCombat } = state.combat!;
   const old = createCombatState(oldCombat);
   assert.deepEqual([old.status, old.endReason, old.currentActorId], ["active", null, "TEST-player"]);
   const success = runFromCombat(state, { expectedRevision: 2 }, createCombatEscapeFixtureRoller("success"));
@@ -204,7 +204,7 @@ test("Phase 13–16 的四種 lastAction 舊快照都 hydrate active；未結算
   ];
   for (const result of variants) {
     ok(result);
-    const { status: _status, endReason: _reason, ...previousShape } = result.state.combat!;
+    const { status: _status, endReason: _reason, activeCastings: _castings, ...previousShape } = result.state.combat!;
     assert.equal(createCombatState(previousShape).status, "active");
     assert.equal(isCombatStateView(result.state.combat), true);
   }

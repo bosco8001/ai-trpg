@@ -268,6 +268,7 @@ test("舊 CombatState 補空冷卻；新裁定與既有 action 經 snapshot 驗�
   const state = playerTurn();
   const legacy = { ...state.combat } as Record<string, unknown>;
   delete legacy.skillCooldowns;
+  delete legacy.activeCastings;
   assert.deepEqual(createCombatState(legacy).skillCooldowns, []);
   const result = use(state); ok(result);
   assert.equal(result.state.combat?.lastAction?.type, "physical-skill");

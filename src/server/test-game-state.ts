@@ -10,6 +10,7 @@ export function createTestGameState(): GameState {
       id: "TEST-character",
       learnedActiveSkillIds: Array.from({ length: 7 }, (_, i) => `TEST-skill-${i + 1}`),
       equippedSkillIds: [],
+      currentMp: 24, // TEST fixture；不是正式起始 MP。
     },
     inventory: createTestCombatInventory(),
     exploration: createInitialTestExplorationState(),

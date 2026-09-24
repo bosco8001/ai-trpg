@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–17 已由使用者確認。Phase 18「物理主動技能」工程實作完成，等待使用者手動確認；Phase 19 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–18 已由使用者確認。Phase 19「多回合施法」工程完成，等待使用者手動確認；Phase 20 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -382,3 +382,7 @@ Phase 17 已由使用者完成手動驗收，包括 PostgreSQL 重啟後保留 `
 ## Phase 18：物理主動技能手動驗收
 
 已裝備的 `TEST-skill-1` 現在可在玩家 Turn 選擇合法敵方目標，由後端沿用 Phase 13 物理攻擊判定，記錄 hit／miss 與每位 actor 的技能冷卻。R1 用後 R2 不可用，R3 恢復；沒有 HP 或傷害。裝備、HIT、MISS、R2／R3、非法提交、刷新、PostgreSQL 重啟、手機及鍵盤的詳細步驟見 [Phase 18 文件](docs/development/PHASE_18_PHYSICAL_ACTIVE_SKILLS.md)。
+
+## Phase 19：多回合施法手動驗收
+
+已裝備的 `TEST-skill-2` 現在可開始三回合詠唱。TEST 角色有 24 MP；開始前須有完整 18 MP，每次開始／繼續只扣 6 MP。進度、已花 MP 與最近行動保存在權威狀態；R3 完成只代表「詠唱完成」，不判定施法成功、命中或傷害。取消不退已花 MP；取消不推進 Turn 只是暫定工程行為，並非正式規則。Memory、隔離 PostgreSQL、刷新、手機、鍵盤及拒絕情境見 [Phase 19 手動測試文件](docs/development/PHASE_19_MULTI_TURN_CASTING.md)。本階段等待使用者手動驗收，Phase 20 尚未開始。

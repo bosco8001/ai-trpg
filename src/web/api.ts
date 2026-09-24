@@ -26,6 +26,7 @@ import {
   isRowMoveOptionsResponse,
   isPhysicalSkillOptionsResponse,
   isPhysicalSkillUseResponse,
+  isCastingResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
@@ -38,6 +39,7 @@ import {
   type RowMoveOptionsResponse,
   type PhysicalSkillOptionsResponse,
   type PhysicalSkillUseResponse,
+  type CastingResponse,
 } from "../shared/game-state.js";
 
 export async function checkApiHealth(
@@ -217,6 +219,31 @@ export async function executePhysicalSkill(
     || body.state.combat?.lastAction?.type !== "physical-skill"
     || body.state.combat.lastAction.skillId !== skillId
     || body.state.combat.lastAction.targetId !== targetId) throw new Error("物理技能回應格式不正確。");
+  return body;
+}
+
+export async function executeCasting(
+  kind: "start" | "continue" | "cancel", expectedRevision: number,
+  skillId?: string, fetcher: typeof fetch = fetch,
+): Promise<CastingResponse> {
+  let response: Response;
+  try {
+    response = await fetcher(`/api/combat/casting/${kind}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+      body: JSON.stringify(kind === "start" ? { expectedRevision, skillId } : { expectedRevision }),
+    });
+  } catch { throw new Error("目前無法提交詠唱，請重新讀取戰鬥狀態。"); }
+  if (response.status >= 500) throw new Error("目前無法完成詠唱操作，請再試一次。");
+  if (!response.ok) throw await saveApiError(response, "詠唱操作未能完成，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try { body = await response.json(); }
+  catch { throw new Error("詠唱回應格式不正確。"); }
+  if (!isCastingResponse(body) || body.state.revision !== expectedRevision + 1
+    || (kind === "start" && body.effect.type !== "casting-started")
+    || (kind === "cancel" && body.effect.type !== "casting-cancelled")
+    || (kind === "continue" && body.effect.type !== "casting-continued" && body.effect.type !== "casting-completed")) {
+    throw new Error("詠唱回應格式不正確。");
+  }
   return body;
 }
 

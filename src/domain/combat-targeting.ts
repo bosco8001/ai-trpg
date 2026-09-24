@@ -61,7 +61,8 @@ export function getNormalAttackTargetOptions(combat: CombatState): NormalAttackT
     currentActorId: "", canPlayerAct: false, legalTargetIds: Object.freeze([]), targets: Object.freeze([]),
   });
   const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!attacker || !isPlayerActionParticipant(attacker)) {
+  if (!attacker || !isPlayerActionParticipant(attacker)
+    || combat.activeCastings.some((casting) => casting.actorId === attacker.id)) {
     return Object.freeze({
       currentActorId: combat.currentActorId,
       canPlayerAct: false,

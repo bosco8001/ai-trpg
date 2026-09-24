@@ -1,13 +1,23 @@
 import type { NormalAttackRange } from "./combat-state.js";
 
 /** 工程測試目錄；不是正式世界技能或內容製作流程。 */
-export interface ActiveSkillDefinition {
+interface SkillDefinitionBase {
   readonly skillId: string;
   readonly displayName: string;
-  readonly category: "physical-active" | "magic-active";
+}
+
+export type ActiveSkillDefinition = SkillDefinitionBase & ({
+  readonly category: "physical-active";
   readonly targetType: "single-enemy";
   readonly range: NormalAttackRange;
-}
+} | {
+  readonly category: "magic-active";
+  readonly targetType: "none";
+  readonly castingType: "direct";
+  readonly totalMpCost: number;
+  readonly castingTurns: number;
+  readonly perTurnMpCost: number;
+});
 
 const definitions: Readonly<Record<string, ActiveSkillDefinition>> = Object.freeze({
   "TEST-skill-1": Object.freeze({
@@ -15,8 +25,9 @@ const definitions: Readonly<Record<string, ActiveSkillDefinition>> = Object.free
     category: "physical-active", targetType: "single-enemy", range: "melee",
   }),
   "TEST-skill-2": Object.freeze({
-    skillId: "TEST-skill-2", displayName: "TEST 非物理技能",
-    category: "magic-active", targetType: "single-enemy", range: "ranged",
+    skillId: "TEST-skill-2", displayName: "TEST 多回合法術",
+    category: "magic-active", targetType: "none", castingType: "direct",
+    totalMpCost: 18, castingTurns: 3, perTurnMpCost: 6,
   }),
 });
 

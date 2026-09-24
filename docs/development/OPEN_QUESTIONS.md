@@ -9,6 +9,11 @@
 - v1 playtest 後 HP／MP 平衡。
 
 ## Magic
+- **取消詠唱是否消耗主要行動／推進 Turn 尚未定案。** Phase 19 採用 **Provisional engineering behavior（暫定工程行為；NOT locked canonical gameplay rule）**：只在施法者自己的 Turn 解除詠唱、不扣新 MP、不退已付 MP、revision +1，並保留目前 actor，不自動推進 Turn。未來若權威規則決定取消要消耗行動，只需局部更改取消 transition 與 UI 提示；這不是正式規則。
+- 正式角色的起始 MP、最大 MP 與等級／職業／種族成長公式尚未建立。Phase 19 的 `TEST-character.currentMp = 24` 僅是工程 fixture，不代表正式平衡。
+- 正式施法後續流程，包括詠唱完成後的成功判定、魔法命中、法術傷害與反噬，仍未定案；Phase 19 只記錄詠唱完成。
+- MP 歸零後暈眩或失去行動能力的精確時機尚未定案。Phase 19 測試施法完成後保留 6 MP。
+- 生產角色與 Save Format v1 的 MP 欄位版本升級政策尚未定案。Phase 19 只為已知 `TEST-character` 舊快照補 `24 MP`，不作為正式角色預設值。
 - 施法成功率完整公式。
 - 反噬機率與具體效果。
 - 魔法書智慧門檻。

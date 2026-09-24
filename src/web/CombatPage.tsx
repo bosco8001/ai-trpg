@@ -22,6 +22,7 @@ import {
   loadRowMoveOptions,
   loadPhysicalSkillOptions,
   executePhysicalSkill,
+  executeCasting,
 } from "./api.js";
 import {
   disabledCombatCommands,
@@ -175,6 +176,19 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       </Panel>
     );
   }
+  if (action.type === "casting-start" || action.type === "casting-continue"
+    || action.type === "casting-cancel" || action.type === "casting-complete") {
+    const casting = action;
+    return <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+      <p className="combat-eyebrow">最近行動・第 {casting.round} 回合</p>
+      <h2 id="combat-last-action-heading">最近行動</h2>
+      <p>{actor}・TEST 多回合法術</p>
+      <p>{casting.type === "casting-start" ? "開始詠唱" : casting.type === "casting-continue" ? "繼續詠唱"
+        : casting.type === "casting-cancel" ? "已取消詠唱" : "詠唱完成"}</p>
+      <p>進度：{casting.completedCastingTurns} / {casting.totalCastingTurns}</p>
+      <p>本次投入：{casting.mpSpentThisAction} MP・總投入：{casting.totalMpSpent} MP</p>
+    </Panel>;
+  }
   const target = participants.get(action.targetId)?.displayName ?? action.targetId;
   return (
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
@@ -219,6 +233,7 @@ export function CombatPage({
   const currentActor = combat?.participants.find((participant) => participant.id === combat.currentActorId);
   const currentActorId = combat?.currentActorId ?? "";
   const hasPlayerActionActor = currentActor?.side === "party" && currentActor.normalAttack !== null;
+  const currentCasting = combat?.activeCastings.find((entry) => entry.actorId === currentActorId);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isTargeting, setIsTargeting] = useState(false);
@@ -247,6 +262,14 @@ export function CombatPage({
   const [skillOptionsReloadId, setSkillOptionsReloadId] = useState(0);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [isUsingSkill, setIsUsingSkill] = useState(false);
+  const [isStartCastingConfirmationOpen, setIsStartCastingConfirmationOpen] = useState(false);
+  const [isCastingMutation, setIsCastingMutation] = useState(false);
+  const [castingError, setCastingError] = useState<string | null>(null);
+  const castingButton = useRef<HTMLButtonElement>(null);
+  const castingHeading = useRef<HTMLHeadingElement>(null);
+  const statusHeading = useRef<HTMLHeadingElement>(null);
+  const focusStatusAfterCasting = useRef(false);
+  const restoreCastingFocus = useRef(false);
   const skillButton = useRef<HTMLButtonElement>(null);
   const skillTargetHeading = useRef<HTMLHeadingElement>(null);
   const restoreSkillFocus = useRef(false);
@@ -278,6 +301,25 @@ export function CombatPage({
   stateUpdateRef.current = onStateUpdate;
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
+  useEffect(() => {
+    if (isStartCastingConfirmationOpen) castingHeading.current?.focus();
+    else if (restoreCastingFocus.current) {
+      castingButton.current?.focus();
+      restoreCastingFocus.current = false;
+    }
+  }, [isStartCastingConfirmationOpen]);
+  useEffect(() => {
+    if (focusStatusAfterCasting.current && combat?.lastAction?.type.startsWith("casting-")) {
+      statusHeading.current?.focus();
+      focusStatusAfterCasting.current = false;
+    }
+  }, [gameState.state.revision]);
+  useEffect(() => {
+    if (!currentCasting || !hasPlayerActionActor) return;
+    setIsTargeting(false); setSelectedSkillId(null); setIsRowMoveMode(false);
+    setIsBagOpen(false); setPendingItemId(null); setIsDefendConfirmationOpen(false);
+    setIsRunConfirmationOpen(false); setIsStartCastingConfirmationOpen(false);
+  }, [currentCasting, hasPlayerActionActor]);
   useEffect(() => {
     if (selectedSkillId) skillTargetHeading.current?.focus();
     else if (restoreSkillFocus.current) {
@@ -449,7 +491,7 @@ export function CombatPage({
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-skills-heading">
                 <h2 id="combat-ended-skills-heading">已裝備技能</h2>
                 <ul className="combat-skill-list">{gameState.state.character.equippedSkillIds.map((skillId) => {
-                  return <li key={skillId}><Button variant="secondary" disabled>{skillId === "TEST-skill-1" ? "TEST 物理技能" : skillId}</Button><p>戰鬥已結束，無法使用。</p></li>;
+                  return <li key={skillId}><Button variant="secondary" disabled>{skillId === "TEST-skill-1" ? "TEST 物理技能" : skillId === "TEST-skill-2" ? "TEST 多回合法術" : skillId}</Button><p>戰鬥已結束，無法使用。</p></li>;
                 })}</ul>
               </Panel>
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-commands-heading">
@@ -471,15 +513,50 @@ export function CombatPage({
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
   const selectedSkill = skillOptions?.skills.find((skill) => skill.skillId === selectedSkillId);
   const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
-  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun || isUsingSkill;
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation;
   const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions || isLoadingSkillOptions;
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canDefend = canPlayerDefend(combat, mutationInFlight);
   const canRun = canPlayerUseNormalAttack(combat, mutationInFlight);
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
+
+  function beginCastingConfirmation() {
+    if (!hasPlayerActionActor || currentCasting || gameState.state.character.currentMp < 18 || mutationInFlight) return;
+    setIsTargeting(false); setTargetOptions(null); setSelectedSkillId(null); setIsRowMoveMode(false);
+    setIsBagOpen(false); setPendingItemId(null); setIsDefendConfirmationOpen(false);
+    setIsRunConfirmationOpen(false); setCastingError(null); setIsStartCastingConfirmationOpen(true);
+  }
+
+  function cancelCastingConfirmation() {
+    if (isCastingMutation) return;
+    restoreCastingFocus.current = true;
+    setIsStartCastingConfirmationOpen(false);
+    setFeedback("已取消開始施法；戰鬥狀態沒有改變。");
+  }
+
+  function submitCasting(kind: "start" | "continue" | "cancel") {
+    if (mutationInFlight || !hasPlayerActionActor || (kind !== "start" && !currentCasting)
+      || (kind === "start" && !isStartCastingConfirmationOpen)) return;
+    setIsCastingMutation(true);
+    focusStatusAfterCasting.current = true;
+    setIsStartCastingConfirmationOpen(false);
+    setCastingError(null);
+    void executeCasting(kind, gameState.state.revision, kind === "start" ? "TEST-skill-2" : undefined)
+      .then((response) => {
+        onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+        setFeedback(response.effect.type === "casting-started" ? "已開始詠唱，本回合投入 6 MP。"
+          : response.effect.type === "casting-continued" ? "已繼續詠唱，本回合投入 6 MP。"
+            : response.effect.type === "casting-completed" ? "詠唱完成，總投入 18 MP；法術效果尚未裁定。"
+              : "已取消詠唱；已投入的 MP 不會返還，現在可選擇主要行動。");
+      }).catch(async (error: unknown) => {
+        const message = error instanceof Error ? error.message : "詠唱操作未能完成，請重新讀取狀態。";
+        setCastingError(message); setFeedback(message);
+        try { onStateUpdate(await onRetryState()); } catch { /* 保留安全錯誤。 */ }
+      }).finally(() => setIsCastingMutation(false));
+  }
 
   function toggleBag() {
     if (mutationInFlight) return;
@@ -878,6 +955,7 @@ export function CombatPage({
                         );
                       const disabledReason = item?.unavailableReason === "not-player-turn"
                         ? "目前不是可操作角色的回合。"
+                        : item?.unavailableReason === "casting-active" ? "請先繼續或取消詠唱。"
                         : item?.unavailableReason === "quantity-depleted"
                           ? "數量為 0，無法使用。"
                           : bagOptionsError ? "目前無法確認物品是否可使用。"
@@ -1034,17 +1112,31 @@ export function CombatPage({
           <aside className="combat-rail" aria-label="戰鬥資訊與指令">
             <Panel className="combat-rail__panel" aria-labelledby="combat-status-heading">
               <p className="combat-eyebrow">戰況</p>
-              <h2 id="combat-status-heading">目前狀態</h2>
+              <h2 id="combat-status-heading" ref={statusHeading} tabIndex={-1}>目前狀態</h2>
               <dl className="combat-status-list">
                 <div><dt>回合</dt><dd>第 {combat.round} 回合</dd></div>
                 <div><dt>目前行動</dt><dd>{currentActor?.displayName ?? combat.currentActorId}</dd></div>
                 <div><dt>參戰者</dt><dd>{combat.participants.length} 名</dd></div>
                 <div><dt>活動</dt><dd>戰鬥中</dd></div>
+                <div><dt>MP</dt><dd>{gameState.state.character.currentMp} <small>（TEST 數值）</small></dd></div>
                 <div><dt>工程版本</dt><dd>{gameState.state.revision}</dd></div>
               </dl>
             </Panel>
 
             <LastActionPanel combat={combat} />
+
+            {combat.activeCastings.map((casting) => <Panel key={casting.actorId} className="combat-rail__panel" aria-live="polite" aria-labelledby={`casting-${casting.actorId}`}>
+              <p className="combat-eyebrow">權威詠唱進度</p>
+              <h2 id={`casting-${casting.actorId}`}>正在詠唱：TEST 多回合法術</h2>
+              <p>進度：{casting.completedCastingTurns} / {casting.totalCastingTurns}</p>
+              <p>已投入：{casting.mpSpent} / {casting.totalMpCost} MP</p>
+              <p>下一次繼續：6 MP</p>
+              {casting.actorId === currentActorId && hasPlayerActionActor ? <div className="combat-row-move-mode__choices">
+                <Button variant="primary" disabled={mutationInFlight} onClick={() => submitCasting("continue")}>繼續詠唱</Button>
+                <Button variant="secondary" disabled={mutationInFlight} onClick={() => submitCasting("cancel")}>取消詠唱</Button>
+              </div> : <p>等待施法者的下一個回合。</p>}
+              <p>取消後，已投入的 MP 不會返還。</p>
+            </Panel>)}
 
             <Panel className="combat-rail__panel" aria-labelledby="combat-narration-heading">
               <p className="combat-eyebrow">戰鬥敘事</p>
@@ -1062,10 +1154,23 @@ export function CombatPage({
                     ? skillOptions.skills.find((entry) => entry.skillId === skillId) : undefined;
                   const reason = option?.unavailableReason === "skill-on-cooldown"
                     ? `冷卻中・第 ${option.readyRound} 回合可再次使用`
+                    : option?.unavailableReason === "casting-active" ? "請先繼續或取消詠唱"
                     : option?.unavailableReason === "not-player-turn" ? "目前不是可操作角色的回合"
                       : option?.unavailableReason === "no-legal-target" ? "目前沒有合法目標"
                         : skillOptionsError ? skillOptionsError : isLoadingSkillOptions || (skillId === "TEST-skill-1" && !option)
                           ? "正在確認技能狀態" : !option ? "此技能尚未支援戰鬥使用" : "可使用";
+                  if (skillId === "TEST-skill-2") {
+                    const available = hasPlayerActionActor && !currentCasting && gameState.state.character.currentMp >= 18;
+                    const reason = currentCasting ? "請先繼續或取消詠唱"
+                      : !hasPlayerActionActor ? "目前不是可操作角色的回合"
+                        : gameState.state.character.currentMp < 18 ? "MP 不足" : "可開始詠唱";
+                    return <li key={skillId} className="combat-skill-item">
+                      <Button ref={castingButton} variant="secondary" data-skill={skillId}
+                        disabled={!available || requestInFlight || selectionModeActive}
+                        onClick={beginCastingConfirmation}>TEST 多回合法術</Button>
+                      <p>魔法主動・18 MP・3 回合詠唱・{reason}</p><small>{skillId}</small>
+                    </li>;
+                  }
                   return <li key={skillId} className="combat-skill-item">
                     {option ? <Button ref={skillId === "TEST-skill-1" ? skillButton : undefined} variant="secondary"
                       data-skill={skillId} disabled={!option.usable || requestInFlight || selectionModeActive}
@@ -1077,6 +1182,16 @@ export function CombatPage({
                 })}</ul>
               ) : <p>目前沒有已裝備的測試技能。</p>}
               {skillUseError ? <p className="combat-feedback__error" role="alert">{skillUseError}</p> : null}
+              {castingError ? <p className="combat-feedback__error" role="alert">{castingError}</p> : null}
+              {isStartCastingConfirmationOpen ? <section className="combat-row-move-mode" aria-labelledby="casting-start-heading" aria-live="polite">
+                <h3 id="casting-start-heading" ref={castingHeading} tabIndex={-1}>開始詠唱？</h3>
+                <p>總消耗：18 MP・詠唱：3 回合・本回合消耗：6 MP。</p>
+                <p>開始後本回合主要行動將結束。</p>
+                <div className="combat-row-move-mode__choices">
+                  <Button variant="primary" disabled={mutationInFlight} onClick={() => submitCasting("start")}>確認開始</Button>
+                  <Button variant="secondary" disabled={mutationInFlight} onClick={cancelCastingConfirmation}>取消</Button>
+                </div>
+              </section> : null}
               {skillOptionsError ? <Button variant="secondary" disabled={isLoadingSkillOptions}
                 onClick={() => setSkillOptionsReloadId((value) => value + 1)}>重新讀取技能</Button> : null}
             </Panel>
@@ -1112,7 +1227,7 @@ export function CombatPage({
                   ref={bagButton}
                   variant="primary"
                   data-command="inventory"
-                  disabled={mutationInFlight}
+                  disabled={mutationInFlight || Boolean(currentCasting) || isStartCastingConfirmationOpen}
                   aria-expanded={isBagOpen}
                   aria-controls="combat-bag-panel"
                   onClick={toggleBag}
@@ -1123,7 +1238,7 @@ export function CombatPage({
                   ref={defendButton}
                   variant="secondary"
                   data-command="defend"
-                  disabled={!canDefend || mutationInFlight || isDefendConfirmationOpen}
+                  disabled={!canDefend || mutationInFlight || isDefendConfirmationOpen || isStartCastingConfirmationOpen}
                   aria-expanded={isDefendConfirmationOpen}
                   aria-controls="combat-defend-panel"
                   onClick={beginDefendConfirmation}
@@ -1166,7 +1281,7 @@ export function CombatPage({
                 <p className="combat-eyebrow">工程測試</p>
                 <h2 id="combat-test-heading">TEST 控制</h2>
                 <p>此控制只在 COMBAT_SANDBOX 開啟時出現，並由後端決定下一回合。</p>
-                <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight || selectionModeActive} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
+                <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight || selectionModeActive || Boolean(currentCasting)} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
               </Panel>
             ) : null}
           </aside>

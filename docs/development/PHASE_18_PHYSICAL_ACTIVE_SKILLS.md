@@ -1,6 +1,6 @@
 # Phase 18：物理主動技能
 
-> Phase 1–17 已由使用者確認。Phase 18 工程實作完成，等待使用者手動確認。Phase 19 尚未開始。
+> Phase 1–18 已由使用者確認。Phase 19 工程實作中；Phase 20 尚未開始。
 
 ## 規則與權威邊界
 
@@ -24,7 +24,7 @@ R1 使用後在 CombatState 記錄 `actorId + skillId + readyRound = 3`。R2 不
 
 現在這三種 action fixture 會在服務執行期間循環提供各自固定的攻擊與閃避骰值；普通攻擊與物理技能共用時也可連續裁定。一次性 `SequenceD20Roller` 仍供明確測試骰子耗盡情境使用；正式 `RandomD20Roller` 與權威 GameState、PostgreSQL snapshot 均未改動。擲骰失敗仍回 HTTP 500，revision、Turn、冷卻與最近裁定保持原狀。技能 API 遇到 5xx 時前端顯示固定繁中錯誤，並在技能區提供警示；不採用失敗回應更新權威狀態。
 
-`tests/combat-physical-skills.test.ts` 新增同一 provider 在 R1、R3、R5 重複技能使用的 HIT、MISS、raw-one-hit 回歸；另測普通攻擊與技能雙向交替、R3 權威 API 及擲骰失敗的原子性。R3 API 測試從 `round = readyRound = 3`、revision 9 提交，斷言 HTTP 200、攻擊 14、閃避 9、命中、`readyRound = 5`、revision 10 及下一位 `TEST-enemy-2`。這些是工程測試結果；Phase 18 仍等待使用者重新手動驗收。
+`tests/combat-physical-skills.test.ts` 新增同一 provider 在 R1、R3、R5 重複技能使用的 HIT、MISS、raw-one-hit 回歸；另測普通攻擊與技能雙向交替、R3 權威 API 及擲骰失敗的原子性。R3 API 測試從 `round = readyRound = 3`、revision 9 提交，斷言 HTTP 200、攻擊 14、閃避 9、命中、`readyRound = 5`、revision 10 及下一位 `TEST-enemy-2`。這些是工程測試結果；Phase 18 其後已由使用者完成手動驗收。
 
 ## 記憶體模式手動驗收
 
@@ -113,4 +113,4 @@ npm run db:migrate
 
 ## 未處理項目
 
-個別技能傷害、額外命中修正、狀態效果、AoE、正式技能內容製作流程、HP／傷害整合仍未定案。Phase 19 尚未開始；Phase 18 不建立體力、魔法、敵方技能 AI、戰鬥敘事、死亡、結算或戰鬥 Save／Load 政策。
+個別技能傷害、額外命中修正、狀態效果、AoE、正式技能內容製作流程、HP／傷害整合仍未定案。Phase 18 不建立體力、魔法、敵方技能 AI、戰鬥敘事、死亡、結算或戰鬥 Save／Load 政策。

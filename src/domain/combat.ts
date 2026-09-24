@@ -11,6 +11,8 @@ import {
   type ActiveCombatState,
   type RunActionResolution,
   type PhysicalSkillActionResolution,
+  type CastingState,
+  type CastingActionResolution,
   type CombatParticipant,
 } from "./combat-state.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
@@ -39,7 +41,7 @@ export interface CombatParticipantSeed {
 }
 
 export type CombatTransitionCode = "invalid-command" | "stale-revision" | "revision-limit"
-  | "already-in-combat" | "not-in-combat" | "combat-ended" | "invalid-combat-setup";
+  | "already-in-combat" | "not-in-combat" | "combat-ended" | "invalid-combat-setup" | "casting-active";
 
 export type CombatTransitionResult =
   | {
@@ -50,10 +52,10 @@ export type CombatTransitionResult =
   | { readonly ok: false; readonly code: CombatTransitionCode; readonly message: string };
 
 export type NormalAttackCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
-  | "combat-ended" | "not-player-turn" | "illegal-target" | "invalid-roll";
+  | "combat-ended" | "not-player-turn" | "illegal-target" | "invalid-roll" | "casting-active";
 
 export type RowMoveCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
-  | "combat-ended" | "not-player-turn" | "illegal-row-move";
+  | "combat-ended" | "not-player-turn" | "illegal-row-move" | "casting-active";
 
 export type NormalAttackResult =
   | {
@@ -86,7 +88,7 @@ export type RowMoveResult =
     }
   | { readonly ok: false; readonly code: RowMoveCode; readonly message: string };
 
-export type CombatItemUnavailableReason = "not-player-turn" | "quantity-depleted";
+export type CombatItemUnavailableReason = "not-player-turn" | "quantity-depleted" | "casting-active";
 
 export interface CombatItemOption {
   readonly itemId: string;
@@ -106,7 +108,7 @@ export type CombatItemOptionsResult =
   | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
 
 export type CombatItemUseCode = "invalid-command" | "stale-revision" | "revision-limit"
-  | "not-in-combat" | "combat-ended" | "not-player-turn" | "unsupported-item" | "item-unavailable";
+  | "not-in-combat" | "combat-ended" | "not-player-turn" | "unsupported-item" | "item-unavailable" | "casting-active";
 
 export type CombatItemUseResult =
   | {
@@ -116,14 +118,14 @@ export type CombatItemUseResult =
     }
   | { readonly ok: false; readonly code: CombatItemUseCode; readonly message: string };
 
-export type DefendCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat" | "combat-ended" | "not-player-turn";
+export type DefendCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat" | "combat-ended" | "not-player-turn" | "casting-active";
 
 export type DefendResult =
   | { readonly ok: true; readonly state: GameState; readonly effect: { readonly type: "defend-completed" } }
   | { readonly ok: false; readonly code: DefendCode; readonly message: string };
 
 export type RunCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
-  | "combat-ended" | "not-player-turn" | "invalid-roll";
+  | "combat-ended" | "not-player-turn" | "invalid-roll" | "casting-active";
 
 export type RunResult =
   | { readonly ok: true; readonly state: GameState; readonly effect: { readonly type: "run-resolved"; readonly outcome: "success" | "failure" } }
@@ -131,7 +133,8 @@ export type RunResult =
 
 export type PhysicalSkillCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
   | "combat-ended" | "not-player-turn" | "unknown-skill" | "not-physical-skill"
-  | "skill-not-learned" | "skill-not-equipped" | "skill-on-cooldown" | "illegal-target" | "invalid-roll";
+  | "skill-not-learned" | "skill-not-equipped" | "skill-on-cooldown" | "illegal-target" | "invalid-roll"
+  | "casting-active";
 
 export interface PhysicalSkillOption {
   readonly skillId: string;
@@ -140,7 +143,7 @@ export interface PhysicalSkillOption {
   readonly targetMode: "single-enemy";
   readonly range: "melee" | "ranged";
   readonly usable: boolean;
-  readonly unavailableReason?: "not-player-turn" | "skill-on-cooldown" | "no-legal-target";
+  readonly unavailableReason?: "not-player-turn" | "skill-on-cooldown" | "no-legal-target" | "casting-active";
   readonly readyRound: number | null;
   readonly targets: NormalAttackTargetOptions["targets"];
 }
@@ -157,7 +160,132 @@ export type PhysicalSkillUseResult =
   } }
   | { readonly ok: false; readonly code: PhysicalSkillCode; readonly message: string };
 
+export type CastingCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "combat-ended" | "not-player-turn" | "unknown-skill" | "not-magic-skill"
+  | "skill-not-learned" | "skill-not-equipped" | "casting-active" | "not-casting" | "insufficient-mp";
+
+export type CastingResult =
+  | { readonly ok: true; readonly state: GameState; readonly effect: { readonly type: "casting-started" | "casting-continued" | "casting-cancelled" | "casting-completed" } }
+  | { readonly ok: false; readonly code: CastingCode; readonly message: string };
+
+const castingMessages: Record<CastingCode, string> = {
+  "invalid-command": "詠唱請求格式不正確。", "stale-revision": "戰鬥狀態已更新，請重新讀取後再詠唱。",
+  "revision-limit": "狀態版本已達工程上限。", "not-in-combat": "目前沒有進行中的戰鬥。",
+  "combat-ended": "戰鬥已結束，不能再詠唱。", "not-player-turn": "目前不是可操作角色的回合。",
+  "unknown-skill": "找不到這個技能定義。", "not-magic-skill": "這不是魔法主動技能。",
+  "skill-not-learned": "角色尚未學會這個技能。", "skill-not-equipped": "這個技能尚未裝備。",
+  "casting-active": "請先繼續或取消目前的詠唱。", "not-casting": "目前沒有可繼續或取消的詠唱。",
+  "insufficient-mp": "目前 MP 不足以支付整個法術。",
+};
+
+function rejectCasting(code: CastingCode): CastingResult {
+  return { ok: false, code, message: castingMessages[code] };
+}
+
+function actorCasting(combat: ActiveCombatState, actorId: string): CastingState | undefined {
+  return combat.activeCastings.find((entry) => entry.actorId === actorId);
+}
+
+function parseStartCasting(value: unknown): { expectedRevision: number; skillId: string } | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 2 || !Object.hasOwn(value, "expectedRevision")
+    || !Object.hasOwn(value, "skillId") || !Number.isSafeInteger(value.expectedRevision)
+    || (value.expectedRevision as number) < 0 || typeof value.skillId !== "string"
+    || !value.skillId.length || value.skillId.trim() !== value.skillId) return undefined;
+  return { expectedRevision: value.expectedRevision as number, skillId: value.skillId };
+}
+
+function castingContext(state: GameState, expectedRevision: number):
+  | { ok: true; combat: ActiveCombatState; actorId: string }
+  | { ok: false; code: CastingCode } {
+  if (expectedRevision !== state.revision) return { ok: false, code: "stale-revision" };
+  if (state.revision === Number.MAX_SAFE_INTEGER) return { ok: false, code: "revision-limit" };
+  if (state.activity !== "in-combat" || state.combat === null) return { ok: false, code: "not-in-combat" };
+  if (state.combat.status === "ended") return { ok: false, code: "combat-ended" };
+  const actor = state.combat.participants.find((entry) => entry.id === state.combat?.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor)) return { ok: false, code: "not-player-turn" };
+  return { ok: true, combat: state.combat, actorId: actor.id };
+}
+
+/** Each successful command writes MP and casting in one authoritative transition. */
+export function startCasting(state: GameState, input: unknown): CastingResult {
+  const command = parseStartCasting(input);
+  if (!command) return rejectCasting("invalid-command");
+  const context = castingContext(state, command.expectedRevision);
+  if (!context.ok) return rejectCasting(context.code);
+  const { combat, actorId } = context;
+  if (actorCasting(combat, actorId)) return rejectCasting("casting-active");
+  const definition = getActiveSkillDefinition(command.skillId);
+  if (!definition) return rejectCasting("unknown-skill");
+  if (definition.category !== "magic-active") return rejectCasting("not-magic-skill");
+  if (!state.character.learnedActiveSkillIds.includes(command.skillId)) return rejectCasting("skill-not-learned");
+  if (!state.character.equippedSkillIds.includes(command.skillId)) return rejectCasting("skill-not-equipped");
+  if (state.character.currentMp < definition.totalMpCost) return rejectCasting("insufficient-mp");
+  const casting: CastingState = {
+    actorId, skillId: command.skillId, startedRound: combat.round, completedCastingTurns: 1,
+    totalCastingTurns: definition.castingTurns, totalMpCost: definition.totalMpCost,
+    mpSpent: definition.perTurnMpCost,
+  };
+  const lastAction: CastingActionResolution = {
+    type: "casting-start", actorId, skillId: command.skillId, round: combat.round,
+    mpSpentThisAction: definition.perTurnMpCost, totalMpSpent: casting.mpSpent,
+    completedCastingTurns: 1, totalCastingTurns: definition.castingTurns,
+  };
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat),
+    activeCastings: [...combat.activeCastings, casting], lastAction });
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1,
+    character: { ...state.character, currentMp: state.character.currentMp - definition.perTurnMpCost }, combat: nextCombat }),
+  effect: { type: "casting-started" } };
+}
+
+export function continueCasting(state: GameState, input: unknown): CastingResult {
+  const expectedRevision = parseExpectedRevision(input);
+  if (expectedRevision === undefined) return rejectCasting("invalid-command");
+  const context = castingContext(state, expectedRevision);
+  if (!context.ok) return rejectCasting(context.code);
+  const { combat, actorId } = context;
+  const casting = actorCasting(combat, actorId);
+  if (!casting) return rejectCasting("not-casting");
+  const definition = getActiveSkillDefinition(casting.skillId);
+  if (!definition || definition.category !== "magic-active") return rejectCasting("unknown-skill");
+  if (state.character.currentMp < definition.perTurnMpCost) return rejectCasting("insufficient-mp");
+  const completedCastingTurns = casting.completedCastingTurns + 1;
+  const totalMpSpent = casting.mpSpent + definition.perTurnMpCost;
+  const completed = completedCastingTurns === casting.totalCastingTurns;
+  const lastAction: CastingActionResolution = {
+    type: completed ? "casting-complete" : "casting-continue", actorId, skillId: casting.skillId,
+    round: combat.round, mpSpentThisAction: definition.perTurnMpCost, totalMpSpent,
+    completedCastingTurns, totalCastingTurns: casting.totalCastingTurns,
+  };
+  const activeCastings = combat.activeCastings.filter((entry) => entry.actorId !== actorId);
+  if (!completed) activeCastings.push({ ...casting, completedCastingTurns, mpSpent: totalMpSpent });
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), activeCastings, lastAction });
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1,
+    character: { ...state.character, currentMp: state.character.currentMp - definition.perTurnMpCost }, combat: nextCombat }),
+  effect: { type: completed ? "casting-completed" : "casting-continued" } };
+}
+
+/** Provisional engineering behavior: cancellation clears casting without advancing Turn. */
+export function cancelCasting(state: GameState, input: unknown): CastingResult {
+  const expectedRevision = parseExpectedRevision(input);
+  if (expectedRevision === undefined) return rejectCasting("invalid-command");
+  const context = castingContext(state, expectedRevision);
+  if (!context.ok) return rejectCasting(context.code);
+  const { combat, actorId } = context;
+  const casting = actorCasting(combat, actorId);
+  if (!casting) return rejectCasting("not-casting");
+  const lastAction: CastingActionResolution = {
+    type: "casting-cancel", actorId, skillId: casting.skillId, round: combat.round,
+    mpSpentThisAction: 0, totalMpSpent: casting.mpSpent,
+    completedCastingTurns: casting.completedCastingTurns, totalCastingTurns: casting.totalCastingTurns,
+  };
+  const nextCombat = createCombatState({ ...combat,
+    activeCastings: combat.activeCastings.filter((entry) => entry.actorId !== actorId), lastAction });
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "casting-cancelled" } };
+}
+
 const physicalSkillMessages: Record<PhysicalSkillCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "物理技能請求格式不正確。",
   "stale-revision": "戰鬥狀態已更新，請重新讀取後再使用技能。",
   "revision-limit": "狀態版本已達工程上限，無法使用技能。",
@@ -178,6 +306,7 @@ function rejectPhysicalSkill(code: PhysicalSkillCode): PhysicalSkillUseResult {
 }
 
 const runMessages: Record<RunCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "逃跑請求格式不正確。",
   "stale-revision": "戰鬥狀態已更新，請重新讀取後再逃跑。",
   "revision-limit": "狀態版本已達工程上限，無法嘗試逃跑。",
@@ -192,6 +321,7 @@ function rejectRun(code: RunCode): RunResult {
 }
 
 const defendMessages: Record<DefendCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "防禦請求格式不正確。",
   "stale-revision": "戰鬥狀態已更新，請重新讀取後再防禦。",
   "revision-limit": "狀態版本已達工程上限，無法執行防禦。",
@@ -205,6 +335,7 @@ function rejectDefend(code: DefendCode): DefendResult {
 }
 
 const itemUseMessages: Record<CombatItemUseCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "物品使用請求格式不正確。",
   "stale-revision": "戰鬥狀態已更新，請重新讀取後再使用物品。",
   "revision-limit": "狀態版本已達工程上限，無法使用物品。",
@@ -226,6 +357,7 @@ interface MutableInitiative extends CombatParticipantSeed {
 }
 
 const messages: Record<CombatTransitionCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "戰鬥命令格式不正確。",
   "stale-revision": "狀態已更新，請重新讀取後再操作戰鬥回合。",
   "revision-limit": "狀態版本已達工程上限，無法更新戰鬥回合。",
@@ -236,6 +368,7 @@ const messages: Record<CombatTransitionCode, string> = {
 };
 
 const attackMessages: Record<NormalAttackCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "普通攻擊請求格式不正確。",
   "stale-revision": "戰鬥狀態已更新，請重新讀取後再攻擊。",
   "revision-limit": "狀態版本已達工程上限，無法執行普通攻擊。",
@@ -247,6 +380,7 @@ const attackMessages: Record<NormalAttackCode, string> = {
 };
 
 const rowMoveMessages: Record<RowMoveCode, string> = {
+  "casting-active": "請先繼續或取消目前的詠唱。",
   "invalid-command": "移動請求格式不正確。",
   "stale-revision": "戰鬥狀態已更新，請重新讀取後再移動。",
   "revision-limit": "狀態版本已達工程上限，無法執行移動。",
@@ -430,6 +564,7 @@ export function rollInitiative(
     })),
     lastAction: null,
     skillCooldowns: [],
+    activeCastings: [],
   });
 }
 
@@ -471,7 +606,7 @@ export function getCurrentPhysicalSkillOptions(state: GameState): PhysicalSkillO
       || !state.character.learnedActiveSkillIds.includes(skillId)) return [];
     const readyRound = combat.skillCooldowns.find((entry) => entry.actorId === actor.id
       && entry.skillId === skillId)?.readyRound ?? null;
-    const targets: NormalAttackTargetOptions["targets"] = canPlayerAct
+    const targets: NormalAttackTargetOptions["targets"] = canPlayerAct && !actorCasting(combat, actor.id)
       ? combat.participants.filter((participant) => participant.side !== actor.side).map((participant) => {
         const check = checkNormalAttackTarget(combat, actor, participant.id, definition.range);
         return check.legal
@@ -480,6 +615,7 @@ export function getCurrentPhysicalSkillOptions(state: GameState): PhysicalSkillO
             ...(check.reason === "front-row-blocked" ? { reason: check.reason } : {}) };
       }) : [];
     const unavailableReason = !canPlayerAct ? "not-player-turn"
+      : actorCasting(combat, actor.id) ? "casting-active"
       : readyRound !== null && combat.round < readyRound ? "skill-on-cooldown"
         : !targets.some((target) => target.legal) ? "no-legal-target" : undefined;
     return [Object.freeze({
@@ -506,6 +642,7 @@ export function usePhysicalSkill(state: GameState, input: unknown, roller: DiceR
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor || !isPlayerActionParticipant(actor)) return rejectPhysicalSkill("not-player-turn");
+  if (actorCasting(combat, actor.id)) return rejectPhysicalSkill("casting-active");
   const definition = getActiveSkillDefinition(command.skillId);
   if (!definition) return rejectPhysicalSkill("unknown-skill");
   if (definition.category !== "physical-active") return rejectPhysicalSkill("not-physical-skill");
@@ -571,6 +708,7 @@ export function advanceCombatTurn(state: GameState, input: unknown): CombatTrans
   if (state.revision === Number.MAX_SAFE_INTEGER) return reject("revision-limit");
   if (state.activity !== "in-combat" || state.combat === null) return reject("not-in-combat");
   if (state.combat.status === "ended") return reject("combat-ended");
+  if (actorCasting(state.combat, state.combat.currentActorId)) return reject("casting-active");
   const combat = advanceToNextTurn(state.combat);
   return {
     ok: true,
@@ -598,7 +736,7 @@ export function getCurrentRowMoveOptions(state: GameState): RowMoveOptionsResult
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor) return { ok: false, code: "not-in-combat", message: rowMoveMessages["not-in-combat"] };
-  const canPlayerAct = isPlayerActionParticipant(actor);
+  const canPlayerAct = isPlayerActionParticipant(actor) && !actorCasting(combat, actor.id);
   const legalTargetRows: readonly CombatRow[] = canPlayerAct
     ? [actor.row === "front" ? "back" : "front"]
     : [];
@@ -622,12 +760,12 @@ export function getCurrentCombatItemOptions(state: GameState): CombatItemOptions
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor) return { ok: false, code: "not-in-combat", message: itemUseMessages["not-in-combat"] };
-  const canPlayerAct = isPlayerActionParticipant(actor);
   const items = state.inventory.flatMap((stack): CombatItemOption[] => {
     const definition = getCombatItemDefinition(stack.itemId);
     if (!definition || !definition.consumable || definition.usage !== "self") return [];
-    const unavailableReason: CombatItemUnavailableReason | undefined = !canPlayerAct
+    const unavailableReason: CombatItemUnavailableReason | undefined = !isPlayerActionParticipant(actor)
       ? "not-player-turn"
+      : actorCasting(combat, actor.id) ? "casting-active"
       : stack.quantity === 0 ? "quantity-depleted" : undefined;
     return [Object.freeze({
       itemId: definition.itemId,
@@ -656,6 +794,7 @@ export function useCombatItem(state: GameState, input: unknown): CombatItemUseRe
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor || !isPlayerActionParticipant(actor)) return rejectItemUse("not-player-turn");
+  if (actorCasting(combat, actor.id)) return rejectItemUse("casting-active");
   const definition = getCombatItemDefinition(command.itemId);
   if (!definition || !definition.consumable || definition.usage !== "self") {
     return rejectItemUse("unsupported-item");
@@ -695,6 +834,7 @@ export function defendCombatTurn(state: GameState, input: unknown): DefendResult
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor || !isPlayerActionParticipant(actor)) return rejectDefend("not-player-turn");
+  if (actorCasting(combat, actor.id)) return rejectDefend("casting-active");
   const lastAction: DefendActionResolution = Object.freeze({
     type: "defend", actorId: actor.id, round: combat.round,
   });
@@ -733,6 +873,7 @@ export function runFromCombat(state: GameState, input: unknown, roller: DiceRoll
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor || !isPlayerActionParticipant(actor)) return rejectRun("not-player-turn");
+  if (actorCasting(combat, actor.id)) return rejectRun("casting-active");
   let check: ReturnType<typeof resolveEscapeCheck>;
   try {
     check = resolveEscapeCheck(rollD20(roller), actor.initiative.dexterityModifier,
@@ -768,6 +909,7 @@ export function moveCombatRow(state: GameState, input: unknown): RowMoveResult {
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor || !isPlayerActionParticipant(actor)) return rejectRowMove("not-player-turn");
+  if (actorCasting(combat, actor.id)) return rejectRowMove("casting-active");
   const options = getCurrentRowMoveOptions(state);
   if (!options.ok || !options.options.legalTargetRows.includes(command.targetRow)) {
     return rejectRowMove("illegal-row-move");
@@ -813,6 +955,7 @@ export function resolveNormalAttack(
   if (!attacker || !isPlayerActionParticipant(attacker)) {
     return rejectAttack("not-player-turn");
   }
+  if (actorCasting(combat, attacker.id)) return rejectAttack("casting-active");
   const target = combat.participants.find((participant) => participant.id === command.targetId);
   if (!target || !checkNormalAttackTarget(combat, attacker, target.id, attacker.normalAttack.range).legal
     || !getLegalNormalAttackTargets(combat, attacker.id, attacker.normalAttack.range).includes(target.id)) {

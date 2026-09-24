@@ -61,6 +61,31 @@ export interface SkillCooldownView {
   readonly readyRound: number;
 }
 
+export interface CastingStateView {
+  readonly actorId: string;
+  readonly skillId: string;
+  readonly startedRound: number;
+  readonly completedCastingTurns: number;
+  readonly totalCastingTurns: number;
+  readonly totalMpCost: number;
+  readonly mpSpent: number;
+}
+
+interface CastingResolutionFields {
+  readonly actorId: string;
+  readonly skillId: string;
+  readonly round: number;
+  readonly mpSpentThisAction: number;
+  readonly totalMpSpent: number;
+  readonly completedCastingTurns: number;
+  readonly totalCastingTurns: number;
+}
+
+export type CastingResolutionView = CastingResolutionFields & (
+  { readonly type: "casting-start" } | { readonly type: "casting-continue" }
+  | { readonly type: "casting-cancel" } | { readonly type: "casting-complete" }
+);
+
 export interface RowMoveResolutionView {
   readonly type: "row-move";
   readonly actorId: string;
@@ -96,7 +121,7 @@ export interface RunResolutionView {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView;
+export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView | CastingResolutionView;
 
 interface CombatStateViewBase {
   readonly round: number;
@@ -104,6 +129,7 @@ interface CombatStateViewBase {
   readonly participants: readonly CombatParticipantView[];
   readonly lastAction: CombatLastActionView | null;
   readonly skillCooldowns: readonly SkillCooldownView[];
+  readonly activeCastings: readonly CastingStateView[];
 }
 
 export interface ActiveCombatStateView extends CombatStateViewBase {
@@ -156,7 +182,7 @@ export interface CombatItemOptionView {
   readonly displayName: typeof TEST_COMBAT_CONSUMABLE_NAME;
   readonly quantity: number;
   readonly usable: boolean;
-  readonly unavailableReason?: "not-player-turn" | "quantity-depleted";
+  readonly unavailableReason?: "not-player-turn" | "quantity-depleted" | "casting-active";
 }
 
 export interface CombatItemOptionsResponse {
@@ -193,7 +219,7 @@ export interface PhysicalSkillOptionView {
   readonly targetMode: "single-enemy";
   readonly range: NormalAttackRange;
   readonly usable: boolean;
-  readonly unavailableReason?: "not-player-turn" | "skill-on-cooldown" | "no-legal-target";
+  readonly unavailableReason?: "not-player-turn" | "skill-on-cooldown" | "no-legal-target" | "casting-active";
   readonly readyRound: number | null;
   readonly targets: readonly NormalAttackTargetOptionView[];
 }
@@ -208,6 +234,10 @@ export interface PhysicalSkillUseResponse extends AuthoritativeGameStateResponse
   readonly effect: { readonly type: "physical-skill-resolved"; readonly outcome: "hit" | "miss" };
 }
 
+export interface CastingResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "casting-started" | "casting-continued" | "casting-cancelled" | "casting-completed" };
+}
+
 export interface AuthoritativeGameStateView {
   readonly revision: number;
   readonly activity: "outside-combat" | "in-combat";
@@ -215,6 +245,7 @@ export interface AuthoritativeGameStateView {
     readonly id: string;
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
+    readonly currentMp: number;
   };
   readonly inventory: readonly InventoryStackView[];
   readonly exploration: {
@@ -351,6 +382,30 @@ function isRunResolution(value: unknown): value is RunResolutionView {
     && value.dc === 8 && value.outcome === (value.total >= 8 ? "success" : "failure");
 }
 
+function isCastingResolution(value: unknown): value is CastingResolutionView {
+  if (!isRecord(value) || !exact(value, ["type", "actorId", "skillId", "round", "mpSpentThisAction", "totalMpSpent", "completedCastingTurns", "totalCastingTurns"])
+    || (value.type !== "casting-start" && value.type !== "casting-continue"
+      && value.type !== "casting-cancel" && value.type !== "casting-complete")
+    || !isId(value.actorId) || value.skillId !== "TEST-skill-2"
+    || !isSafeInteger(value.round) || value.round < 1
+    || !isSafeInteger(value.completedCastingTurns) || value.completedCastingTurns < 1
+    || value.completedCastingTurns > 3 || value.totalCastingTurns !== 3
+    || value.totalMpSpent !== value.completedCastingTurns * 6
+    || value.mpSpentThisAction !== (value.type === "casting-cancel" ? 0 : 6)) return false;
+  return (value.type !== "casting-start" || value.completedCastingTurns === 1)
+    && (value.type !== "casting-complete" || value.completedCastingTurns === 3)
+    && ((value.type === "casting-complete") || value.completedCastingTurns < 3);
+}
+
+function isCastingState(value: unknown): value is CastingStateView {
+  return isRecord(value) && exact(value, ["actorId", "skillId", "startedRound", "completedCastingTurns", "totalCastingTurns", "totalMpCost", "mpSpent"])
+    && isId(value.actorId) && value.skillId === "TEST-skill-2"
+    && isSafeInteger(value.startedRound) && value.startedRound >= 1
+    && (value.completedCastingTurns === 1 || value.completedCastingTurns === 2)
+    && value.totalCastingTurns === 3 && value.totalMpCost === 18
+    && value.mpSpent === value.completedCastingTurns * 6;
+}
+
 function resolveTieOrder(participants: readonly CombatParticipantView[], rollIndex: number): string[] | undefined {
   const groups = new Map<number, CombatParticipantView[]>();
   for (const participant of participants) {
@@ -399,13 +454,13 @@ function expectedTurnOrder(participants: readonly CombatParticipantView[]): stri
 
 export function isCombatStateView(value: unknown): value is CombatStateView {
   if (!isRecord(value) || !exact(value, [
-    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns",
+    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings",
   ])
     || !isSafeInteger(value.round) || value.round < 1
     || (value.status !== "active" && value.status !== "ended")
     || !isIds(value.turnOrder)
     || !Array.isArray(value.participants) || value.participants.length === 0
-    || !Array.isArray(value.skillCooldowns)) return false;
+    || !Array.isArray(value.skillCooldowns) || !Array.isArray(value.activeCastings)) return false;
   const participants = value.participants.map(parseParticipant);
   if (participants.some((participant) => participant === undefined)) return false;
   const validatedParticipants = participants as CombatParticipantView[];
@@ -414,11 +469,20 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   const lastAction = value.lastAction;
   if (lastAction !== null && !isPhysicalAttackResolution(lastAction)
     && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)
-    && !isDefendResolution(lastAction) && !isRunResolution(lastAction)) return false;
+    && !isDefendResolution(lastAction) && !isRunResolution(lastAction)
+    && !isCastingResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
   const cooldowns = value.skillCooldowns as unknown[];
+  const castings = value.activeCastings as unknown[];
+  if (!castings.every(isCastingState)
+    || new Set(castings.map((entry) => (entry as CastingStateView).actorId)).size !== castings.length
+    || castings.some((entry) => {
+      const casting = entry as CastingStateView;
+      return !ids.includes(casting.actorId) || casting.startedRound > (value.round as number)
+        || validatedParticipants.find((participant) => participant.id === casting.actorId)?.side !== "party";
+    }) || (value.status === "ended" && castings.length > 0)) return false;
   if (!cooldowns.every((entry) => isRecord(entry) && exact(entry, ["actorId", "skillId", "readyRound"])
     && isId(entry.actorId) && ids.includes(entry.actorId) && entry.skillId === "TEST-skill-1"
     && isSafeInteger(entry.readyRound) && entry.readyRound >= 3 && entry.readyRound <= (value.round as number) + 2)) return false;
@@ -444,6 +508,11 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
       return cooldown.actorId === lastAction.actorId && cooldown.skillId === lastAction.skillId
         && cooldown.readyRound === lastAction.readyRound;
     }))
+    && (lastAction === null || !lastAction.type.startsWith("casting-")
+      || ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
+        ? castings.some((entry) => (entry as CastingStateView).actorId === lastAction.actorId
+          && (entry as CastingStateView).mpSpent === lastAction.totalMpSpent)
+        : !castings.some((entry) => (entry as CastingStateView).actorId === lastAction.actorId)))
     && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow)
     && (lastAction === null || (lastAction.type !== "item-use" && lastAction.type !== "defend" && lastAction.type !== "run")
       || actor?.normalAttack !== null)
@@ -456,9 +525,10 @@ export function isAuthoritativeGameStateView(value: unknown): value is Authorita
     || !isSafeInteger(value.revision) || value.revision < 0
     || (value.activity !== "outside-combat" && value.activity !== "in-combat")
     || !isRecord(value.character)
-    || !exact(value.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
+    || !exact(value.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp"])
     || !isId(value.character.id) || !isIds(value.character.learnedActiveSkillIds)
     || !isIds(value.character.equippedSkillIds)
+    || !isSafeInteger(value.character.currentMp) || value.character.currentMp < 0
     || !Array.isArray(value.inventory)
     || !value.inventory.every((entry) => isRecord(entry)
       && exact(entry, ["itemId", "quantity"])
@@ -568,6 +638,7 @@ export function isCombatItemOptionsResponse(value: unknown): value is CombatItem
     && (item.usable
       ? item.quantity > 0 && item.unavailableReason === undefined
       : item.unavailableReason === "not-player-turn"
+        || item.unavailableReason === "casting-active"
         || (item.unavailableReason === "quantity-depleted" && item.quantity === 0)));
   return validItems && new Set(value.items.map((item) => (item as Record<string, unknown>).itemId)).size === value.items.length;
 }
@@ -627,7 +698,7 @@ export function isPhysicalSkillOptionsResponse(value: unknown): value is Physica
     && (skill.readyRound === null || (isSafeInteger(skill.readyRound) && skill.readyRound >= 3))
     && (skill.usable ? skill.unavailableReason === undefined
       : skill.unavailableReason === "not-player-turn" || skill.unavailableReason === "skill-on-cooldown"
-        || skill.unavailableReason === "no-legal-target")
+        || skill.unavailableReason === "no-legal-target" || skill.unavailableReason === "casting-active")
     && (skill.unavailableReason !== "skill-on-cooldown" || skill.readyRound !== null)
     && Array.isArray(skill.targets)
     && skill.targets.every((target) => isRecord(target)
@@ -648,4 +719,16 @@ export function isPhysicalSkillUseResponse(value: unknown): value is PhysicalSki
     && (value.effect.outcome === "hit" || value.effect.outcome === "miss")
     && value.state.combat?.lastAction?.type === "physical-skill"
     && value.state.combat.lastAction.outcome === value.effect.outcome;
+}
+
+export function isCastingResponse(value: unknown): value is CastingResponse {
+  if (!isRecord(value) || !exact(value, ["sandbox", "storage", "effect", "state"])
+    || typeof value.sandbox !== "boolean" || (value.storage !== "memory" && value.storage !== "postgres")
+    || !isAuthoritativeGameStateView(value.state) || !isRecord(value.effect)
+    || !exact(value.effect, ["type"])) return false;
+  const action = value.state.combat?.lastAction;
+  return (value.effect.type === "casting-started" && action?.type === "casting-start")
+    || (value.effect.type === "casting-continued" && action?.type === "casting-continue")
+    || (value.effect.type === "casting-cancelled" && action?.type === "casting-cancel")
+    || (value.effect.type === "casting-completed" && action?.type === "casting-complete");
 }

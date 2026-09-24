@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–17 已由使用者確認。Phase 18「物理主動技能」工程實作完成，等待使用者手動確認；Phase 19 尚未開始。
+Phase 1–18 已由使用者確認。Phase 19「多回合施法」工程完成，等待使用者手動確認；Phase 20 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -243,4 +243,10 @@ Phase 16 已由使用者手動確認。
 
 沿用 Phase 3 的已學與已裝備技能欄位，加入最小 TEST 技能定義。`TEST-skill-1` 是物理主動、單一敵方、近戰的工程 fixture。`GET /api/combat/physical-skills/options` 從權威角色與戰鬥狀態推導可用性及目標；`POST /api/combat/physical-skills/use` 在擲骰前重新驗證 revision、玩家 Turn、已學、已裝備、類別、冷卻與目標。攻擊和閃避共用 Phase 13 判定，命中與未命中都消耗 Turn、保存 `physical-skill` lastAction 與 `actorId + skillId + readyRound` 冷卻，revision 只加一次。R1 使用後 R3 可再使用。
 
-舊 CombatState 缺冷卻欄位時補空陣列。runtime 繼續放入 `game_states.snapshot` JSONB，沒有新 migration。前端已裝備技能區支援選技能、選合法目標、取消與回合式冷卻文字；失敗不 optimistic 更新。TEST 技能不建立傷害、HP、SP、狀態效果或 LLM 敘事。詳細手動驗收見 [Phase 18 文件](PHASE_18_PHYSICAL_ACTIVE_SKILLS.md)。Phase 18 等待使用者手動確認；Phase 19 尚未開始。
+舊 CombatState 缺冷卻欄位時補空陣列。runtime 繼續放入 `game_states.snapshot` JSONB，沒有新 migration。前端已裝備技能區支援選技能、選合法目標、取消與回合式冷卻文字；失敗不 optimistic 更新。TEST 技能不建立傷害、HP、SP、狀態效果或 LLM 敘事。詳細手動驗收見 [Phase 18 文件](PHASE_18_PHYSICAL_ACTIVE_SKILLS.md)。Phase 18 已由使用者手動確認，包括重複骰 fixture 修復、R1／R2／R3、MISS、非法操作、刷新、終止戰鬥及 PostgreSQL 重啟。
+
+## Phase 19 交付紀錄
+
+已加入 `TEST-skill-2` 多回合直接施法工程定義（18 MP／3 回合／每回合 6 MP），角色權威 `currentMp` 與 CombatState 依 `actorId` 持有的詠唱進度。開始先檢查完整 18 MP 與已學／已裝備，再扣 6 MP；繼續各扣 6 MP；最後一次只記錄「詠唱完成」。開始／繼續／完成均沿用 Phase 11 回合推進，revision 各加一次。取消清除詠唱、不退 MP、不扣新 MP，暫時不推進 Turn；此點明確列為 **Provisional engineering behavior（NOT locked canonical gameplay rule）**，見 [未解問題](OPEN_QUESTIONS.md)。施法中其他主要行動由後端拒絕；敵方回合不改 MP 或進度。
+
+`game_states.snapshot` JSONB 保存 MP、詠唱、最近機械行動、Round／actor 與 revision；靜態 TEST 法術定義留在程式目錄，沒有 migration。已知 `TEST-character` 舊快照可補 24 MP 與空詠唱；正式角色的 MP／Save 格式升級需另訂版本政策。UI 顯示 MP、已裝備法術、完整成本門檻、開始確認、詠唱進度、繼續／取消及完成結果。沒有命中、傷害、成功率、反噬或 LLM。實作與手動測試見 [Phase 19 文件](PHASE_19_MULTI_TURN_CASTING.md)。工程檢查：`npm run build`、`git diff --check` 通過；`npm test` 在獨立 `ai_trpg_phase19_test` PostgreSQL 資料庫共 197 項通過、0 失敗、0 略過。實際停止並重啟 API 後，MP、詠唱 1/3、已投入 6、revision／actor／Round 保持，且 R2 可繼續至 2/3。瀏覽器手感、手機與鍵盤仍由使用者驗收；Phase 20 尚未開始。

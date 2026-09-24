@@ -11,6 +11,9 @@ import {
   moveCombatRow,
   resolveNormalAttack,
   usePhysicalSkill,
+  startCasting,
+  continueCasting,
+  cancelCasting,
   runFromCombat,
   useCombatItem as useCombatItemTransition,
   startCombat as startCombatTransition,
@@ -43,6 +46,9 @@ export interface GameStateSession {
   run(input: unknown, roller: DiceRoller): ReturnType<typeof runFromCombat> | Promise<ReturnType<typeof runFromCombat>>;
   physicalSkillOptions(): ReturnType<typeof getCurrentPhysicalSkillOptions> | Promise<ReturnType<typeof getCurrentPhysicalSkillOptions>>;
   usePhysicalSkill(input: unknown, roller: DiceRoller): ReturnType<typeof usePhysicalSkill> | Promise<ReturnType<typeof usePhysicalSkill>>;
+  startCasting(input: unknown): ReturnType<typeof startCasting> | Promise<ReturnType<typeof startCasting>>;
+  continueCasting(input: unknown): ReturnType<typeof continueCasting> | Promise<ReturnType<typeof continueCasting>>;
+  cancelCasting(input: unknown): ReturnType<typeof cancelCasting> | Promise<ReturnType<typeof cancelCasting>>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -82,6 +88,21 @@ export function createDomainSession(initialState: GameState) {
       if (result.ok) state = result.state;
       return result;
     },
+    startCasting(input: unknown) {
+      const result = startCasting(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    continueCasting(input: unknown) {
+      const result = continueCasting(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    cancelCasting(input: unknown) {
+      const result = cancelCasting(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
     rowMoveOptions: () => getCurrentRowMoveOptions(state),
     moveRow(input: unknown) {
       const result = moveCombatRow(state, input);
@@ -110,6 +131,20 @@ export function createDomainSession(initialState: GameState) {
 /** 每次從 repository 取得最新快照；跨程序寫入由 repository 的 revision 條件守護。 */
 export function createPersistedDomainSession(repository: GameStateRepository, initialState: GameState) {
   const seed = createGameState(initialState);
+  async function persistCasting(transition: typeof startCasting, input: unknown) {
+    if (repository.withStateLocked) {
+      return repository.withStateLocked(seed, (state) => {
+        const result = transition(state, input);
+        return { result, ...(result.ok ? { nextState: result.state } : {}) };
+      });
+    }
+    const state = await repository.createIfAbsent(seed);
+    const result = transition(state, input);
+    if (!result.ok) return result;
+    const saved = await repository.saveIfRevision(state.revision, result.state);
+    return saved ? result : { ok: false as const, code: "stale-revision" as const,
+      message: "戰鬥狀態已更新，請重新讀取後再詠唱。" };
+  }
   return {
     getState: () => repository.createIfAbsent(seed),
     async execute(input: unknown) {
@@ -175,6 +210,15 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
       const saved = await repository.saveIfRevision(state.revision, result.state);
       return saved ? result : { ok: false as const, code: "stale-revision" as const,
         message: "戰鬥狀態已更新，請重新讀取後再使用技能。" };
+    },
+    async startCasting(input: unknown) {
+      return persistCasting(startCasting, input);
+    },
+    async continueCasting(input: unknown) {
+      return persistCasting(continueCasting, input);
+    },
+    async cancelCasting(input: unknown) {
+      return persistCasting(cancelCasting, input);
     },
     async normalAttack(input: unknown, roller: DiceRoller) {
       if (repository.withStateLocked) {

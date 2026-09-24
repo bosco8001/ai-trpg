@@ -25,6 +25,7 @@ function seed(characterId = "TEST-character"): GameState {
       id: characterId,
       learnedActiveSkillIds: ["TEST-skill-1"],
       equippedSkillIds: [],
+      currentMp: 24,
     },
     inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },

@@ -22,6 +22,7 @@ export interface GameState {
     /** 只包含佔六格的已學主動技能；不包含種族能力與武器熟練。 */
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
+    readonly currentMp: number;
   };
   /** Authoritative item stacks; item definitions live in the static domain catalog. */
   readonly inventory: readonly InventoryStack[];
@@ -169,11 +170,15 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
   if (!hasExactKeys(seed, ["revision", "activity", "character", "inventory", "exploration", "combat"])
-    || !hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
+    || !(hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp"])
+      || (hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
+        && seed.character.id === "TEST-character"))
     || !hasExactKeys(seed.exploration, ["locationId", "lastObservationTargetId"])) {
     throw new Error("初始 domain 狀態不符合契約。");
   }
   const character = seed.character;
+  // 僅供已知 TEST-character 的 Phase 1–18 舊快照升級；正式角色須帶有 MP。
+  const currentMp = Object.hasOwn(character, "currentMp") ? character.currentMp : 24;
   const exploration = seed.exploration;
   let combat: CombatState | null;
   try {
@@ -187,6 +192,7 @@ export function createGameState(seed: unknown): GameState {
     || !isId(character.id)
     || !isIds(character.learnedActiveSkillIds)
     || !isIds(character.equippedSkillIds)
+    || !isRevision(currentMp)
     || !isInventory(seed.inventory)
     || new Set(character.learnedActiveSkillIds).size !== character.learnedActiveSkillIds.length
     || loadoutError(character.learnedActiveSkillIds, character.equippedSkillIds)
@@ -207,6 +213,7 @@ export function createGameState(seed: unknown): GameState {
       id: character.id,
       learnedActiveSkillIds: Object.freeze([...character.learnedActiveSkillIds]),
       equippedSkillIds: Object.freeze([...character.equippedSkillIds]),
+      currentMp,
     }),
     inventory: normalizeInventory(seed.inventory),
     exploration: Object.freeze({

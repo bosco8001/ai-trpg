@@ -68,6 +68,27 @@ export interface SkillCooldown {
   readonly readyRound: number;
 }
 
+export interface CastingState {
+  readonly actorId: string;
+  readonly skillId: string;
+  readonly startedRound: number;
+  readonly completedCastingTurns: number;
+  readonly totalCastingTurns: number;
+  readonly totalMpCost: number;
+  readonly mpSpent: number;
+}
+
+export interface CastingActionResolution {
+  readonly type: "casting-start" | "casting-continue" | "casting-cancel" | "casting-complete";
+  readonly actorId: string;
+  readonly skillId: string;
+  readonly round: number;
+  readonly mpSpentThisAction: number;
+  readonly totalMpSpent: number;
+  readonly completedCastingTurns: number;
+  readonly totalCastingTurns: number;
+}
+
 export interface RowMoveActionResolution {
   readonly type: "row-move";
   readonly actorId: string;
@@ -103,7 +124,7 @@ export interface RunActionResolution {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution;
+export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution | CastingActionResolution;
 
 interface CombatStateBase {
   readonly round: number;
@@ -111,6 +132,7 @@ interface CombatStateBase {
   readonly participants: readonly CombatParticipant[];
   readonly lastAction: CombatLastAction | null;
   readonly skillCooldowns: readonly SkillCooldown[];
+  readonly activeCastings: readonly CastingState[];
 }
 
 export interface ActiveCombatState extends CombatStateBase {
@@ -371,6 +393,25 @@ function parseRunAction(value: Record<string, unknown>): RunActionResolution | u
   });
 }
 
+function parseCastingAction(value: Record<string, unknown>): CastingActionResolution | undefined {
+  if (!exact(value, ["type", "actorId", "skillId", "round", "mpSpentThisAction", "totalMpSpent", "completedCastingTurns", "totalCastingTurns"])
+    || (value.type !== "casting-start" && value.type !== "casting-continue"
+      && value.type !== "casting-cancel" && value.type !== "casting-complete")
+    || !isId(value.actorId) || !isId(value.skillId) || !isPositiveSafeInteger(value.round)
+    || !isSafeInteger(value.mpSpentThisAction) || !isSafeInteger(value.totalMpSpent)
+    || !isPositiveSafeInteger(value.completedCastingTurns) || !isPositiveSafeInteger(value.totalCastingTurns)) return undefined;
+  const definition = getActiveSkillDefinition(value.skillId);
+  if (!definition || definition.category !== "magic-active"
+    || value.totalCastingTurns !== definition.castingTurns
+    || value.completedCastingTurns > definition.castingTurns
+    || value.totalMpSpent !== value.completedCastingTurns * definition.perTurnMpCost
+    || value.mpSpentThisAction !== (value.type === "casting-cancel" ? 0 : definition.perTurnMpCost)
+    || (value.type === "casting-start" && value.completedCastingTurns !== 1)
+    || (value.type === "casting-complete" && value.completedCastingTurns !== definition.castingTurns)
+    || (value.type !== "casting-complete" && value.completedCastingTurns >= definition.castingTurns)) return undefined;
+  return Object.freeze(value) as unknown as CastingActionResolution;
+}
+
 function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
@@ -379,6 +420,7 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value.type === "item-use") return parseItemUseAction(value);
   if (value.type === "defend") return parseDefendAction(value);
   if (value.type === "run") return parseRunAction(value);
+  if (typeof value.type === "string" && value.type.startsWith("casting-")) return parseCastingAction(value);
   return undefined;
 }
 
@@ -390,9 +432,10 @@ export function createCombatState(value: unknown): CombatState {
   const previousSkillShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns"]);
   const currentShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
   const skillShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns"]);
+  const castingShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings"]);
   const status = legacyShape || previousShape || previousSkillShape ? "active" : value.status;
   const endReason = legacyShape || previousShape || previousSkillShape ? null : value.endReason;
-  if ((!legacyShape && !previousShape && !previousSkillShape && !currentShape && !skillShape)
+  if ((!legacyShape && !previousShape && !previousSkillShape && !currentShape && !skillShape && !castingShape)
     || !isPositiveSafeInteger(value.round)
     || (status !== "active" && status !== "ended")
     || (status === "active" && (endReason !== null || !isSafeInteger(value.currentTurnIndex)
@@ -405,7 +448,7 @@ export function createCombatState(value: unknown): CombatState {
   }
   const participants = value.participants.map((participant) => parseParticipant(participant, legacyShape));
   const lastAction = legacyShape ? null : parseLastAction(value.lastAction);
-  const skillCooldowns: SkillCooldown[] = (skillShape || previousSkillShape) && Array.isArray(value.skillCooldowns)
+  const skillCooldowns: SkillCooldown[] = (skillShape || castingShape || previousSkillShape) && Array.isArray(value.skillCooldowns)
     ? value.skillCooldowns.map((entry) => {
       if (!isRecord(entry) || !exact(entry, ["actorId", "skillId", "readyRound"])
         || !isId(entry.actorId) || !isId(entry.skillId)
@@ -415,13 +458,29 @@ export function createCombatState(value: unknown): CombatState {
       }
       return Object.freeze({ actorId: entry.actorId, skillId: entry.skillId, readyRound: entry.readyRound });
     }) : [];
-  if ((skillShape || previousSkillShape) && !Array.isArray(value.skillCooldowns)) throw new Error("技能冷卻資料格式不正確。");
+  if ((skillShape || castingShape || previousSkillShape) && !Array.isArray(value.skillCooldowns)) throw new Error("技能冷卻資料格式不正確。");
+  if (castingShape && !Array.isArray(value.activeCastings)) throw new Error("詠唱資料格式不正確。");
+  const activeCastings: CastingState[] = castingShape ? (value.activeCastings as unknown[]).map((entry) => {
+    if (!isRecord(entry) || !exact(entry, ["actorId", "skillId", "startedRound", "completedCastingTurns", "totalCastingTurns", "totalMpCost", "mpSpent"])
+      || !isId(entry.actorId) || !isId(entry.skillId) || !isPositiveSafeInteger(entry.startedRound)
+      || !isPositiveSafeInteger(entry.completedCastingTurns) || !isPositiveSafeInteger(entry.totalCastingTurns)
+      || !isPositiveSafeInteger(entry.totalMpCost) || !isPositiveSafeInteger(entry.mpSpent)) throw new Error("詠唱資料格式不正確。");
+    const definition = getActiveSkillDefinition(entry.skillId);
+    if (!definition || definition.category !== "magic-active" || entry.totalCastingTurns !== definition.castingTurns
+      || entry.totalMpCost !== definition.totalMpCost || entry.completedCastingTurns >= definition.castingTurns
+      || entry.mpSpent !== entry.completedCastingTurns * definition.perTurnMpCost) throw new Error("詠唱進度不一致。");
+    return Object.freeze(entry) as unknown as CastingState;
+  }) : [];
   const ids = participants.map((participant) => participant.id);
   const expectedOrder = expectedTurnOrder(participants);
   if (lastAction === undefined
     || new Set(ids).size !== ids.length
     || skillCooldowns.some((entry) => !ids.includes(entry.actorId) || entry.readyRound > (value.round as number) + 2)
     || new Set(skillCooldowns.map((entry) => `${entry.actorId}\u0000${entry.skillId}`)).size !== skillCooldowns.length
+    || new Set(activeCastings.map((entry) => entry.actorId)).size !== activeCastings.length
+    || activeCastings.some((entry) => !ids.includes(entry.actorId) || entry.startedRound > (value.round as number)
+      || !isPlayerActionParticipant(participants.find((participant) => participant.id === entry.actorId)!))
+    || (status === "ended" && activeCastings.length > 0)
     || value.turnOrder.length !== ids.length
     || new Set(value.turnOrder).size !== value.turnOrder.length
     || value.turnOrder.some((id) => !ids.includes(id))
@@ -440,6 +499,11 @@ export function createCombatState(value: unknown): CombatState {
     || (lastAction?.type === "physical-skill"
       && skillCooldowns.find((entry) => entry.actorId === lastAction.actorId
         && entry.skillId === lastAction.skillId)?.readyRound !== lastAction.readyRound)
+    || (lastAction !== null && lastAction.type.startsWith("casting-")
+      && ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
+        ? !activeCastings.some((entry) => entry.actorId === lastAction.actorId
+          && entry.skillId === lastAction.skillId && entry.mpSpent === lastAction.totalMpSpent)
+        : activeCastings.some((entry) => entry.actorId === lastAction.actorId)))
     || (lastAction?.type === "row-move"
       && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
     || ((lastAction?.type === "item-use" || lastAction?.type === "defend" || lastAction?.type === "run")
@@ -454,6 +518,7 @@ export function createCombatState(value: unknown): CombatState {
     participants: Object.freeze(participants),
     lastAction,
     skillCooldowns: Object.freeze(skillCooldowns),
+    activeCastings: Object.freeze(activeCastings),
   };
   if (status === "ended") return Object.freeze({
     ...base, status: "ended", endReason: "escaped", currentTurnIndex: null, currentActorId: null,

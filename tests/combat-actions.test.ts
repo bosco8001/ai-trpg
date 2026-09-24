@@ -63,6 +63,7 @@ function seed(characterId = "TEST-character"): GameState {
       id: characterId,
       learnedActiveSkillIds: ["TEST-skill-1"],
       equippedSkillIds: [],
+      currentMp: 24,
     },
     inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
@@ -572,7 +573,7 @@ test("普通攻擊結果 UI 只顯示檢定事實與命中結果，不顯示傷�
   assert.match(page, /結果：命中/);
   assert.match(page, /目前行動：<strong>TEST 敵人 2<\/strong>/);
   const visibleText = page.replace(/<[^>]+>/g, " ");
-  assert.doesNotMatch(visibleText, /\b(?:HP|MP)\b|damage|傷害|揮劍|躲開|暴擊|critical/i);
+  assert.doesNotMatch(visibleText, /\bHP\b|damage|傷害|揮劍|躲開|暴擊|critical/i);
 });
 
 test("target mode 的取消與進入流程不會直接呼叫 attack endpoint；卡片平時維持 article", async () => {
