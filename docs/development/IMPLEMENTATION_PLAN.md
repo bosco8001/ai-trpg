@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–16 已由使用者確認。Phase 17「逃跑行動」工程實作完成，等待使用者手動驗收；Phase 18 尚未開始。
+Phase 1–17 已由使用者確認。Phase 18「物理主動技能」工程實作完成，等待使用者手動確認；Phase 19 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -237,4 +237,10 @@ Phase 16 已由使用者手動確認。
 
 舊 CombatState 缺少 lifecycle 欄位時安全 hydrate 為 `active`；PostgreSQL JSONB 保存 lifecycle、end reason、裁定及 revision，無新 migration。戰鬥已結束後攻擊、換排、物品、防禦、再次逃跑及 TEST advance 都由後端拒絕。Save／Load 防護維持。Combat UI 啟用逃跑確認與取消，成功呈現終止畫面並停用所有指令；失敗顯示機械結果與下一位行動者。沒有追逐、結算獎勵、探索改動或 LLM 敘事。
 
-新增 `tests/combat-run.test.ts` 與 [Phase 17 手動驗收文件](PHASE_17_RUN_ESCAPE.md)。工程檢查：`npm test` 共 174 項，166 項通過、0 項失敗、8 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build` 與 `git diff --check` 通過。瀏覽器／手機／鍵盤與 PostgreSQL restart 仍由使用者手動驗收。Phase 17 等待使用者手動確認。Phase 18 尚未開始。
+新增 `tests/combat-run.test.ts` 與 [Phase 17 手動驗收文件](PHASE_17_RUN_ESCAPE.md)。工程檢查：`npm test` 共 174 項，166 項通過、0 項失敗、8 項 PostgreSQL 整合測試因未提供隔離的 `TEST_DATABASE_URL` 而略過；`npm run typecheck`、`npm run build` 與 `git diff --check` 通過。使用者其後完成手動驗收，包括 PostgreSQL 重啟後維持 `ended / escaped` 終止戰鬥畫面。Phase 1–17 已由使用者確認。
+
+## Phase 18 交付紀錄
+
+沿用 Phase 3 的已學與已裝備技能欄位，加入最小 TEST 技能定義。`TEST-skill-1` 是物理主動、單一敵方、近戰的工程 fixture。`GET /api/combat/physical-skills/options` 從權威角色與戰鬥狀態推導可用性及目標；`POST /api/combat/physical-skills/use` 在擲骰前重新驗證 revision、玩家 Turn、已學、已裝備、類別、冷卻與目標。攻擊和閃避共用 Phase 13 判定，命中與未命中都消耗 Turn、保存 `physical-skill` lastAction 與 `actorId + skillId + readyRound` 冷卻，revision 只加一次。R1 使用後 R3 可再使用。
+
+舊 CombatState 缺冷卻欄位時補空陣列。runtime 繼續放入 `game_states.snapshot` JSONB，沒有新 migration。前端已裝備技能區支援選技能、選合法目標、取消與回合式冷卻文字；失敗不 optimistic 更新。TEST 技能不建立傷害、HP、SP、狀態效果或 LLM 敘事。詳細手動驗收見 [Phase 18 文件](PHASE_18_PHYSICAL_ACTIVE_SKILLS.md)。Phase 18 等待使用者手動確認；Phase 19 尚未開始。

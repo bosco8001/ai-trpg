@@ -49,6 +49,18 @@ export interface NormalAttackResolutionView {
   readonly outcome: "hit" | "miss";
 }
 
+export interface PhysicalSkillResolutionView extends Omit<NormalAttackResolutionView, "type"> {
+  readonly type: "physical-skill";
+  readonly skillId: string;
+  readonly readyRound: number;
+}
+
+export interface SkillCooldownView {
+  readonly actorId: string;
+  readonly skillId: string;
+  readonly readyRound: number;
+}
+
 export interface RowMoveResolutionView {
   readonly type: "row-move";
   readonly actorId: string;
@@ -84,13 +96,14 @@ export interface RunResolutionView {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView;
+export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView;
 
 interface CombatStateViewBase {
   readonly round: number;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipantView[];
   readonly lastAction: CombatLastActionView | null;
+  readonly skillCooldowns: readonly SkillCooldownView[];
 }
 
 export interface ActiveCombatStateView extends CombatStateViewBase {
@@ -173,6 +186,28 @@ export interface CombatRunResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "run-resolved"; readonly outcome: "success" | "failure" };
 }
 
+export interface PhysicalSkillOptionView {
+  readonly skillId: string;
+  readonly displayName: string;
+  readonly category: "physical-active";
+  readonly targetMode: "single-enemy";
+  readonly range: NormalAttackRange;
+  readonly usable: boolean;
+  readonly unavailableReason?: "not-player-turn" | "skill-on-cooldown" | "no-legal-target";
+  readonly readyRound: number | null;
+  readonly targets: readonly NormalAttackTargetOptionView[];
+}
+
+export interface PhysicalSkillOptionsResponse {
+  readonly revision: number;
+  readonly currentActorId: string;
+  readonly skills: readonly PhysicalSkillOptionView[];
+}
+
+export interface PhysicalSkillUseResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "physical-skill-resolved"; readonly outcome: "hit" | "miss" };
+}
+
 export interface AuthoritativeGameStateView {
   readonly revision: number;
   readonly activity: "outside-combat" | "in-combat";
@@ -250,10 +285,16 @@ function parseParticipant(value: unknown): CombatParticipantView | undefined {
   return value as unknown as CombatParticipantView;
 }
 
-function isNormalAttackResolution(value: unknown): value is NormalAttackResolutionView {
+function isPhysicalAttackResolution(value: unknown): value is NormalAttackResolutionView | PhysicalSkillResolutionView {
+  const skill = isRecord(value) && value.type === "physical-skill";
   return isRecord(value)
-    && exact(value, ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
-    && value.type === "normal-attack" && isSafeInteger(value.round) && value.round > 0
+    && exact(value, skill
+      ? ["type", "round", "actorId", "skillId", "targetId", "attack", "evasion", "outcome", "readyRound"]
+      : ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
+    && (value.type === "normal-attack" || skill)
+    && (!skill || (value.skillId === "TEST-skill-1" && isSafeInteger(value.readyRound)
+      && value.readyRound === (value.round as number) + 2))
+    && isSafeInteger(value.round) && value.round > 0
     && isId(value.actorId) && isId(value.targetId)
     && (value.outcome === "hit" || value.outcome === "miss")
     && isRecord(value.attack)
@@ -358,24 +399,30 @@ function expectedTurnOrder(participants: readonly CombatParticipantView[]): stri
 
 export function isCombatStateView(value: unknown): value is CombatStateView {
   if (!isRecord(value) || !exact(value, [
-    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction",
+    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns",
   ])
     || !isSafeInteger(value.round) || value.round < 1
     || (value.status !== "active" && value.status !== "ended")
     || !isIds(value.turnOrder)
-    || !Array.isArray(value.participants) || value.participants.length === 0) return false;
+    || !Array.isArray(value.participants) || value.participants.length === 0
+    || !Array.isArray(value.skillCooldowns)) return false;
   const participants = value.participants.map(parseParticipant);
   if (participants.some((participant) => participant === undefined)) return false;
   const validatedParticipants = participants as CombatParticipantView[];
   const ids = validatedParticipants.map((participant) => participant.id);
   const expected = expectedTurnOrder(validatedParticipants);
   const lastAction = value.lastAction;
-  if (lastAction !== null && !isNormalAttackResolution(lastAction)
+  if (lastAction !== null && !isPhysicalAttackResolution(lastAction)
     && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)
     && !isDefendResolution(lastAction) && !isRunResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
+  const cooldowns = value.skillCooldowns as unknown[];
+  if (!cooldowns.every((entry) => isRecord(entry) && exact(entry, ["actorId", "skillId", "readyRound"])
+    && isId(entry.actorId) && ids.includes(entry.actorId) && entry.skillId === "TEST-skill-1"
+    && isSafeInteger(entry.readyRound) && entry.readyRound >= 3 && entry.readyRound <= (value.round as number) + 2)) return false;
+  if (new Set(cooldowns.map((entry) => `${(entry as SkillCooldownView).actorId}\u0000${(entry as SkillCooldownView).skillId}`)).size !== cooldowns.length) return false;
   return new Set(ids).size === ids.length
     && value.turnOrder.length === ids.length
     && new Set(value.turnOrder).size === value.turnOrder.length
@@ -389,9 +436,14 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
         && lastAction?.type === "run" && lastAction.outcome === "success" && lastAction.round === value.round)
     && (lastAction === null || (lastAction.round <= value.round
       && ids.includes(lastAction.actorId) && actor?.side === "party"))
-    && (lastAction === null || lastAction.type !== "normal-attack"
+    && (lastAction === null || (lastAction.type !== "normal-attack" && lastAction.type !== "physical-skill")
       || (ids.includes(lastAction.targetId)
         && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"))
+    && (lastAction?.type !== "physical-skill" || cooldowns.some((entry) => {
+      const cooldown = entry as SkillCooldownView;
+      return cooldown.actorId === lastAction.actorId && cooldown.skillId === lastAction.skillId
+        && cooldown.readyRound === lastAction.readyRound;
+    }))
     && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow)
     && (lastAction === null || (lastAction.type !== "item-use" && lastAction.type !== "defend" && lastAction.type !== "run")
       || actor?.normalAttack !== null)
@@ -560,4 +612,40 @@ export function isCombatRunResponse(value: unknown): value is CombatRunResponse 
     && value.state.combat?.lastAction?.type === "run"
     && value.state.combat.lastAction.outcome === value.effect.outcome
     && value.state.combat.status === (value.effect.outcome === "success" ? "ended" : "active");
+}
+
+export function isPhysicalSkillOptionsResponse(value: unknown): value is PhysicalSkillOptionsResponse {
+  if (!isRecord(value) || !exact(value, ["revision", "currentActorId", "skills"])
+    || !isSafeInteger(value.revision) || value.revision < 0 || !isId(value.currentActorId)
+    || !Array.isArray(value.skills)) return false;
+  return value.skills.every((skill) => isRecord(skill)
+    && (exact(skill, ["skillId", "displayName", "category", "targetMode", "range", "usable", "readyRound", "targets"])
+      || exact(skill, ["skillId", "displayName", "category", "targetMode", "range", "usable", "unavailableReason", "readyRound", "targets"]))
+    && skill.skillId === "TEST-skill-1" && skill.displayName === "TEST 物理技能"
+    && skill.category === "physical-active" && skill.targetMode === "single-enemy" && skill.range === "melee"
+    && typeof skill.usable === "boolean"
+    && (skill.readyRound === null || (isSafeInteger(skill.readyRound) && skill.readyRound >= 3))
+    && (skill.usable ? skill.unavailableReason === undefined
+      : skill.unavailableReason === "not-player-turn" || skill.unavailableReason === "skill-on-cooldown"
+        || skill.unavailableReason === "no-legal-target")
+    && (skill.unavailableReason !== "skill-on-cooldown" || skill.readyRound !== null)
+    && Array.isArray(skill.targets)
+    && skill.targets.every((target) => isRecord(target)
+      && (exact(target, ["targetId", "displayName", "legal"])
+        || exact(target, ["targetId", "displayName", "legal", "reason"]))
+      && isId(target.targetId) && isId(target.displayName) && typeof target.legal === "boolean"
+      && (target.legal ? target.reason === undefined : target.reason === "front-row-blocked"))
+    && new Set(skill.targets.map((target) => (target as NormalAttackTargetOptionView).targetId)).size === skill.targets.length)
+    && new Set(value.skills.map((skill) => (skill as PhysicalSkillOptionView).skillId)).size === value.skills.length;
+}
+
+export function isPhysicalSkillUseResponse(value: unknown): value is PhysicalSkillUseResponse {
+  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+    && typeof value.sandbox === "boolean" && (value.storage === "memory" || value.storage === "postgres")
+    && isAuthoritativeGameStateView(value.state)
+    && isRecord(value.effect) && exact(value.effect, ["type", "outcome"])
+    && value.effect.type === "physical-skill-resolved"
+    && (value.effect.outcome === "hit" || value.effect.outcome === "miss")
+    && value.state.combat?.lastAction?.type === "physical-skill"
+    && value.state.combat.lastAction.outcome === value.effect.outcome;
 }

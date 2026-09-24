@@ -24,6 +24,8 @@ import {
   isCombatSandboxAdvanceResponse,
   isNormalAttackOptionsResponse,
   isRowMoveOptionsResponse,
+  isPhysicalSkillOptionsResponse,
+  isPhysicalSkillUseResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
@@ -34,6 +36,8 @@ import {
   type CombatSandboxAdvanceResponse,
   type NormalAttackOptionsResponse,
   type RowMoveOptionsResponse,
+  type PhysicalSkillOptionsResponse,
+  type PhysicalSkillUseResponse,
 } from "../shared/game-state.js";
 
 export async function checkApiHealth(
@@ -179,6 +183,40 @@ export async function executeNormalAttack(
     throw new Error("普通攻擊回應格式不正確。");
   }
   if (!isCombatNormalAttackResponse(body)) throw new Error("普通攻擊回應格式不正確。");
+  return body;
+}
+
+export async function loadPhysicalSkillOptions(fetcher: typeof fetch = fetch): Promise<PhysicalSkillOptionsResponse> {
+  let response: Response;
+  try { response = await fetcher("/api/combat/physical-skills/options", { cache: "no-store" }); }
+  catch { throw new Error("目前無法讀取物理技能，請確認服務後再試。"); }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取物理技能，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try { body = await response.json(); }
+  catch { throw new Error("物理技能選項回應格式不正確。"); }
+  if (!isPhysicalSkillOptionsResponse(body)) throw new Error("物理技能選項回應格式不正確。");
+  return body;
+}
+
+export async function executePhysicalSkill(
+  expectedRevision: number, skillId: string, targetId: string, fetcher: typeof fetch = fetch,
+): Promise<PhysicalSkillUseResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/physical-skills/use", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision, skillId, targetId }), cache: "no-store",
+    });
+  } catch { throw new Error("物理技能暫時無法使用，請重新讀取戰鬥狀態。"); }
+  if (response.status >= 500) throw new Error("目前無法完成技能判定，請再試一次。");
+  if (!response.ok) throw await saveApiError(response, "物理技能暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try { body = await response.json(); }
+  catch { throw new Error("物理技能回應格式不正確。"); }
+  if (!isPhysicalSkillUseResponse(body) || body.state.revision !== expectedRevision + 1
+    || body.state.combat?.lastAction?.type !== "physical-skill"
+    || body.state.combat.lastAction.skillId !== skillId
+    || body.state.combat.lastAction.targetId !== targetId) throw new Error("物理技能回應格式不正確。");
   return body;
 }
 

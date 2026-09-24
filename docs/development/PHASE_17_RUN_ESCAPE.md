@@ -1,6 +1,6 @@
 # Phase 17：逃跑行動
 
-> Phase 1–16 已由使用者確認。Phase 17 工程實作完成，等待使用者手動確認。Phase 18 尚未開始。
+> Phase 1–17 已由使用者確認，包括 PostgreSQL 重啟後保留逃跑成功的終止戰鬥畫面。Phase 18 工程實作完成，等待使用者手動確認；Phase 19 尚未開始。
 
 ## 權威規則與工程邊界
 
@@ -96,4 +96,4 @@ npm run db:migrate
 
 ## 工程檢查
 
-工程檢查結果見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md) 與本階段完成回報。自動化檢查不代表使用者的瀏覽器、手機、鍵盤或 PostgreSQL 重啟驗收。Phase 17 等待使用者確認，Phase 18 尚未開始。
+工程檢查結果見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md) 與本階段完成回報。Phase 17 已由使用者完成瀏覽器、手機、鍵盤與 PostgreSQL 重啟手動驗收。

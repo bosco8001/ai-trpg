@@ -11,6 +11,8 @@ import type {
   CombatItemUseResult,
   DefendResult,
   RunResult,
+  PhysicalSkillOptionsResult,
+  PhysicalSkillUseResult,
 } from "../../domain/combat.js";
 import type { GameStateSession } from "../domain-session.js";
 
@@ -26,6 +28,8 @@ export interface CombatService {
   useCombatItem(input: unknown): Promise<CombatItemUseResult>;
   defend(input: unknown): Promise<DefendResult>;
   run(input: unknown): Promise<RunResult>;
+  physicalSkillOptions(): Promise<PhysicalSkillOptionsResult>;
+  usePhysicalSkill(input: unknown): Promise<PhysicalSkillUseResult>;
 }
 
 /** 只協調 session 與骰子；不依賴 LLM、narration 或前端。 */
@@ -51,6 +55,12 @@ export function createCombatService(
     },
     async normalAttack(input: unknown) {
       return session.normalAttack(input, actionRoller);
+    },
+    async physicalSkillOptions() {
+      return session.physicalSkillOptions();
+    },
+    async usePhysicalSkill(input: unknown) {
+      return session.usePhysicalSkill(input, actionRoller);
     },
     async rowMoveOptions() {
       return session.rowMoveOptions();

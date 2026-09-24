@@ -1,4 +1,5 @@
 import { getCombatItemDefinition } from "./combat-items.js";
+import { getActiveSkillDefinition } from "./physical-skills.js";
 
 export type CombatSide = "party" | "enemy";
 export type CombatRow = "front" | "back";
@@ -55,6 +56,18 @@ export interface NormalAttackActionResolution {
   readonly outcome: "hit" | "miss";
 }
 
+export interface PhysicalSkillActionResolution extends Omit<NormalAttackActionResolution, "type"> {
+  readonly type: "physical-skill";
+  readonly skillId: string;
+  readonly readyRound: number;
+}
+
+export interface SkillCooldown {
+  readonly actorId: string;
+  readonly skillId: string;
+  readonly readyRound: number;
+}
+
 export interface RowMoveActionResolution {
   readonly type: "row-move";
   readonly actorId: string;
@@ -90,13 +103,14 @@ export interface RunActionResolution {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastAction = NormalAttackActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution;
+export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution;
 
 interface CombatStateBase {
   readonly round: number;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipant[];
   readonly lastAction: CombatLastAction | null;
+  readonly skillCooldowns: readonly SkillCooldown[];
 }
 
 export interface ActiveCombatState extends CombatStateBase {
@@ -261,10 +275,16 @@ function expectedTurnOrder(participants: readonly CombatParticipant[]): string[]
   });
 }
 
-function parseNormalAttackAction(value: Record<string, unknown>): NormalAttackActionResolution | undefined {
-  if (!exact(value, ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
-    || value.type !== "normal-attack" || !isPositiveSafeInteger(value.round)
+function parsePhysicalAttackAction(value: Record<string, unknown>): NormalAttackActionResolution | PhysicalSkillActionResolution | undefined {
+  const skill = value.type === "physical-skill";
+  if (!exact(value, skill
+    ? ["type", "round", "actorId", "skillId", "targetId", "attack", "evasion", "outcome", "readyRound"]
+    : ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
+    || (value.type !== "normal-attack" && !skill) || !isPositiveSafeInteger(value.round)
     || !isId(value.actorId) || !isId(value.targetId)
+    || (skill && (!isId(value.skillId)
+      || getActiveSkillDefinition(value.skillId)?.category !== "physical-active"
+      || !isPositiveSafeInteger(value.readyRound) || value.readyRound !== value.round + 2))
     || (value.outcome !== "hit" && value.outcome !== "miss")
     || !isRecord(value.attack) || !exact(value.attack, [
       "rawD20", "perceptionModifier", "weaponMainStatModifier", "proficiencyModifier", "total",
@@ -280,7 +300,7 @@ function parseNormalAttackAction(value: Record<string, unknown>): NormalAttackAc
     || value.evasion.total !== value.evasion.rawD20 + value.evasion.dexterityModifier
     || value.outcome !== (value.attack.total >= value.evasion.total ? "hit" : "miss")) return undefined;
   return Object.freeze({
-    type: "normal-attack",
+    type: value.type,
     round: value.round,
     actorId: value.actorId,
     targetId: value.targetId,
@@ -297,7 +317,8 @@ function parseNormalAttackAction(value: Record<string, unknown>): NormalAttackAc
       total: value.evasion.total,
     }),
     outcome: value.outcome,
-  });
+    ...(skill ? { skillId: value.skillId as string, readyRound: value.readyRound as number } : {}),
+  }) as NormalAttackActionResolution | PhysicalSkillActionResolution;
 }
 
 function parseRowMoveAction(value: Record<string, unknown>): RowMoveActionResolution | undefined {
@@ -353,7 +374,7 @@ function parseRunAction(value: Record<string, unknown>): RunActionResolution | u
 function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
-  if (value.type === "normal-attack") return parseNormalAttackAction(value);
+  if (value.type === "normal-attack" || value.type === "physical-skill") return parsePhysicalAttackAction(value);
   if (value.type === "row-move") return parseRowMoveAction(value);
   if (value.type === "item-use") return parseItemUseAction(value);
   if (value.type === "defend") return parseDefendAction(value);
@@ -366,10 +387,12 @@ export function createCombatState(value: unknown): CombatState {
   if (!isRecord(value)) throw new Error("CombatState 格式不正確。");
   const legacyShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants"]);
   const previousShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
+  const previousSkillShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns"]);
   const currentShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
-  const status = legacyShape || previousShape ? "active" : value.status;
-  const endReason = legacyShape || previousShape ? null : value.endReason;
-  if ((!legacyShape && !previousShape && !currentShape)
+  const skillShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns"]);
+  const status = legacyShape || previousShape || previousSkillShape ? "active" : value.status;
+  const endReason = legacyShape || previousShape || previousSkillShape ? null : value.endReason;
+  if ((!legacyShape && !previousShape && !previousSkillShape && !currentShape && !skillShape)
     || !isPositiveSafeInteger(value.round)
     || (status !== "active" && status !== "ended")
     || (status === "active" && (endReason !== null || !isSafeInteger(value.currentTurnIndex)
@@ -382,10 +405,23 @@ export function createCombatState(value: unknown): CombatState {
   }
   const participants = value.participants.map((participant) => parseParticipant(participant, legacyShape));
   const lastAction = legacyShape ? null : parseLastAction(value.lastAction);
+  const skillCooldowns: SkillCooldown[] = (skillShape || previousSkillShape) && Array.isArray(value.skillCooldowns)
+    ? value.skillCooldowns.map((entry) => {
+      if (!isRecord(entry) || !exact(entry, ["actorId", "skillId", "readyRound"])
+        || !isId(entry.actorId) || !isId(entry.skillId)
+        || getActiveSkillDefinition(entry.skillId)?.category !== "physical-active"
+        || !isPositiveSafeInteger(entry.readyRound) || entry.readyRound < 3) {
+        throw new Error("技能冷卻資料格式不正確。");
+      }
+      return Object.freeze({ actorId: entry.actorId, skillId: entry.skillId, readyRound: entry.readyRound });
+    }) : [];
+  if ((skillShape || previousSkillShape) && !Array.isArray(value.skillCooldowns)) throw new Error("技能冷卻資料格式不正確。");
   const ids = participants.map((participant) => participant.id);
   const expectedOrder = expectedTurnOrder(participants);
   if (lastAction === undefined
     || new Set(ids).size !== ids.length
+    || skillCooldowns.some((entry) => !ids.includes(entry.actorId) || entry.readyRound > (value.round as number) + 2)
+    || new Set(skillCooldowns.map((entry) => `${entry.actorId}\u0000${entry.skillId}`)).size !== skillCooldowns.length
     || value.turnOrder.length !== ids.length
     || new Set(value.turnOrder).size !== value.turnOrder.length
     || value.turnOrder.some((id) => !ids.includes(id))
@@ -398,9 +434,12 @@ export function createCombatState(value: unknown): CombatState {
     || (lastAction !== null && (lastAction.round > value.round
       || !ids.includes(lastAction.actorId)
       || participants.find((participant) => participant.id === lastAction.actorId)?.side !== "party"))
-    || (lastAction?.type === "normal-attack"
+    || ((lastAction?.type === "normal-attack" || lastAction?.type === "physical-skill")
       && (!ids.includes(lastAction.targetId)
         || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))
+    || (lastAction?.type === "physical-skill"
+      && skillCooldowns.find((entry) => entry.actorId === lastAction.actorId
+        && entry.skillId === lastAction.skillId)?.readyRound !== lastAction.readyRound)
     || (lastAction?.type === "row-move"
       && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
     || ((lastAction?.type === "item-use" || lastAction?.type === "defend" || lastAction?.type === "run")
@@ -414,6 +453,7 @@ export function createCombatState(value: unknown): CombatState {
     turnOrder: Object.freeze([...value.turnOrder]),
     participants: Object.freeze(participants),
     lastAction,
+    skillCooldowns: Object.freeze(skillCooldowns),
   };
   if (status === "ended") return Object.freeze({
     ...base, status: "ended", endReason: "escaped", currentTurnIndex: null, currentActorId: null,

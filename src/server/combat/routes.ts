@@ -11,6 +11,8 @@ import {
   isCombatRowMoveResponse,
   isNormalAttackOptionsResponse,
   isRowMoveOptionsResponse,
+  isPhysicalSkillOptionsResponse,
+  isPhysicalSkillUseResponse,
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
@@ -161,6 +163,39 @@ export function registerCombatActionRoutes(
   storage: "memory" | "postgres",
   sandbox: boolean,
 ) {
+  app.get("/api/combat/physical-skills/options", async (_request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.physicalSkillOptions();
+      if (!result.ok) return reply.code(409).send({ error: result.code, message: result.message });
+      const response = { revision: result.revision, ...result.options };
+      if (!isPhysicalSkillOptionsResponse(response)) throw new Error("物理技能選項未通過 runtime validation。");
+      return response;
+    } catch (error) {
+      return safeActionFailure(app, reply, error);
+    }
+  });
+
+  app.post<{ Body: unknown }>("/api/combat/physical-skills/use", {
+    bodyLimit: 1024,
+    errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.code(400).send({ error: "invalid-request", message: "請送出有效的物理技能請求。" });
+    },
+  }, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.usePhysicalSkill(request.body);
+      if (!result.ok) return reply.code(result.code === "invalid-command" ? 400
+        : result.code === "invalid-roll" ? 500 : 409).send({ error: result.code, message: result.message });
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      if (!isPhysicalSkillUseResponse(response)) throw new Error("物理技能回應未通過 runtime validation。");
+      return response;
+    } catch (error) {
+      return safeActionFailure(app, reply, error);
+    }
+  });
+
   app.get("/api/combat/normal-attack/options", async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
     try {

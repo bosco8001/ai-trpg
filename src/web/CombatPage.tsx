@@ -8,6 +8,7 @@ import type {
   NormalAttackOptionsResponse,
   NormalAttackTargetOptionView,
   RowMoveOptionsResponse,
+  PhysicalSkillOptionsResponse,
 } from "../shared/game-state.js";
 import {
   advanceTestCombatTurn,
@@ -19,6 +20,8 @@ import {
   loadCombatItemOptions,
   loadNormalAttackOptions,
   loadRowMoveOptions,
+  loadPhysicalSkillOptions,
+  executePhysicalSkill,
 } from "./api.js";
 import {
   disabledCombatCommands,
@@ -77,7 +80,7 @@ function ParticipantCard({
           variant="secondary"
           className="combat-target-button"
           data-target={participant.id}
-          aria-label={"選擇攻擊目標：" + participant.displayName}
+          aria-label={"選擇目標：" + participant.displayName}
           onClick={() => onSelectTarget(participant.id)}
         >
           選擇此目標
@@ -177,6 +180,7 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
       <p className="combat-eyebrow">戰鬥裁定・第 {action.round} 回合</p>
       <h2 id="combat-last-action-heading">最近裁定</h2>
+      {action.type === "physical-skill" ? <p>技能：{action.skillId === "TEST-skill-1" ? "TEST 物理技能" : action.skillId}</p> : null}
       <p className="combat-last-action__pair">{actor} → {target}</p>
       <dl className="combat-last-action__checks">
         <div>
@@ -195,6 +199,7 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       <p className="combat-last-action__outcome" data-outcome={action.outcome}>
         結果：{action.outcome === "hit" ? "命中" : "未命中"}
       </p>
+      {action.type === "physical-skill" ? <p>第 {action.readyRound} 回合可再次使用。未計算傷害。</p> : null}
     </Panel>
   );
 }
@@ -236,7 +241,17 @@ export function CombatPage({
   const [isRunConfirmationOpen, setIsRunConfirmationOpen] = useState(false);
   const [isSubmittingRun, setIsSubmittingRun] = useState(false);
   const [targetOptions, setTargetOptions] = useState<NormalAttackOptionsResponse | null>(null);
+  const [skillOptions, setSkillOptions] = useState<PhysicalSkillOptionsResponse | null>(null);
+  const [skillOptionsError, setSkillOptionsError] = useState<string | null>(null);
+  const [isLoadingSkillOptions, setIsLoadingSkillOptions] = useState(false);
+  const [skillOptionsReloadId, setSkillOptionsReloadId] = useState(0);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [isUsingSkill, setIsUsingSkill] = useState(false);
+  const skillButton = useRef<HTMLButtonElement>(null);
+  const skillTargetHeading = useRef<HTMLHeadingElement>(null);
+  const restoreSkillFocus = useRef(false);
   const [feedback, setFeedback] = useState(stateError ?? "");
+  const [skillUseError, setSkillUseError] = useState<string | null>(null);
   const attackButton = useRef<HTMLButtonElement>(null);
   const defendButton = useRef<HTMLButtonElement>(null);
   const defendHeading = useRef<HTMLHeadingElement>(null);
@@ -263,6 +278,31 @@ export function CombatPage({
   stateUpdateRef.current = onStateUpdate;
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
+  useEffect(() => {
+    if (selectedSkillId) skillTargetHeading.current?.focus();
+    else if (restoreSkillFocus.current) {
+      skillButton.current?.focus();
+      restoreSkillFocus.current = false;
+    }
+  }, [selectedSkillId]);
+  useEffect(() => {
+    let active = true;
+    setSkillOptions(null);
+    if (!combat || combat.status === "ended") return () => { active = false; };
+    setIsLoadingSkillOptions(true);
+    setSkillOptionsError(null);
+    void loadPhysicalSkillOptions().then((options) => {
+      if (!active) return;
+      if (options.revision !== gameState.state.revision || options.currentActorId !== currentActorId) {
+        setSkillOptionsError("戰鬥狀態已更新，請重新讀取技能。");
+        return;
+      }
+      setSkillOptions(options);
+    }).catch(() => {
+      if (active) setSkillOptionsError("目前無法讀取物理技能，請確認服務後再試。");
+    }).finally(() => { if (active) setIsLoadingSkillOptions(false); });
+    return () => { active = false; };
+  }, [gameState.state.revision, currentActorId, skillOptionsReloadId]);
   useEffect(() => {
     if (!isTargeting && restoreAttackFocus.current) {
       attackButton.current?.focus();
@@ -406,6 +446,12 @@ export function CombatPage({
             </Panel>
             <aside className="combat-rail" aria-label="戰鬥結束資訊">
               <LastActionPanel combat={combat} />
+              <Panel className="combat-rail__panel" aria-labelledby="combat-ended-skills-heading">
+                <h2 id="combat-ended-skills-heading">已裝備技能</h2>
+                <ul className="combat-skill-list">{gameState.state.character.equippedSkillIds.map((skillId) => {
+                  return <li key={skillId}><Button variant="secondary" disabled>{skillId === "TEST-skill-1" ? "TEST 物理技能" : skillId}</Button><p>戰鬥已結束，無法使用。</p></li>;
+                })}</ul>
+              </Panel>
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-commands-heading">
                 <h2 id="combat-ended-commands-heading">基本指令</h2>
                 <div className="combat-commands">
@@ -423,9 +469,11 @@ export function CombatPage({
 
   const lanes = getCombatPresentationLanes(combat.participants);
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
-  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun;
-  const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions;
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen;
+  const selectedSkill = skillOptions?.skills.find((skill) => skill.skillId === selectedSkillId);
+  const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun || isUsingSkill;
+  const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions || isLoadingSkillOptions;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canDefend = canPlayerDefend(combat, mutationInFlight);
   const canRun = canPlayerUseNormalAttack(combat, mutationInFlight);
@@ -443,12 +491,14 @@ export function CombatPage({
       return;
     }
     setIsTargeting(false);
+    setSelectedSkillId(null);
     setIsLoadingTargets(false);
     setTargetOptions(null);
     setIsRowMoveMode(false);
     setIsLoadingRowMoveOptions(false);
     setPendingItemId(null);
     setIsDefendConfirmationOpen(false);
+    setIsRunConfirmationOpen(false);
     setIsBagOpen(true);
     setFeedback("");
   }
@@ -456,10 +506,12 @@ export function CombatPage({
   function beginDefendConfirmation() {
     if (!canDefend || mutationInFlight) return;
     setIsTargeting(false);
+    setSelectedSkillId(null);
     setTargetOptions(null);
     setIsRowMoveMode(false);
     setPendingItemId(null);
     setIsBagOpen(false);
+    setIsRunConfirmationOpen(false);
     setIsDefendConfirmationOpen(true);
     setFeedback("");
   }
@@ -467,6 +519,7 @@ export function CombatPage({
   function beginRunConfirmation() {
     if (!canRun || mutationInFlight) return;
     setIsTargeting(false);
+    setSelectedSkillId(null);
     setTargetOptions(null);
     setIsRowMoveMode(false);
     setPendingItemId(null);
@@ -580,6 +633,7 @@ export function CombatPage({
   function beginTargetSelection() {
     if (!canPlayerAttack || requestInFlight || isRowMoveMode) return;
     setIsTargeting(true);
+    setSelectedSkillId(null);
     setTargetOptions(null);
     setIsLoadingTargets(true);
     setFeedback("正在取得伺服器提供的合法目標……");
@@ -630,9 +684,56 @@ export function CombatPage({
     }).finally(() => setIsResolving(false));
   }
 
+  function beginSkillTargetSelection(skillId: string) {
+    const option = skillOptions?.skills.find((entry) => entry.skillId === skillId);
+    if (!option?.usable || skillOptions?.revision !== gameState.state.revision
+      || skillOptions.currentActorId !== currentActorId || mutationInFlight) return;
+    setIsTargeting(false);
+    setTargetOptions(null);
+    setIsRowMoveMode(false);
+    setIsBagOpen(false);
+    setPendingItemId(null);
+    setIsDefendConfirmationOpen(false);
+    setIsRunConfirmationOpen(false);
+    setSelectedSkillId(skillId);
+    setSkillUseError(null);
+    setFeedback("");
+  }
+
+  function cancelSkillTargetSelection() {
+    if (isUsingSkill) return;
+    restoreSkillFocus.current = true;
+    setSelectedSkillId(null);
+    setFeedback("已取消選擇技能目標；戰鬥狀態沒有改變。");
+  }
+
+  function selectSkillTarget(targetId: string) {
+    if (!selectedSkillId || !selectedSkill?.usable || !skillTargetsById.get(targetId)?.legal
+      || skillOptions?.revision !== gameState.state.revision
+      || skillOptions.currentActorId !== currentActorId || mutationInFlight) return;
+    setIsUsingSkill(true);
+    setSelectedSkillId(null);
+    setSkillUseError(null);
+    setFeedback("正在由戰鬥系統裁定物理技能……");
+    void executePhysicalSkill(gameState.state.revision, selectedSkillId, targetId).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setFeedback(response.effect.outcome === "hit" ? "物理技能裁定完成：命中。" : "物理技能裁定完成：未命中。");
+    }).catch(async (error: unknown) => {
+      const message = error instanceof Error ? error.message : "物理技能暫時無法使用，請重新讀取戰鬥狀態。";
+      setSkillUseError(message);
+      setFeedback(message);
+      try {
+        const latest = await onRetryState();
+        onStateUpdate(latest);
+      } catch { /* 保留最後確認的狀態與安全訊息。 */ }
+      setSkillOptionsReloadId((value) => value + 1);
+    }).finally(() => setIsUsingSkill(false));
+  }
+
   function beginRowMoveSelection() {
     if (!canPlayerMoveRow || requestInFlight || isTargeting) return;
     setIsRowMoveMode(true);
+    setSelectedSkillId(null);
     setFeedback("");
   }
 
@@ -684,6 +785,7 @@ export function CombatPage({
     setFeedback("正在請裁判推進 TEST 回合……");
     void advanceTestCombatTurn(gameState.state.revision).then((response) => {
       setIsTargeting(false);
+      setSelectedSkillId(null);
       setTargetOptions(null);
       setIsRowMoveMode(false);
       setIsDefendConfirmationOpen(false);
@@ -700,6 +802,7 @@ export function CombatPage({
     setFeedback("正在重新讀取戰鬥狀態……");
     void onRetryState().then((next) => {
       setIsTargeting(false);
+      setSelectedSkillId(null);
       setTargetOptions(null);
       setIsRowMoveMode(false);
       setIsDefendConfirmationOpen(false);
@@ -735,6 +838,13 @@ export function CombatPage({
               <div><p className="combat-eyebrow">戰場</p><h2 id="battlefield-heading">參戰者位置</h2></div>
               <p>排位來自權威狀態；完成換排會消耗整個回合。</p>
             </div>
+            {selectedSkillId ? (
+              <section className="combat-target-mode" aria-labelledby="combat-skill-target-heading" aria-live="polite">
+                <h3 id="combat-skill-target-heading" ref={skillTargetHeading} tabIndex={-1}>請選擇技能目標</h3>
+                <p>{selectedSkill?.displayName ?? selectedSkillId}・只可指定合法敵方目標。</p>
+                <Button variant="secondary" onClick={cancelSkillTargetSelection} disabled={isUsingSkill}>取消</Button>
+              </section>
+            ) : null}
             {isBagOpen ? (
               <section id="combat-bag-panel" className="combat-bag-mode" aria-labelledby="combat-bag-heading" aria-live="polite">
                 <div className="combat-bag-mode__heading">
@@ -908,10 +1018,10 @@ export function CombatPage({
                           key={participant.id}
                           participant={participant}
                           current={participant.id === combat.currentActorId}
-                          targeting={isTargeting && !isLoadingTargets}
-                          targetOption={targetOptionsById.get(participant.id)}
+                          targeting={(isTargeting && !isLoadingTargets) || selectedSkillId !== null}
+                          targetOption={selectedSkillId ? skillTargetsById.get(participant.id) : targetOptionsById.get(participant.id)}
                           canSubmitTarget={!requestInFlight}
-                          onSelectTarget={selectTarget}
+                          onSelectTarget={selectedSkillId ? selectSkillTarget : selectTarget}
                         />
                       ))
                       : <p className="combat-lane__empty">目前沒有參戰者。</p>}
@@ -946,9 +1056,29 @@ export function CombatPage({
               <p className="combat-eyebrow">技能</p>
               <h2 id="combat-skills-heading">已裝備技能</h2>
               {gameState.state.character.equippedSkillIds.length > 0 ? (
-                <ul className="combat-skill-list">{gameState.state.character.equippedSkillIds.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+                <ul className="combat-skill-list">{gameState.state.character.equippedSkillIds.map((skillId) => {
+                  const option = skillOptions?.revision === gameState.state.revision
+                    && skillOptions.currentActorId === currentActorId
+                    ? skillOptions.skills.find((entry) => entry.skillId === skillId) : undefined;
+                  const reason = option?.unavailableReason === "skill-on-cooldown"
+                    ? `冷卻中・第 ${option.readyRound} 回合可再次使用`
+                    : option?.unavailableReason === "not-player-turn" ? "目前不是可操作角色的回合"
+                      : option?.unavailableReason === "no-legal-target" ? "目前沒有合法目標"
+                        : skillOptionsError ? skillOptionsError : isLoadingSkillOptions || (skillId === "TEST-skill-1" && !option)
+                          ? "正在確認技能狀態" : !option ? "此技能尚未支援戰鬥使用" : "可使用";
+                  return <li key={skillId} className="combat-skill-item">
+                    {option ? <Button ref={skillId === "TEST-skill-1" ? skillButton : undefined} variant="secondary"
+                      data-skill={skillId} disabled={!option.usable || requestInFlight || selectionModeActive}
+                      onClick={() => beginSkillTargetSelection(skillId)}>{option.displayName}</Button>
+                      : <span>{skillId === "TEST-skill-1" ? "TEST 物理技能" : skillId}</span>}
+                    <p>{option || skillId === "TEST-skill-1" ? "物理主動" : "未接入"}・{reason}</p>
+                    <small>{skillId}</small>
+                  </li>;
+                })}</ul>
               ) : <p>目前沒有已裝備的測試技能。</p>}
-              <p className="combat-rail__notice">尚未接入戰鬥技能操作。</p>
+              {skillUseError ? <p className="combat-feedback__error" role="alert">{skillUseError}</p> : null}
+              {skillOptionsError ? <Button variant="secondary" disabled={isLoadingSkillOptions}
+                onClick={() => setSkillOptionsReloadId((value) => value + 1)}>重新讀取技能</Button> : null}
             </Panel>
 
             <Panel className="combat-rail__panel" aria-labelledby="combat-commands-heading">

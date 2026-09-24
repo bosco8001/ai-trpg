@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–16 已由使用者確認。Phase 17「逃跑行動」工程實作完成，等待使用者手動驗收；Phase 18 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–17 已由使用者確認。Phase 18「物理主動技能」工程實作完成，等待使用者手動確認；Phase 19 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -377,6 +377,8 @@ Phase 16 已由使用者手動確認。完整紀錄見 [Phase 16 文件](docs/de
 
 ## Phase 17：逃跑行動手動驗收
 
-Phase 17 工程實作完成，等待使用者手動驗收；Phase 18 尚未開始。完整成功、失敗、API、刷新、PostgreSQL、手機與鍵盤步驟見 [Phase 17 文件](docs/development/PHASE_17_RUN_ESCAPE.md)。
+Phase 17 已由使用者完成手動驗收，包括 PostgreSQL 重啟後保留 `ended / escaped` 終止戰鬥畫面。完整步驟見 [Phase 17 文件](docs/development/PHASE_17_RUN_ESCAPE.md)。
 
-玩家回合的「逃跑」先開確認；只有確認才呼叫 `POST /api/combat/run`，body 精確只有 `expectedRevision`。後端擲 D20，加上既有敏捷修正及種族修正，總值達 DC 8 就成功。TEST 玩家修正為敏捷 +2、種族 0；龍裔在 domain 判定額外 −2。失敗會消耗 Turn；成功時保存 `ended`／`escaped`、成功裁定及單次 revision 更新，並停止所有戰鬥行動。結算與返回探索留待 Phase 26。
+## Phase 18：物理主動技能手動驗收
+
+已裝備的 `TEST-skill-1` 現在可在玩家 Turn 選擇合法敵方目標，由後端沿用 Phase 13 物理攻擊判定，記錄 hit／miss 與每位 actor 的技能冷卻。R1 用後 R2 不可用，R3 恢復；沒有 HP 或傷害。裝備、HIT、MISS、R2／R3、非法提交、刷新、PostgreSQL 重啟、手機及鍵盤的詳細步驟見 [Phase 18 文件](docs/development/PHASE_18_PHYSICAL_ACTIVE_SKILLS.md)。

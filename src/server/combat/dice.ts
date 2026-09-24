@@ -41,7 +41,15 @@ export function createCombatActionFixtureRoller(mode: CombatActionRollFixtureMod
     miss: [3, 15],
     "raw-one-hit": [1, 1],
   };
-  return new SequenceD20Roller(sequence[mode]);
+  const rolls = sequence[mode];
+  let next = 0;
+  return {
+    d20() {
+      const roll = rolls[next]!;
+      next = (next + 1) % rolls.length;
+      return roll;
+    },
+  };
 }
 
 export function createCombatEscapeFixtureRoller(mode: CombatEscapeRollFixtureMode): DiceRoller {

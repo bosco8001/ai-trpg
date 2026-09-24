@@ -10,8 +10,11 @@ import {
   type DefendActionResolution,
   type ActiveCombatState,
   type RunActionResolution,
+  type PhysicalSkillActionResolution,
+  type CombatParticipant,
 } from "./combat-state.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
+import { getActiveSkillDefinition } from "./physical-skills.js";
 import { getCombatItemDefinition } from "./combat-items.js";
 import {
   getNormalAttackTargetOptions,
@@ -125,6 +128,54 @@ export type RunCode = "invalid-command" | "stale-revision" | "revision-limit" | 
 export type RunResult =
   | { readonly ok: true; readonly state: GameState; readonly effect: { readonly type: "run-resolved"; readonly outcome: "success" | "failure" } }
   | { readonly ok: false; readonly code: RunCode; readonly message: string };
+
+export type PhysicalSkillCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "combat-ended" | "not-player-turn" | "unknown-skill" | "not-physical-skill"
+  | "skill-not-learned" | "skill-not-equipped" | "skill-on-cooldown" | "illegal-target" | "invalid-roll";
+
+export interface PhysicalSkillOption {
+  readonly skillId: string;
+  readonly displayName: string;
+  readonly category: "physical-active";
+  readonly targetMode: "single-enemy";
+  readonly range: "melee" | "ranged";
+  readonly usable: boolean;
+  readonly unavailableReason?: "not-player-turn" | "skill-on-cooldown" | "no-legal-target";
+  readonly readyRound: number | null;
+  readonly targets: NormalAttackTargetOptions["targets"];
+}
+
+export type PhysicalSkillOptionsResult =
+  | { readonly ok: true; readonly revision: number; readonly options: {
+    readonly currentActorId: string; readonly skills: readonly PhysicalSkillOption[];
+  } }
+  | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
+
+export type PhysicalSkillUseResult =
+  | { readonly ok: true; readonly state: GameState; readonly effect: {
+    readonly type: "physical-skill-resolved"; readonly outcome: "hit" | "miss";
+  } }
+  | { readonly ok: false; readonly code: PhysicalSkillCode; readonly message: string };
+
+const physicalSkillMessages: Record<PhysicalSkillCode, string> = {
+  "invalid-command": "物理技能請求格式不正確。",
+  "stale-revision": "戰鬥狀態已更新，請重新讀取後再使用技能。",
+  "revision-limit": "狀態版本已達工程上限，無法使用技能。",
+  "not-in-combat": "目前沒有進行中的戰鬥。",
+  "combat-ended": "戰鬥已結束，不能再執行行動。",
+  "not-player-turn": "目前不是可操作角色的回合。",
+  "unknown-skill": "找不到這個技能定義。",
+  "not-physical-skill": "這不是目前支援的物理主動技能。",
+  "skill-not-learned": "角色尚未學會這個技能。",
+  "skill-not-equipped": "這個技能尚未裝備。",
+  "skill-on-cooldown": "技能仍在冷卻中。",
+  "illegal-target": "目前無法合法指定這名目標。",
+  "invalid-roll": "物理攻擊骰子服務暫時無法使用。",
+};
+
+function rejectPhysicalSkill(code: PhysicalSkillCode): PhysicalSkillUseResult {
+  return { ok: false, code, message: physicalSkillMessages[code] };
+}
 
 const runMessages: Record<RunCode, string> = {
   "invalid-command": "逃跑請求格式不正確。",
@@ -254,6 +305,20 @@ function parseItemUseCommand(value: unknown): { readonly expectedRevision: numbe
   return { expectedRevision: value.expectedRevision, itemId: value.itemId };
 }
 
+function parsePhysicalSkillCommand(value: unknown): {
+  readonly expectedRevision: number; readonly skillId: string; readonly targetId: string;
+} | undefined {
+  if (!isRecord(value) || Object.keys(value).length !== 3
+    || !Object.hasOwn(value, "expectedRevision") || !Object.hasOwn(value, "skillId")
+    || !Object.hasOwn(value, "targetId")
+    || typeof value.expectedRevision !== "number" || !Number.isSafeInteger(value.expectedRevision)
+    || value.expectedRevision < 0 || typeof value.skillId !== "string"
+    || !value.skillId.length || value.skillId.trim() !== value.skillId
+    || typeof value.targetId !== "string" || !value.targetId.length
+    || value.targetId.trim() !== value.targetId) return undefined;
+  return { expectedRevision: value.expectedRevision, skillId: value.skillId, targetId: value.targetId };
+}
+
 function advanceToNextTurn(combat: ActiveCombatState): ActiveCombatState {
   const wrapsRound = combat.currentTurnIndex === combat.turnOrder.length - 1;
   const currentTurnIndex = wrapsRound ? 0 : combat.currentTurnIndex + 1;
@@ -364,7 +429,111 @@ export function rollInitiative(
       racialEscapeModifier: participant.racialEscapeModifier ?? 0,
     })),
     lastAction: null,
+    skillCooldowns: [],
   });
+}
+
+/** Phase 13 的同一組 physical Attack／Evasion 裁定，供普通攻擊及物理技能呼叫。 */
+export function resolvePhysicalAttackCheck(
+  profile: CombatNormalAttackProfile,
+  target: CombatParticipant,
+  roller: DiceRoller,
+): Pick<NormalAttackActionResolution, "attack" | "evasion" | "outcome"> {
+  const attackD20 = rollD20(roller);
+  const evasionD20 = rollD20(roller);
+  const attackTotal = attackD20 + profile.perceptionModifier
+    + profile.weaponMainStatModifier + profile.proficiencyModifier;
+  const evasionModifier = target.initiative.dexterityModifier;
+  const evasionTotal = evasionD20 + evasionModifier;
+  return Object.freeze({
+    attack: Object.freeze({
+      rawD20: attackD20, perceptionModifier: profile.perceptionModifier,
+      weaponMainStatModifier: profile.weaponMainStatModifier,
+      proficiencyModifier: profile.proficiencyModifier, total: attackTotal,
+    }),
+    evasion: Object.freeze({ rawD20: evasionD20, dexterityModifier: evasionModifier, total: evasionTotal }),
+    outcome: attackTotal >= evasionTotal ? "hit" : "miss",
+  });
+}
+
+/** 已裝備技能的 server-derived 可用性，沒有寫入 GameState。 */
+export function getCurrentPhysicalSkillOptions(state: GameState): PhysicalSkillOptionsResult {
+  if (state.activity !== "in-combat" || state.combat === null || state.combat.status === "ended") {
+    return { ok: false, code: "not-in-combat", message: physicalSkillMessages["not-in-combat"] };
+  }
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor) return { ok: false, code: "not-in-combat", message: physicalSkillMessages["not-in-combat"] };
+  const canPlayerAct = isPlayerActionParticipant(actor);
+  const skills: PhysicalSkillOption[] = state.character.equippedSkillIds.flatMap((skillId) => {
+    const definition = getActiveSkillDefinition(skillId);
+    if (!definition || definition.category !== "physical-active"
+      || !state.character.learnedActiveSkillIds.includes(skillId)) return [];
+    const readyRound = combat.skillCooldowns.find((entry) => entry.actorId === actor.id
+      && entry.skillId === skillId)?.readyRound ?? null;
+    const targets: NormalAttackTargetOptions["targets"] = canPlayerAct
+      ? combat.participants.filter((participant) => participant.side !== actor.side).map((participant) => {
+        const check = checkNormalAttackTarget(combat, actor, participant.id, definition.range);
+        return check.legal
+          ? { targetId: participant.id, displayName: participant.displayName, legal: true }
+          : { targetId: participant.id, displayName: participant.displayName, legal: false,
+            ...(check.reason === "front-row-blocked" ? { reason: check.reason } : {}) };
+      }) : [];
+    const unavailableReason = !canPlayerAct ? "not-player-turn"
+      : readyRound !== null && combat.round < readyRound ? "skill-on-cooldown"
+        : !targets.some((target) => target.legal) ? "no-legal-target" : undefined;
+    return [Object.freeze({
+      skillId, displayName: definition.displayName, category: "physical-active" as const,
+      targetMode: definition.targetType, range: definition.range,
+      usable: unavailableReason === undefined,
+      ...(unavailableReason ? { unavailableReason } : {}), readyRound,
+      targets: Object.freeze(targets),
+    })];
+  });
+  return { ok: true, revision: state.revision, options: Object.freeze({
+    currentActorId: actor.id, skills: Object.freeze(skills),
+  }) };
+}
+
+/** 驗證完成後才擲骰；命中與落空都進冷卻、消耗 Turn。 */
+export function usePhysicalSkill(state: GameState, input: unknown, roller: DiceRoller): PhysicalSkillUseResult {
+  const command = parsePhysicalSkillCommand(input);
+  if (!command) return rejectPhysicalSkill("invalid-command");
+  if (command.expectedRevision !== state.revision) return rejectPhysicalSkill("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectPhysicalSkill("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectPhysicalSkill("not-in-combat");
+  if (state.combat.status === "ended") return rejectPhysicalSkill("combat-ended");
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor)) return rejectPhysicalSkill("not-player-turn");
+  const definition = getActiveSkillDefinition(command.skillId);
+  if (!definition) return rejectPhysicalSkill("unknown-skill");
+  if (definition.category !== "physical-active") return rejectPhysicalSkill("not-physical-skill");
+  if (!state.character.learnedActiveSkillIds.includes(command.skillId)) return rejectPhysicalSkill("skill-not-learned");
+  if (!state.character.equippedSkillIds.includes(command.skillId)) return rejectPhysicalSkill("skill-not-equipped");
+  const previous = combat.skillCooldowns.find((entry) => entry.actorId === actor.id && entry.skillId === command.skillId);
+  if (previous && combat.round < previous.readyRound) return rejectPhysicalSkill("skill-on-cooldown");
+  const target = combat.participants.find((participant) => participant.id === command.targetId);
+  if (!target || !checkNormalAttackTarget(combat, actor, target.id, definition.range).legal
+    || !getLegalNormalAttackTargets(combat, actor.id, definition.range).includes(target.id)) {
+    return rejectPhysicalSkill("illegal-target");
+  }
+  let check: ReturnType<typeof resolvePhysicalAttackCheck>;
+  try { check = resolvePhysicalAttackCheck(actor.normalAttack, target, roller); }
+  catch { return rejectPhysicalSkill("invalid-roll"); }
+  const readyRound = combat.round + 2;
+  if (!Number.isSafeInteger(readyRound)) return rejectPhysicalSkill("revision-limit");
+  const lastAction: PhysicalSkillActionResolution = Object.freeze({
+    type: "physical-skill", actorId: actor.id, round: combat.round,
+    skillId: command.skillId, targetId: target.id, readyRound, ...check,
+  });
+  const skillCooldowns = [
+    ...combat.skillCooldowns.filter((entry) => entry.actorId !== actor.id || entry.skillId !== command.skillId),
+    { actorId: actor.id, skillId: command.skillId, readyRound },
+  ];
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), skillCooldowns, lastAction });
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "physical-skill-resolved", outcome: check.outcome } };
 }
 
 export function startCombat(
@@ -650,42 +819,23 @@ export function resolveNormalAttack(
     return rejectAttack("illegal-target");
   }
 
-  let attackD20: number;
-  let evasionD20: number;
+  let check: ReturnType<typeof resolvePhysicalAttackCheck>;
   try {
-    attackD20 = rollD20(roller);
-    evasionD20 = rollD20(roller);
+    check = resolvePhysicalAttackCheck(attacker.normalAttack, target, roller);
   } catch {
     return rejectAttack("invalid-roll");
   }
-  const attackTotal = attackD20 + attacker.normalAttack.perceptionModifier
-    + attacker.normalAttack.weaponMainStatModifier + attacker.normalAttack.proficiencyModifier;
-  const evasionModifier = target.initiative.dexterityModifier;
-  const evasionTotal = evasionD20 + evasionModifier;
-  const outcome = attackTotal >= evasionTotal ? "hit" : "miss";
   const lastAction: NormalAttackActionResolution = Object.freeze({
     type: "normal-attack",
     round: combat.round,
     actorId: attacker.id,
     targetId: target.id,
-    attack: Object.freeze({
-      rawD20: attackD20,
-      perceptionModifier: attacker.normalAttack.perceptionModifier,
-      weaponMainStatModifier: attacker.normalAttack.weaponMainStatModifier,
-      proficiencyModifier: attacker.normalAttack.proficiencyModifier,
-      total: attackTotal,
-    }),
-    evasion: Object.freeze({
-      rawD20: evasionD20,
-      dexterityModifier: evasionModifier,
-      total: evasionTotal,
-    }),
-    outcome,
+    ...check,
   });
   const nextCombat = createCombatState({ ...advanceToNextTurn(combat), lastAction });
   return {
     ok: true,
     state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
-    effect: { type: "normal-attack-resolved", outcome },
+    effect: { type: "normal-attack-resolved", outcome: check.outcome },
   };
 }
