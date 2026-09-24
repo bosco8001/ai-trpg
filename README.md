@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–18 已由使用者確認。Phase 19「多回合施法」工程完成，等待使用者手動確認；Phase 20 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–19 已由使用者確認。Phase 20「AoE 與龍息」工程完成，等待使用者手動確認；Phase 21 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -385,4 +385,8 @@ Phase 17 已由使用者完成手動驗收，包括 PostgreSQL 重啟後保留 `
 
 ## Phase 19：多回合施法手動驗收
 
-已裝備的 `TEST-skill-2` 現在可開始三回合詠唱。TEST 角色有 24 MP；開始前須有完整 18 MP，每次開始／繼續只扣 6 MP。進度、已花 MP 與最近行動保存在權威狀態；R3 完成只代表「詠唱完成」，不判定施法成功、命中或傷害。取消不退已花 MP；取消不推進 Turn 只是暫定工程行為，並非正式規則。Memory、隔離 PostgreSQL、刷新、手機、鍵盤及拒絕情境見 [Phase 19 手動測試文件](docs/development/PHASE_19_MULTI_TURN_CASTING.md)。本階段等待使用者手動驗收，Phase 20 尚未開始。
+已裝備的 `TEST-skill-2` 現在可開始三回合詠唱。TEST 角色有 24 MP；開始前須有完整 18 MP，每次開始／繼續只扣 6 MP。進度、已花 MP 與最近行動保存在權威狀態；R3 完成只代表「詠唱完成」，不判定施法成功、命中或傷害。取消不退已花 MP；取消不推進 Turn 只是暫定工程行為，並非正式規則。Memory、隔離 PostgreSQL、刷新、手機、鍵盤及拒絕情境見 [Phase 19 手動測試文件](docs/development/PHASE_19_MULTI_TURN_CASTING.md)。Phase 19 已由使用者手動確認，包括 PostgreSQL API 重啟後從詠唱 1/3 繼續至 2/3。
+
+## Phase 20：AoE 與龍息手動驗收
+
+龍裔 TEST 角色的天生能力「龍息」可選敵方前排或後排。系統逐一對該排敵人擲攻擊與閃避，記錄命中、未命中和暴擊；目前沒有傷害或 HP。龍息不佔技能格、不扣 MP，R1 使用後 R4 才能再用。完整 Memory、冷卻、詠唱、隔離 PostgreSQL、手機與鍵盤步驟見 [Phase 20 文件](docs/development/PHASE_20_AOE_DRAGON_BREATH.md)。Phase 20 工程完成，等待使用者手動驗收；Phase 21 尚未開始。

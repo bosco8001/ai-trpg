@@ -167,7 +167,10 @@ test("舊 TEST 快照只補工程 MP／空詠唱；UI 顯示權威進度與完�
   const started = startCasting(player(), { expectedRevision: 3, skillId: "TEST-skill-2" }); ok(started);
   const old = JSON.parse(JSON.stringify(started.state)) as Record<string, unknown>;
   delete (old.character as Record<string, unknown>).currentMp;
+  delete (old.character as Record<string, unknown>).raceId;
+  delete (old.character as Record<string, unknown>).dragonBreathElement;
   delete (old.combat as Record<string, unknown>).activeCastings;
+  delete (old.combat as Record<string, unknown>).racialAbilityCooldowns;
   const hydrated = hydrateStateRow({ character_id: "TEST-character", revision: String(started.state.revision),
     snapshot: { activity: old.activity, character: old.character, inventory: old.inventory,
       exploration: old.exploration, combat: { ...(old.combat as object), lastAction: null } } });

@@ -166,7 +166,7 @@ test("戰鬥 ended 後所有 action 與 TEST advance 都拒絕，不會再次擲
 
 test("舊 CombatState hydrate active；新 terminal 狀態及裁定必須一致", () => {
   const state = playerState();
-  const { status: _status, endReason: _reason, activeCastings: _castings, ...oldCombat } = state.combat!;
+  const { status: _status, endReason: _reason, activeCastings: _castings, racialAbilityCooldowns: _racial, ...oldCombat } = state.combat!;
   const old = createCombatState(oldCombat);
   assert.deepEqual([old.status, old.endReason, old.currentActorId], ["active", null, "TEST-player"]);
   const success = runFromCombat(state, { expectedRevision: 2 }, createCombatEscapeFixtureRoller("success"));
@@ -204,7 +204,7 @@ test("Phase 13–16 的四種 lastAction 舊快照都 hydrate active；未結算
   ];
   for (const result of variants) {
     ok(result);
-    const { status: _status, endReason: _reason, activeCastings: _castings, ...previousShape } = result.state.combat!;
+    const { status: _status, endReason: _reason, activeCastings: _castings, racialAbilityCooldowns: _racial, ...previousShape } = result.state.combat!;
     assert.equal(createCombatState(previousShape).status, "active");
     assert.equal(isCombatStateView(result.state.combat), true);
   }
@@ -283,7 +283,7 @@ test("前端 request 只有 revision；畫面呈現成功或失敗的機械結�
   assert.match(page(succeeded.state), /結果：逃跑成功/);
   assert.match(page(succeeded.state), /戰鬥結算與返回探索尚未接入/);
   assert.doesNotMatch(page(succeeded.state), /目前行動：TEST 敵人 2|戰鬥敘事|成功率|進入探索/);
-  assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 6);
+  assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 7);
   assert.equal(canPlayerUseNormalAttack(succeeded.state.combat!, false), false);
   const source = await readFile(new URL("../src/web/CombatPage.tsx", import.meta.url), "utf8");
   assert.match(source, /確定要嘗試逃跑嗎？/);

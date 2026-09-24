@@ -14,6 +14,8 @@ import {
   startCasting,
   continueCasting,
   cancelCasting,
+  getCurrentDragonBreathOptions,
+  useDragonBreath,
   runFromCombat,
   useCombatItem as useCombatItemTransition,
   startCombat as startCombatTransition,
@@ -49,6 +51,8 @@ export interface GameStateSession {
   startCasting(input: unknown): ReturnType<typeof startCasting> | Promise<ReturnType<typeof startCasting>>;
   continueCasting(input: unknown): ReturnType<typeof continueCasting> | Promise<ReturnType<typeof continueCasting>>;
   cancelCasting(input: unknown): ReturnType<typeof cancelCasting> | Promise<ReturnType<typeof cancelCasting>>;
+  dragonBreathOptions(): ReturnType<typeof getCurrentDragonBreathOptions> | Promise<ReturnType<typeof getCurrentDragonBreathOptions>>;
+  useDragonBreath(input: unknown, roller: DiceRoller): ReturnType<typeof useDragonBreath> | Promise<ReturnType<typeof useDragonBreath>>;
 }
 
 /** 單程序記憶體邊界；程序重啟後狀態會重設。 */
@@ -100,6 +104,12 @@ export function createDomainSession(initialState: GameState) {
     },
     cancelCasting(input: unknown) {
       const result = cancelCasting(state, input);
+      if (result.ok) state = result.state;
+      return result;
+    },
+    dragonBreathOptions: () => getCurrentDragonBreathOptions(state),
+    useDragonBreath(input: unknown, roller: DiceRoller) {
+      const result = useDragonBreath(state, input, roller);
       if (result.ok) state = result.state;
       return result;
     },
@@ -219,6 +229,23 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
     },
     async cancelCasting(input: unknown) {
       return persistCasting(cancelCasting, input);
+    },
+    async dragonBreathOptions() {
+      return getCurrentDragonBreathOptions(await repository.createIfAbsent(seed));
+    },
+    async useDragonBreath(input: unknown, roller: DiceRoller) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = useDragonBreath(state, input, roller);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = useDragonBreath(state, input, roller);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : { ok: false as const, code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新選擇攻擊區域。" };
     },
     async normalAttack(input: unknown, roller: DiceRoller) {
       if (repository.withStateLocked) {

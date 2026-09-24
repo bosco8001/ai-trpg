@@ -61,6 +61,28 @@ export interface SkillCooldownView {
   readonly readyRound: number;
 }
 
+export interface RacialAbilityCooldownView {
+  readonly actorId: string;
+  readonly abilityId: "dragon-breath";
+  readonly readyRound: number;
+}
+
+export interface DragonBreathResolutionView {
+  readonly type: "dragon-breath";
+  readonly actorId: string;
+  readonly round: number;
+  readonly element: "fire" | "ice" | "lightning";
+  readonly targetRow: CombatRow;
+  readonly readyRound: number;
+  readonly results: readonly {
+    readonly targetId: string;
+    readonly attack: { readonly rawD20: number; readonly perceptionModifier: number; readonly total: number };
+    readonly evasion: { readonly rawD20: number; readonly dexterityModifier: number; readonly total: number };
+    readonly outcome: "hit" | "miss";
+    readonly critical: boolean;
+  }[];
+}
+
 export interface CastingStateView {
   readonly actorId: string;
   readonly skillId: string;
@@ -121,7 +143,7 @@ export interface RunResolutionView {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView | CastingResolutionView;
+export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView | CastingResolutionView | DragonBreathResolutionView;
 
 interface CombatStateViewBase {
   readonly round: number;
@@ -130,6 +152,7 @@ interface CombatStateViewBase {
   readonly lastAction: CombatLastActionView | null;
   readonly skillCooldowns: readonly SkillCooldownView[];
   readonly activeCastings: readonly CastingStateView[];
+  readonly racialAbilityCooldowns: readonly RacialAbilityCooldownView[];
 }
 
 export interface ActiveCombatStateView extends CombatStateViewBase {
@@ -238,6 +261,22 @@ export interface CastingResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "casting-started" | "casting-continued" | "casting-cancelled" | "casting-completed" };
 }
 
+export interface DragonBreathOptionsResponse {
+  readonly revision: number;
+  readonly currentActorId: string;
+  readonly currentRound: number;
+  readonly element: "fire" | "ice" | "lightning" | null;
+  readonly readyRound: number | null;
+  readonly available: boolean;
+  readonly unavailableReason?: "not-player-turn" | "not-dragonborn" | "element-unresolved" | "casting-active" | "ability-on-cooldown" | "no-target-row";
+  readonly rows: readonly { readonly row: CombatRow; readonly targetCount: number; readonly available: boolean;
+    readonly unavailableReason?: "empty-target-row" }[];
+}
+
+export interface DragonBreathResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "dragon-breath-resolved" };
+}
+
 export interface AuthoritativeGameStateView {
   readonly revision: number;
   readonly activity: "outside-combat" | "in-combat";
@@ -246,6 +285,8 @@ export interface AuthoritativeGameStateView {
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
     readonly currentMp: number;
+    readonly raceId: string | null;
+    readonly dragonBreathElement: "fire" | "ice" | "lightning" | null;
   };
   readonly inventory: readonly InventoryStackView[];
   readonly exploration: {
@@ -406,6 +447,28 @@ function isCastingState(value: unknown): value is CastingStateView {
     && value.mpSpent === value.completedCastingTurns * 6;
 }
 
+function isDragonBreathResolution(value: unknown): value is DragonBreathResolutionView {
+  if (!isRecord(value) || !exact(value, ["type", "actorId", "round", "element", "targetRow", "readyRound", "results"])
+    || value.type !== "dragon-breath" || !isId(value.actorId) || !isSafeInteger(value.round) || value.round < 1
+    || (value.element !== "fire" && value.element !== "ice" && value.element !== "lightning")
+    || (value.targetRow !== "front" && value.targetRow !== "back")
+    || value.readyRound !== value.round + 3 || !Array.isArray(value.results) || value.results.length === 0) return false;
+  return value.results.every((result) => isRecord(result)
+    && exact(result, ["targetId", "attack", "evasion", "outcome", "critical"])
+    && isId(result.targetId) && isRecord(result.attack)
+    && exact(result.attack, ["rawD20", "perceptionModifier", "total"])
+    && isD20(result.attack.rawD20) && isSafeInteger(result.attack.perceptionModifier)
+    && result.attack.total === result.attack.rawD20 + result.attack.perceptionModifier
+    && isSafeInteger(result.attack.total) && isRecord(result.evasion)
+    && exact(result.evasion, ["rawD20", "dexterityModifier", "total"])
+    && isD20(result.evasion.rawD20) && isSafeInteger(result.evasion.dexterityModifier)
+    && result.evasion.total === result.evasion.rawD20 + result.evasion.dexterityModifier
+    && isSafeInteger(result.evasion.total)
+    && result.outcome === (result.attack.total >= result.evasion.total ? "hit" : "miss")
+    && result.critical === (result.outcome === "hit" && result.attack.rawD20 >= 19))
+    && new Set(value.results.map((result) => (result as Record<string, unknown>).targetId)).size === value.results.length;
+}
+
 function resolveTieOrder(participants: readonly CombatParticipantView[], rollIndex: number): string[] | undefined {
   const groups = new Map<number, CombatParticipantView[]>();
   for (const participant of participants) {
@@ -454,13 +517,14 @@ function expectedTurnOrder(participants: readonly CombatParticipantView[]): stri
 
 export function isCombatStateView(value: unknown): value is CombatStateView {
   if (!isRecord(value) || !exact(value, [
-    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings",
+    "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings", "racialAbilityCooldowns",
   ])
     || !isSafeInteger(value.round) || value.round < 1
     || (value.status !== "active" && value.status !== "ended")
     || !isIds(value.turnOrder)
     || !Array.isArray(value.participants) || value.participants.length === 0
-    || !Array.isArray(value.skillCooldowns) || !Array.isArray(value.activeCastings)) return false;
+    || !Array.isArray(value.skillCooldowns) || !Array.isArray(value.activeCastings)
+    || !Array.isArray(value.racialAbilityCooldowns)) return false;
   const participants = value.participants.map(parseParticipant);
   if (participants.some((participant) => participant === undefined)) return false;
   const validatedParticipants = participants as CombatParticipantView[];
@@ -470,12 +534,17 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   if (lastAction !== null && !isPhysicalAttackResolution(lastAction)
     && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)
     && !isDefendResolution(lastAction) && !isRunResolution(lastAction)
-    && !isCastingResolution(lastAction)) return false;
+    && !isCastingResolution(lastAction) && !isDragonBreathResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
   const cooldowns = value.skillCooldowns as unknown[];
   const castings = value.activeCastings as unknown[];
+  const racialCooldowns = value.racialAbilityCooldowns as unknown[];
+  if (!racialCooldowns.every((entry) => isRecord(entry) && exact(entry, ["actorId", "abilityId", "readyRound"])
+    && isId(entry.actorId) && ids.includes(entry.actorId) && entry.abilityId === "dragon-breath"
+    && isSafeInteger(entry.readyRound) && entry.readyRound >= 4 && entry.readyRound <= (value.round as number) + 3)
+    || new Set(racialCooldowns.map((entry) => (entry as RacialAbilityCooldownView).actorId)).size !== racialCooldowns.length) return false;
   if (!castings.every(isCastingState)
     || new Set(castings.map((entry) => (entry as CastingStateView).actorId)).size !== castings.length
     || castings.some((entry) => {
@@ -508,6 +577,15 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
       return cooldown.actorId === lastAction.actorId && cooldown.skillId === lastAction.skillId
         && cooldown.readyRound === lastAction.readyRound;
     }))
+    && (lastAction?.type !== "dragon-breath" || (racialCooldowns.some((entry) => {
+      const cooldown = entry as RacialAbilityCooldownView;
+      return cooldown.actorId === lastAction.actorId && cooldown.readyRound === lastAction.readyRound;
+    }) && lastAction.results.length === validatedParticipants.filter((participant) => participant.side === "enemy"
+      && participant.row === lastAction.targetRow).length
+      && lastAction.results.every((result) => validatedParticipants.some((participant) => participant.id === result.targetId
+      && participant.side === "enemy" && participant.row === lastAction.targetRow
+      && participant.initiative.dexterityModifier === result.evasion.dexterityModifier)
+      && actor?.normalAttack?.perceptionModifier === result.attack.perceptionModifier)))
     && (lastAction === null || !lastAction.type.startsWith("casting-")
       || ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
         ? castings.some((entry) => (entry as CastingStateView).actorId === lastAction.actorId
@@ -525,10 +603,14 @@ export function isAuthoritativeGameStateView(value: unknown): value is Authorita
     || !isSafeInteger(value.revision) || value.revision < 0
     || (value.activity !== "outside-combat" && value.activity !== "in-combat")
     || !isRecord(value.character)
-    || !exact(value.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp"])
+    || !exact(value.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp", "raceId", "dragonBreathElement"])
     || !isId(value.character.id) || !isIds(value.character.learnedActiveSkillIds)
     || !isIds(value.character.equippedSkillIds)
     || !isSafeInteger(value.character.currentMp) || value.character.currentMp < 0
+    || (value.character.raceId !== null && !isId(value.character.raceId))
+    || (value.character.dragonBreathElement !== null && value.character.dragonBreathElement !== "fire"
+      && value.character.dragonBreathElement !== "ice" && value.character.dragonBreathElement !== "lightning")
+    || (value.character.raceId !== "dragonborn" && value.character.dragonBreathElement !== null)
     || !Array.isArray(value.inventory)
     || !value.inventory.every((entry) => isRecord(entry)
       && exact(entry, ["itemId", "quantity"])
@@ -544,6 +626,9 @@ export function isAuthoritativeGameStateView(value: unknown): value is Authorita
   if (value.activity === "outside-combat") return value.combat === null;
   if (!isCombatStateView(value.combat)) return false;
   const lastAction = value.combat.lastAction;
+  if (lastAction?.type === "dragon-breath"
+    && (value.character.raceId !== "dragonborn"
+      || value.character.dragonBreathElement !== lastAction.element)) return false;
   if (lastAction?.type !== "item-use") return true;
   const stack = value.inventory.find((entry) => (entry as Record<string, unknown>).itemId === lastAction.itemId) as
     | Record<string, unknown> | undefined;
@@ -731,4 +816,36 @@ export function isCastingResponse(value: unknown): value is CastingResponse {
     || (value.effect.type === "casting-continued" && action?.type === "casting-continue")
     || (value.effect.type === "casting-cancelled" && action?.type === "casting-cancel")
     || (value.effect.type === "casting-completed" && action?.type === "casting-complete");
+}
+
+export function isDragonBreathOptionsResponse(value: unknown): value is DragonBreathOptionsResponse {
+  if (!isRecord(value) || !(exact(value, ["revision", "currentActorId", "currentRound", "element", "readyRound", "available", "rows"])
+    || exact(value, ["revision", "currentActorId", "currentRound", "element", "readyRound", "available", "unavailableReason", "rows"]))
+    || !isSafeInteger(value.revision) || value.revision < 0 || !isId(value.currentActorId)
+    || !isSafeInteger(value.currentRound) || value.currentRound < 1
+    || (value.element !== null && value.element !== "fire" && value.element !== "ice" && value.element !== "lightning")
+    || (value.readyRound !== null && (!isSafeInteger(value.readyRound) || value.readyRound < 4))
+    || typeof value.available !== "boolean" || !Array.isArray(value.rows) || value.rows.length !== 2) return false;
+  const reasons = ["not-player-turn", "not-dragonborn", "element-unresolved", "casting-active", "ability-on-cooldown", "no-target-row"];
+  return (value.available ? value.unavailableReason === undefined : reasons.includes(value.unavailableReason as string))
+    && (value.unavailableReason !== "ability-on-cooldown" || value.readyRound !== null)
+    && value.rows.every((row) => isRecord(row)
+      && (exact(row, ["row", "targetCount", "available"])
+        || exact(row, ["row", "targetCount", "available", "unavailableReason"]))
+      && (row.row === "front" || row.row === "back")
+      && isSafeInteger(row.targetCount) && row.targetCount >= 0
+      && row.available === (row.targetCount > 0)
+      && (row.available ? row.unavailableReason === undefined : row.unavailableReason === "empty-target-row"))
+    && new Set(value.rows.map((row) => (row as Record<string, unknown>).row)).size === 2;
+}
+
+export function isDragonBreathResponse(value: unknown): value is DragonBreathResponse {
+  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+    && typeof value.sandbox === "boolean" && (value.storage === "memory" || value.storage === "postgres")
+    && isAuthoritativeGameStateView(value.state)
+    && isRecord(value.effect) && exact(value.effect, ["type"])
+    && value.effect.type === "dragon-breath-resolved"
+    && value.state.combat?.lastAction?.type === "dragon-breath"
+    && value.state.character.raceId === "dragonborn"
+    && value.state.character.dragonBreathElement === value.state.combat.lastAction.element;
 }

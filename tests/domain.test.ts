@@ -10,7 +10,8 @@ import { createTestCombatInventory } from "../src/domain/combat-items.js";
 const learned = Array.from({ length: 7 }, (_, i) => `TEST-skill-${i + 1}`);
 const seed = (): GameState => ({
   revision: 0, activity: "outside-combat",
-  character: { id: "TEST-character", learnedActiveSkillIds: [...learned], equippedSkillIds: [], currentMp: 24 },
+  character: { id: "TEST-character", learnedActiveSkillIds: [...learned], equippedSkillIds: [], currentMp: 24,
+    raceId: "dragonborn", dragonBreathElement: "fire" },
   inventory: createTestCombatInventory(),
   exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
   combat: null,

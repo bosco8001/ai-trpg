@@ -68,6 +68,32 @@ export interface SkillCooldown {
   readonly readyRound: number;
 }
 
+export interface RacialAbilityCooldown {
+  readonly actorId: string;
+  readonly abilityId: "dragon-breath";
+  readonly readyRound: number;
+}
+
+export type DragonBreathElement = "fire" | "ice" | "lightning";
+
+export interface AoETargetResolution {
+  readonly targetId: string;
+  readonly attack: { readonly rawD20: number; readonly perceptionModifier: number; readonly total: number };
+  readonly evasion: { readonly rawD20: number; readonly dexterityModifier: number; readonly total: number };
+  readonly outcome: "hit" | "miss";
+  readonly critical: boolean;
+}
+
+export interface DragonBreathActionResolution {
+  readonly type: "dragon-breath";
+  readonly actorId: string;
+  readonly round: number;
+  readonly element: DragonBreathElement;
+  readonly targetRow: CombatRow;
+  readonly readyRound: number;
+  readonly results: readonly AoETargetResolution[];
+}
+
 export interface CastingState {
   readonly actorId: string;
   readonly skillId: string;
@@ -124,7 +150,7 @@ export interface RunActionResolution {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution | CastingActionResolution;
+export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution | CastingActionResolution | DragonBreathActionResolution;
 
 interface CombatStateBase {
   readonly round: number;
@@ -133,6 +159,7 @@ interface CombatStateBase {
   readonly lastAction: CombatLastAction | null;
   readonly skillCooldowns: readonly SkillCooldown[];
   readonly activeCastings: readonly CastingState[];
+  readonly racialAbilityCooldowns: readonly RacialAbilityCooldown[];
 }
 
 export interface ActiveCombatState extends CombatStateBase {
@@ -412,6 +439,38 @@ function parseCastingAction(value: Record<string, unknown>): CastingActionResolu
   return Object.freeze(value) as unknown as CastingActionResolution;
 }
 
+function parseDragonBreathAction(value: Record<string, unknown>): DragonBreathActionResolution | undefined {
+  if (!exact(value, ["type", "actorId", "round", "element", "targetRow", "readyRound", "results"])
+    || value.type !== "dragon-breath" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)
+    || (value.element !== "fire" && value.element !== "ice" && value.element !== "lightning")
+    || (value.targetRow !== "front" && value.targetRow !== "back")
+    || value.readyRound !== value.round + 3 || !Array.isArray(value.results) || value.results.length === 0) return undefined;
+  const results: AoETargetResolution[] = [];
+  for (const result of value.results) {
+    if (!isRecord(result) || !exact(result, ["targetId", "attack", "evasion", "outcome", "critical"])
+      || !isId(result.targetId) || !isRecord(result.attack)
+      || !exact(result.attack, ["rawD20", "perceptionModifier", "total"])
+      || !isD20(result.attack.rawD20) || !isSafeInteger(result.attack.perceptionModifier)
+      || !isSafeInteger(result.attack.total)
+      || result.attack.total !== result.attack.rawD20 + result.attack.perceptionModifier
+      || !isRecord(result.evasion) || !exact(result.evasion, ["rawD20", "dexterityModifier", "total"])
+      || !isD20(result.evasion.rawD20) || !isSafeInteger(result.evasion.dexterityModifier)
+      || !isSafeInteger(result.evasion.total)
+      || result.evasion.total !== result.evasion.rawD20 + result.evasion.dexterityModifier
+      || result.outcome !== (result.attack.total >= result.evasion.total ? "hit" : "miss")
+      || result.critical !== (result.outcome === "hit" && result.attack.rawD20 >= 19)) return undefined;
+    results.push(Object.freeze({ targetId: result.targetId, attack: Object.freeze({
+      rawD20: result.attack.rawD20, perceptionModifier: result.attack.perceptionModifier, total: result.attack.total,
+    }), evasion: Object.freeze({
+      rawD20: result.evasion.rawD20, dexterityModifier: result.evasion.dexterityModifier, total: result.evasion.total,
+    }), outcome: result.outcome as "hit" | "miss", critical: result.critical }));
+  }
+  if (new Set(results.map((result) => result.targetId)).size !== results.length) return undefined;
+  return Object.freeze({ type: "dragon-breath", actorId: value.actorId, round: value.round,
+    element: value.element, targetRow: value.targetRow, readyRound: value.readyRound,
+    results: Object.freeze(results) });
+}
+
 function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
@@ -420,6 +479,7 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value.type === "item-use") return parseItemUseAction(value);
   if (value.type === "defend") return parseDefendAction(value);
   if (value.type === "run") return parseRunAction(value);
+  if (value.type === "dragon-breath") return parseDragonBreathAction(value);
   if (typeof value.type === "string" && value.type.startsWith("casting-")) return parseCastingAction(value);
   return undefined;
 }
@@ -433,9 +493,10 @@ export function createCombatState(value: unknown): CombatState {
   const currentShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
   const skillShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns"]);
   const castingShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings"]);
+  const breathShape = exact(value, ["status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings", "racialAbilityCooldowns"]);
   const status = legacyShape || previousShape || previousSkillShape ? "active" : value.status;
   const endReason = legacyShape || previousShape || previousSkillShape ? null : value.endReason;
-  if ((!legacyShape && !previousShape && !previousSkillShape && !currentShape && !skillShape && !castingShape)
+  if ((!legacyShape && !previousShape && !previousSkillShape && !currentShape && !skillShape && !castingShape && !breathShape)
     || !isPositiveSafeInteger(value.round)
     || (status !== "active" && status !== "ended")
     || (status === "active" && (endReason !== null || !isSafeInteger(value.currentTurnIndex)
@@ -448,7 +509,7 @@ export function createCombatState(value: unknown): CombatState {
   }
   const participants = value.participants.map((participant) => parseParticipant(participant, legacyShape));
   const lastAction = legacyShape ? null : parseLastAction(value.lastAction);
-  const skillCooldowns: SkillCooldown[] = (skillShape || castingShape || previousSkillShape) && Array.isArray(value.skillCooldowns)
+  const skillCooldowns: SkillCooldown[] = (skillShape || castingShape || breathShape || previousSkillShape) && Array.isArray(value.skillCooldowns)
     ? value.skillCooldowns.map((entry) => {
       if (!isRecord(entry) || !exact(entry, ["actorId", "skillId", "readyRound"])
         || !isId(entry.actorId) || !isId(entry.skillId)
@@ -458,9 +519,9 @@ export function createCombatState(value: unknown): CombatState {
       }
       return Object.freeze({ actorId: entry.actorId, skillId: entry.skillId, readyRound: entry.readyRound });
     }) : [];
-  if ((skillShape || castingShape || previousSkillShape) && !Array.isArray(value.skillCooldowns)) throw new Error("技能冷卻資料格式不正確。");
-  if (castingShape && !Array.isArray(value.activeCastings)) throw new Error("詠唱資料格式不正確。");
-  const activeCastings: CastingState[] = castingShape ? (value.activeCastings as unknown[]).map((entry) => {
+  if ((skillShape || castingShape || breathShape || previousSkillShape) && !Array.isArray(value.skillCooldowns)) throw new Error("技能冷卻資料格式不正確。");
+  if ((castingShape || breathShape) && !Array.isArray(value.activeCastings)) throw new Error("詠唱資料格式不正確。");
+  const activeCastings: CastingState[] = (castingShape || breathShape) ? (value.activeCastings as unknown[]).map((entry) => {
     if (!isRecord(entry) || !exact(entry, ["actorId", "skillId", "startedRound", "completedCastingTurns", "totalCastingTurns", "totalMpCost", "mpSpent"])
       || !isId(entry.actorId) || !isId(entry.skillId) || !isPositiveSafeInteger(entry.startedRound)
       || !isPositiveSafeInteger(entry.completedCastingTurns) || !isPositiveSafeInteger(entry.totalCastingTurns)
@@ -471,11 +532,23 @@ export function createCombatState(value: unknown): CombatState {
       || entry.mpSpent !== entry.completedCastingTurns * definition.perTurnMpCost) throw new Error("詠唱進度不一致。");
     return Object.freeze(entry) as unknown as CastingState;
   }) : [];
+  if (breathShape && !Array.isArray(value.racialAbilityCooldowns)) throw new Error("天生能力冷卻資料格式不正確。");
+  const racialAbilityCooldowns: RacialAbilityCooldown[] = breathShape
+    ? (value.racialAbilityCooldowns as unknown[]).map((entry) => {
+      if (!isRecord(entry) || !exact(entry, ["actorId", "abilityId", "readyRound"])
+        || !isId(entry.actorId) || entry.abilityId !== "dragon-breath"
+        || !isPositiveSafeInteger(entry.readyRound) || entry.readyRound < 4) {
+        throw new Error("天生能力冷卻資料格式不正確。");
+      }
+      return Object.freeze({ actorId: entry.actorId, abilityId: "dragon-breath" as const, readyRound: entry.readyRound });
+    }) : [];
   const ids = participants.map((participant) => participant.id);
   const expectedOrder = expectedTurnOrder(participants);
   if (lastAction === undefined
     || new Set(ids).size !== ids.length
     || skillCooldowns.some((entry) => !ids.includes(entry.actorId) || entry.readyRound > (value.round as number) + 2)
+    || racialAbilityCooldowns.some((entry) => !ids.includes(entry.actorId) || entry.readyRound > (value.round as number) + 3)
+    || new Set(racialAbilityCooldowns.map((entry) => `${entry.actorId}\u0000${entry.abilityId}`)).size !== racialAbilityCooldowns.length
     || new Set(skillCooldowns.map((entry) => `${entry.actorId}\u0000${entry.skillId}`)).size !== skillCooldowns.length
     || new Set(activeCastings.map((entry) => entry.actorId)).size !== activeCastings.length
     || activeCastings.some((entry) => !ids.includes(entry.actorId) || entry.startedRound > (value.round as number)
@@ -499,6 +572,14 @@ export function createCombatState(value: unknown): CombatState {
     || (lastAction?.type === "physical-skill"
       && skillCooldowns.find((entry) => entry.actorId === lastAction.actorId
         && entry.skillId === lastAction.skillId)?.readyRound !== lastAction.readyRound)
+    || (lastAction?.type === "dragon-breath" && (racialAbilityCooldowns.find((entry) => entry.actorId === lastAction.actorId
+      && entry.abilityId === "dragon-breath")?.readyRound !== lastAction.readyRound
+      || lastAction.results.length !== participants.filter((participant) => participant.side === "enemy"
+        && participant.row === lastAction.targetRow).length
+      || lastAction.results.some((result) => participants.find((participant) => participant.id === result.targetId)?.side !== "enemy"
+        || participants.find((participant) => participant.id === result.targetId)?.row !== lastAction.targetRow
+        || result.evasion.dexterityModifier !== participants.find((participant) => participant.id === result.targetId)?.initiative.dexterityModifier
+        || result.attack.perceptionModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.normalAttack?.perceptionModifier)))
     || (lastAction !== null && lastAction.type.startsWith("casting-")
       && ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
         ? !activeCastings.some((entry) => entry.actorId === lastAction.actorId
@@ -519,6 +600,7 @@ export function createCombatState(value: unknown): CombatState {
     lastAction,
     skillCooldowns: Object.freeze(skillCooldowns),
     activeCastings: Object.freeze(activeCastings),
+    racialAbilityCooldowns: Object.freeze(racialAbilityCooldowns),
   };
   if (status === "ended") return Object.freeze({
     ...base, status: "ended", endReason: "escaped", currentTurnIndex: null, currentActorId: null,

@@ -14,6 +14,8 @@ import type {
   PhysicalSkillOptionsResult,
   PhysicalSkillUseResult,
   CastingResult,
+  DragonBreathOptionsResult,
+  DragonBreathResult,
 } from "../../domain/combat.js";
 import type { GameStateSession } from "../domain-session.js";
 
@@ -34,6 +36,8 @@ export interface CombatService {
   startCasting(input: unknown): Promise<CastingResult>;
   continueCasting(input: unknown): Promise<CastingResult>;
   cancelCasting(input: unknown): Promise<CastingResult>;
+  dragonBreathOptions(): Promise<DragonBreathOptionsResult>;
+  useDragonBreath(input: unknown): Promise<DragonBreathResult>;
 }
 
 /** 只協調 session 與骰子；不依賴 LLM、narration 或前端。 */
@@ -69,6 +73,8 @@ export function createCombatService(
     async startCasting(input: unknown) { return session.startCasting(input); },
     async continueCasting(input: unknown) { return session.continueCasting(input); },
     async cancelCasting(input: unknown) { return session.cancelCasting(input); },
+    async dragonBreathOptions() { return session.dragonBreathOptions(); },
+    async useDragonBreath(input: unknown) { return session.useDragonBreath(input, actionRoller); },
     async rowMoveOptions() {
       return session.rowMoveOptions();
     },

@@ -14,6 +14,8 @@ import {
   isPhysicalSkillOptionsResponse,
   isPhysicalSkillUseResponse,
   isCastingResponse,
+  isDragonBreathOptionsResponse,
+  isDragonBreathResponse,
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
@@ -168,6 +170,17 @@ function safeCastingFailure(app: FastifyInstance, reply: FastifyReply, error: un
   return reply.code(500).send({ error: "casting-failed", message: "目前無法處理詠唱，請重新讀取戰鬥狀態。" });
 }
 
+function safeBreathFailure(app: FastifyInstance, reply: FastifyReply, error: unknown) {
+  app.log.error({ err: error }, "戰鬥龍息操作失敗");
+  if (error instanceof PersistenceUnavailableError) {
+    return reply.code(503).send({ error: "state-unavailable", message: "戰鬥狀態暫時無法使用，請稍後再試。" });
+  }
+  if (error instanceof InvalidPersistedStateError) {
+    return reply.code(500).send({ error: "state-invalid", message: "已保存的戰鬥狀態無法安全讀取。" });
+  }
+  return reply.code(500).send({ error: "dragon-breath-failed", message: "目前無法處理龍息，請重新讀取戰鬥狀態。" });
+}
+
 /** Formal read/action boundary. Legal targets are derived; only the attack transition writes state. */
 export function registerCombatActionRoutes(
   app: FastifyInstance,
@@ -175,6 +188,33 @@ export function registerCombatActionRoutes(
   storage: "memory" | "postgres",
   sandbox: boolean,
 ) {
+  app.get("/api/combat/dragon-breath/options", async (_request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.dragonBreathOptions();
+      if (!result.ok) return reply.code(409).send({ error: result.code, message: result.message });
+      const response = { revision: result.revision, ...result.options };
+      if (!isDragonBreathOptionsResponse(response)) throw new Error("龍息選項未通過 runtime validation。");
+      return response;
+    } catch (error) { return safeBreathFailure(app, reply, error); }
+  });
+  app.post<{ Body: unknown }>("/api/combat/dragon-breath", {
+    bodyLimit: 1024,
+    errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.code(400).send({ error: "invalid-request", message: "請送出有效的龍息請求。" });
+    },
+  }, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.useDragonBreath(request.body);
+      if (!result.ok) return reply.code(result.code === "invalid-command" ? 400
+        : result.code === "invalid-roll" ? 500 : 409).send({ error: result.code, message: result.message });
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      if (!isDragonBreathResponse(response)) throw new Error("龍息回應未通過 runtime validation。");
+      return response;
+    } catch (error) { return safeBreathFailure(app, reply, error); }
+  });
   for (const kind of ["start", "continue", "cancel"] as const) {
     app.post<{ Body: unknown }>(`/api/combat/casting/${kind}`, {
       bodyLimit: 1024,

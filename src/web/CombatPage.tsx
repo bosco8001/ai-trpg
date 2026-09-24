@@ -9,6 +9,7 @@ import type {
   NormalAttackTargetOptionView,
   RowMoveOptionsResponse,
   PhysicalSkillOptionsResponse,
+  DragonBreathOptionsResponse,
 } from "../shared/game-state.js";
 import {
   advanceTestCombatTurn,
@@ -23,6 +24,8 @@ import {
   loadPhysicalSkillOptions,
   executePhysicalSkill,
   executeCasting,
+  loadDragonBreathOptions,
+  executeDragonBreath,
 } from "./api.js";
 import {
   disabledCombatCommands,
@@ -189,6 +192,21 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       <p>本次投入：{casting.mpSpentThisAction} MP・總投入：{casting.totalMpSpent} MP</p>
     </Panel>;
   }
+  if (action.type === "dragon-breath") {
+    const element = action.element === "fire" ? "火" : action.element === "ice" ? "冰" : "雷";
+    return <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+      <p className="combat-eyebrow">戰鬥裁定・第 {action.round} 回合</p>
+      <h2 id="combat-last-action-heading">龍息・{element}</h2>
+      <p>目標：敵方{action.targetRow === "front" ? "前排" : "後排"}</p>
+      {action.results.map((result) => <div key={result.targetId} className="combat-aoe-result">
+        <h3>{participants.get(result.targetId)?.displayName ?? result.targetId}</h3>
+        <p>攻擊：{result.attack.rawD20} {modifierTerm(result.attack.perceptionModifier)} PER = {result.attack.total}</p>
+        <p>閃避：{result.evasion.rawD20} {modifierTerm(result.evasion.dexterityModifier)} DEX = {result.evasion.total}</p>
+        <p>結果：{result.outcome === "hit" ? `命中${result.critical ? "・暴擊" : ""}` : "未命中"}</p>
+      </div>)}
+      <p>第 {action.readyRound} 回合可再次使用。</p>
+    </Panel>;
+  }
   const target = participants.get(action.targetId)?.displayName ?? action.targetId;
   return (
     <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
@@ -265,6 +283,15 @@ export function CombatPage({
   const [isStartCastingConfirmationOpen, setIsStartCastingConfirmationOpen] = useState(false);
   const [isCastingMutation, setIsCastingMutation] = useState(false);
   const [castingError, setCastingError] = useState<string | null>(null);
+  const [breathOptions, setBreathOptions] = useState<DragonBreathOptionsResponse | null>(null);
+  const [breathOptionsError, setBreathOptionsError] = useState<string | null>(null);
+  const [breathReloadId, setBreathReloadId] = useState(0);
+  const [isBreathRowSelectionOpen, setIsBreathRowSelectionOpen] = useState(false);
+  const [isUsingBreath, setIsUsingBreath] = useState(false);
+  const breathButton = useRef<HTMLButtonElement>(null);
+  const breathHeading = useRef<HTMLHeadingElement>(null);
+  const restoreBreathFocus = useRef(false);
+  const focusStatusAfterBreath = useRef(false);
   const castingButton = useRef<HTMLButtonElement>(null);
   const castingHeading = useRef<HTMLHeadingElement>(null);
   const statusHeading = useRef<HTMLHeadingElement>(null);
@@ -302,6 +329,38 @@ export function CombatPage({
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
   useEffect(() => {
+    let active = true;
+    setBreathOptions(null);
+    setIsBreathRowSelectionOpen(false);
+    if (!combat || combat.status === "ended") return () => { active = false; };
+    setBreathOptionsError(null);
+    void loadDragonBreathOptions().then((options) => {
+      if (!active) return;
+      if (options.revision !== gameState.state.revision || options.currentActorId !== currentActorId
+        || options.currentRound !== combat.round) {
+        setBreathOptionsError("戰鬥狀態已更新，請重新讀取龍息狀態。");
+        return;
+      }
+      setBreathOptions(options);
+    }).catch((error: unknown) => {
+      if (active) setBreathOptionsError(error instanceof Error ? error.message : "目前無法讀取龍息狀態。");
+    });
+    return () => { active = false; };
+  }, [gameState.state.revision, currentActorId, combat?.round, breathReloadId]);
+  useEffect(() => {
+    if (isBreathRowSelectionOpen) breathHeading.current?.focus();
+    else if (restoreBreathFocus.current) {
+      breathButton.current?.focus();
+      restoreBreathFocus.current = false;
+    }
+  }, [isBreathRowSelectionOpen]);
+  useEffect(() => {
+    if (focusStatusAfterBreath.current && combat?.lastAction?.type === "dragon-breath") {
+      statusHeading.current?.focus();
+      focusStatusAfterBreath.current = false;
+    }
+  }, [gameState.state.revision]);
+  useEffect(() => {
     if (isStartCastingConfirmationOpen) castingHeading.current?.focus();
     else if (restoreCastingFocus.current) {
       castingButton.current?.focus();
@@ -319,6 +378,7 @@ export function CombatPage({
     setIsTargeting(false); setSelectedSkillId(null); setIsRowMoveMode(false);
     setIsBagOpen(false); setPendingItemId(null); setIsDefendConfirmationOpen(false);
     setIsRunConfirmationOpen(false); setIsStartCastingConfirmationOpen(false);
+    setIsBreathRowSelectionOpen(false);
   }, [currentCasting, hasPlayerActionActor]);
   useEffect(() => {
     if (selectedSkillId) skillTargetHeading.current?.focus();
@@ -488,6 +548,11 @@ export function CombatPage({
             </Panel>
             <aside className="combat-rail" aria-label="戰鬥結束資訊">
               <LastActionPanel combat={combat} />
+              <Panel className="combat-rail__panel" aria-labelledby="combat-ended-breath-heading">
+                <h2 id="combat-ended-breath-heading">天生能力</h2>
+                <Button variant="secondary" disabled>龍息</Button>
+                <p>戰鬥已結束，無法使用。</p>
+              </Panel>
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-skills-heading">
                 <h2 id="combat-ended-skills-heading">已裝備技能</h2>
                 <ul className="combat-skill-list">{gameState.state.character.equippedSkillIds.map((skillId) => {
@@ -513,15 +578,49 @@ export function CombatPage({
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
   const selectedSkill = skillOptions?.skills.find((skill) => skill.skillId === selectedSkillId);
   const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
-  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation;
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation || isUsingBreath;
   const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions || isLoadingSkillOptions;
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen || isBreathRowSelectionOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canDefend = canPlayerDefend(combat, mutationInFlight);
   const canRun = canPlayerUseNormalAttack(combat, mutationInFlight);
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
+
+  function beginBreathRowSelection() {
+    if (!breathOptions?.available || breathOptions.revision !== gameState.state.revision
+      || breathOptions.currentActorId !== currentActorId || mutationInFlight || selectionModeActive) return;
+    setIsBreathRowSelectionOpen(true);
+    setFeedback("");
+  }
+
+  function cancelBreathRowSelection() {
+    if (isUsingBreath) return;
+    restoreBreathFocus.current = true;
+    setIsBreathRowSelectionOpen(false);
+    setFeedback("已取消選擇攻擊區域；戰鬥狀態沒有改變。");
+  }
+
+  function selectBreathRow(row: CombatRow) {
+    if (!isBreathRowSelectionOpen || !breathOptions?.available
+      || breathOptions.revision !== gameState.state.revision
+      || !breathOptions.rows.some((entry) => entry.row === row && entry.available)
+      || mutationInFlight) return;
+    setIsUsingBreath(true);
+    focusStatusAfterBreath.current = true;
+    setFeedback("正在逐一裁定龍息目標……");
+    void executeDragonBreath(gameState.state.revision, row).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setIsBreathRowSelectionOpen(false);
+      setFeedback("龍息裁定完成；目前回合已結束。");
+    }).catch(async (error: unknown) => {
+      focusStatusAfterBreath.current = false;
+      setIsBreathRowSelectionOpen(false);
+      setFeedback(error instanceof Error ? error.message : "龍息暫時無法使用，請重新讀取戰鬥狀態。");
+      try { onStateUpdate(await onRetryState()); } catch { /* 保留最後確認的狀態與安全錯誤。 */ }
+    }).finally(() => setIsUsingBreath(false));
+  }
 
   function beginCastingConfirmation() {
     if (!hasPlayerActionActor || currentCasting || gameState.state.character.currentMp < 18 || mutationInFlight) return;
@@ -1147,6 +1246,40 @@ export function CombatPage({
             <Panel className="combat-rail__panel" aria-labelledby="combat-skills-heading">
               <p className="combat-eyebrow">技能</p>
               <h2 id="combat-skills-heading">已裝備技能</h2>
+              <section className="combat-innate-ability" aria-labelledby="combat-innate-heading">
+                <h3 id="combat-innate-heading">天生能力</h3>
+                <Button ref={breathButton} variant="secondary" aria-expanded={isBreathRowSelectionOpen}
+                  aria-controls="combat-breath-rows"
+                  disabled={!breathOptions?.available || mutationInFlight || selectionModeActive}
+                  onClick={beginBreathRowSelection}>
+                  龍息{breathOptions?.element === "fire" ? "・火" : breathOptions?.element === "ice" ? "・冰"
+                    : breathOptions?.element === "lightning" ? "・雷" : ""}
+                </Button>
+                <p>敵方前／後排 AoE・{breathOptions?.available ? "可使用"
+                  : breathOptions?.unavailableReason === "ability-on-cooldown" ? `冷卻中・第 ${breathOptions.readyRound} 回合可再次使用`
+                    : breathOptions?.unavailableReason === "casting-active" ? "請先繼續或取消詠唱"
+                      : breathOptions?.unavailableReason === "not-player-turn" ? "等待玩家回合"
+                        : breathOptions?.unavailableReason === "not-dragonborn" ? "只有龍裔可使用"
+                          : breathOptions?.unavailableReason === "element-unresolved" ? "龍息元素尚未確定"
+                            : breathOptions?.unavailableReason === "no-target-row" ? "目前沒有可攻擊目標"
+                              : breathOptionsError ?? "正在讀取狀態"}</p>
+                {breathOptionsError ? <Button variant="secondary" onClick={() => setBreathReloadId((value) => value + 1)}>
+                  重新讀取龍息狀態
+                </Button> : null}
+                {isBreathRowSelectionOpen ? <div id="combat-breath-rows" className="combat-row-move-mode" aria-live="polite">
+                  <h3 ref={breathHeading} tabIndex={-1}>選擇攻擊區域</h3>
+                  <div className="combat-row-move-mode__choices">
+                    {breathOptions?.rows.map((row) => <div key={row.row}>
+                      <Button variant="secondary" disabled={!row.available || mutationInFlight}
+                        onClick={() => selectBreathRow(row.row)}>
+                        敵方{row.row === "front" ? "前排" : "後排"}（{row.targetCount}）
+                      </Button>
+                      {!row.available ? <p>該排目前沒有可攻擊目標。</p> : null}
+                    </div>)}
+                    <Button variant="secondary" disabled={mutationInFlight} onClick={cancelBreathRowSelection}>取消</Button>
+                  </div>
+                </div> : null}
+              </section>
               {gameState.state.character.equippedSkillIds.length > 0 ? (
                 <ul className="combat-skill-list">{gameState.state.character.equippedSkillIds.map((skillId) => {
                   const option = skillOptions?.revision === gameState.state.revision

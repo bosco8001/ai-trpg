@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–18 已由使用者確認。Phase 19「多回合施法」工程完成，等待使用者手動確認；Phase 20 尚未開始。
+Phase 1–19 已由使用者確認。Phase 20「AoE 與龍息」工程完成，等待使用者手動確認；Phase 21 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -249,4 +249,10 @@ Phase 16 已由使用者手動確認。
 
 已加入 `TEST-skill-2` 多回合直接施法工程定義（18 MP／3 回合／每回合 6 MP），角色權威 `currentMp` 與 CombatState 依 `actorId` 持有的詠唱進度。開始先檢查完整 18 MP 與已學／已裝備，再扣 6 MP；繼續各扣 6 MP；最後一次只記錄「詠唱完成」。開始／繼續／完成均沿用 Phase 11 回合推進，revision 各加一次。取消清除詠唱、不退 MP、不扣新 MP，暫時不推進 Turn；此點明確列為 **Provisional engineering behavior（NOT locked canonical gameplay rule）**，見 [未解問題](OPEN_QUESTIONS.md)。施法中其他主要行動由後端拒絕；敵方回合不改 MP 或進度。
 
-`game_states.snapshot` JSONB 保存 MP、詠唱、最近機械行動、Round／actor 與 revision；靜態 TEST 法術定義留在程式目錄，沒有 migration。已知 `TEST-character` 舊快照可補 24 MP 與空詠唱；正式角色的 MP／Save 格式升級需另訂版本政策。UI 顯示 MP、已裝備法術、完整成本門檻、開始確認、詠唱進度、繼續／取消及完成結果。沒有命中、傷害、成功率、反噬或 LLM。實作與手動測試見 [Phase 19 文件](PHASE_19_MULTI_TURN_CASTING.md)。工程檢查：`npm run build`、`git diff --check` 通過；`npm test` 在獨立 `ai_trpg_phase19_test` PostgreSQL 資料庫共 197 項通過、0 失敗、0 略過。實際停止並重啟 API 後，MP、詠唱 1/3、已投入 6、revision／actor／Round 保持，且 R2 可繼續至 2/3。瀏覽器手感、手機與鍵盤仍由使用者驗收；Phase 20 尚未開始。
+`game_states.snapshot` JSONB 保存 MP、詠唱、最近機械行動、Round／actor 與 revision；靜態 TEST 法術定義留在程式目錄，沒有 migration。已知 `TEST-character` 舊快照可補 24 MP 與空詠唱；正式角色的 MP／Save 格式升級需另訂版本政策。UI 顯示 MP、已裝備法術、完整成本門檻、開始確認、詠唱進度、繼續／取消及完成結果。沒有命中、傷害、成功率、反噬或 LLM。實作與手動測試見 [Phase 19 文件](PHASE_19_MULTI_TURN_CASTING.md)。工程檢查：`npm run build`、`git diff --check` 通過；`npm test` 在獨立 `ai_trpg_phase19_test` PostgreSQL 資料庫共 197 項通過、0 失敗、0 略過。實際停止並重啟 API 後，MP、詠唱 1/3、已投入 6、revision／actor／Round 保持，且 R2 可繼續至 2/3。瀏覽器、手機與鍵盤其後已由使用者手動驗收；Phase 19 已確認。
+
+## Phase 20 交付紀錄
+
+新增通用的逐目標 row-based AoE 解析：後端由玩家所選敵方排取得全體目標，每位目標分別擲攻擊／閃避，單一行動一次保存結果、一次推進 Turn 與增加 revision。首個使用者可操作能力只有龍裔天生能力「龍息」。龍息依角色權威種族與固定元素判定資格，使用 D20 + PER，命中後才判 raw 19／20 暴擊；R1 用後 R4 可再用。獨立 `racialAbilityCooldowns` 不與物理技能冷卻混用，也不佔六格、不扣 MP、不詠唱。空排、冷卻、進行中詠唱、舊 revision、額外欄位及終止戰鬥均安全拒絕。擲骰失敗不提交部分結果。
+
+元素、冷卻及最近逐目標裁定保存於既有 JSONB；已知 TEST 舊角色補固定火元素，未知正式舊角色保持未解決，舊 CombatState 補空冷卻。沒有 migration、傷害、HP、護甲或 LLM。介面新增緊湊「天生能力」及選排操作，開啟／取消不寫權威狀態。詳細規則與手動清單見 [Phase 20 文件](PHASE_20_AOE_DRAGON_BREATH.md)。工程檢查：`npm test` 在獨立 `ai_trpg_phase20_test` PostgreSQL 資料庫共 209 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，dry run 無待執行 migration。手機、鍵盤、遊戲操作與 API 重啟仍待使用者手動確認。Phase 21 尚未開始。

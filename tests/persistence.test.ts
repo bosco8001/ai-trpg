@@ -23,6 +23,8 @@ function seed(id = "TEST-character"): GameState {
       learnedActiveSkillIds: ["TEST-skill-1", "TEST-skill-2"],
       equippedSkillIds: [],
       currentMp: 24,
+      raceId: id === "TEST-character" ? "dragonborn" : null,
+      dragonBreathElement: id === "TEST-character" ? "fire" : null,
     },
     inventory: createTestCombatInventory(),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },

@@ -11,6 +11,8 @@ export function createTestGameState(): GameState {
       learnedActiveSkillIds: Array.from({ length: 7 }, (_, i) => `TEST-skill-${i + 1}`),
       equippedSkillIds: [],
       currentMp: 24, // TEST fixture；不是正式起始 MP。
+      raceId: "dragonborn", // TEST fixture；不是正式創角種族配置。
+      dragonBreathElement: "fire", // TEST fixture only；不是正式元素生成機率。
     },
     inventory: createTestCombatInventory(),
     exploration: createInitialTestExplorationState(),

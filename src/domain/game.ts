@@ -23,6 +23,10 @@ export interface GameState {
     readonly learnedActiveSkillIds: readonly string[];
     readonly equippedSkillIds: readonly string[];
     readonly currentMp: number;
+    /** 已確定的角色種族；null 代表舊資料尚未解決。 */
+    readonly raceId: string | null;
+    /** 創角後固定；TEST 角色使用固定工程 fixture。 */
+    readonly dragonBreathElement: "fire" | "ice" | "lightning" | null;
   };
   /** Authoritative item stacks; item definitions live in the static domain catalog. */
   readonly inventory: readonly InventoryStack[];
@@ -170,7 +174,8 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
   if (!hasExactKeys(seed, ["revision", "activity", "character", "inventory", "exploration", "combat"])
-    || !(hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp"])
+    || !(hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp", "raceId", "dragonBreathElement"])
+      || hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp"])
       || (hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
         && seed.character.id === "TEST-character"))
     || !hasExactKeys(seed.exploration, ["locationId", "lastObservationTargetId"])) {
@@ -179,6 +184,11 @@ export function createGameState(seed: unknown): GameState {
   const character = seed.character;
   // 僅供已知 TEST-character 的 Phase 1–18 舊快照升級；正式角色須帶有 MP。
   const currentMp = Object.hasOwn(character, "currentMp") ? character.currentMp : 24;
+  // 僅已知 TEST 角色補固定火元素；未知舊角色不產生種族或龍息元素。
+  const raceId = Object.hasOwn(character, "raceId") ? character.raceId
+    : character.id === "TEST-character" ? "dragonborn" : null;
+  const dragonBreathElement = Object.hasOwn(character, "dragonBreathElement") ? character.dragonBreathElement
+    : character.id === "TEST-character" ? "fire" : null;
   const exploration = seed.exploration;
   let combat: CombatState | null;
   try {
@@ -193,6 +203,10 @@ export function createGameState(seed: unknown): GameState {
     || !isIds(character.learnedActiveSkillIds)
     || !isIds(character.equippedSkillIds)
     || !isRevision(currentMp)
+    || (raceId !== null && !isId(raceId))
+    || (dragonBreathElement !== null && dragonBreathElement !== "fire"
+      && dragonBreathElement !== "ice" && dragonBreathElement !== "lightning")
+    || (raceId !== "dragonborn" && dragonBreathElement !== null)
     || !isInventory(seed.inventory)
     || new Set(character.learnedActiveSkillIds).size !== character.learnedActiveSkillIds.length
     || loadoutError(character.learnedActiveSkillIds, character.equippedSkillIds)
@@ -206,6 +220,10 @@ export function createGameState(seed: unknown): GameState {
     && seed.inventory.find((stack) => stack.itemId === lastAction.itemId)?.quantity !== lastAction.quantityAfter) {
     throw new Error("CombatState 最近物品行動與權威 inventory 數量不一致。");
   }
+  if (lastAction?.type === "dragon-breath"
+    && (raceId !== "dragonborn" || dragonBreathElement !== lastAction.element)) {
+    throw new Error("CombatState 龍息裁定與角色權威資料不一致。");
+  }
   return Object.freeze({
     revision: seed.revision,
     activity: seed.activity,
@@ -214,6 +232,8 @@ export function createGameState(seed: unknown): GameState {
       learnedActiveSkillIds: Object.freeze([...character.learnedActiveSkillIds]),
       equippedSkillIds: Object.freeze([...character.equippedSkillIds]),
       currentMp,
+      raceId,
+      dragonBreathElement,
     }),
     inventory: normalizeInventory(seed.inventory),
     exploration: Object.freeze({

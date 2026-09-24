@@ -27,6 +27,8 @@ import {
   isPhysicalSkillOptionsResponse,
   isPhysicalSkillUseResponse,
   isCastingResponse,
+  isDragonBreathOptionsResponse,
+  isDragonBreathResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
@@ -40,6 +42,9 @@ import {
   type PhysicalSkillOptionsResponse,
   type PhysicalSkillUseResponse,
   type CastingResponse,
+  type DragonBreathOptionsResponse,
+  type DragonBreathResponse,
+  type CombatRow,
 } from "../shared/game-state.js";
 
 export async function checkApiHealth(
@@ -197,6 +202,35 @@ export async function loadPhysicalSkillOptions(fetcher: typeof fetch = fetch): P
   try { body = await response.json(); }
   catch { throw new Error("物理技能選項回應格式不正確。"); }
   if (!isPhysicalSkillOptionsResponse(body)) throw new Error("物理技能選項回應格式不正確。");
+  return body;
+}
+
+export async function loadDragonBreathOptions(fetcher: typeof fetch = fetch): Promise<DragonBreathOptionsResponse> {
+  let response: Response;
+  try { response = await fetcher("/api/combat/dragon-breath/options", { cache: "no-store" }); }
+  catch { throw new Error("目前無法讀取龍息狀態，請確認服務後再試。"); }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取龍息狀態，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try { body = await response.json(); } catch { throw new Error("龍息選項回應格式不正確。"); }
+  if (!isDragonBreathOptionsResponse(body)) throw new Error("龍息選項回應格式不正確。");
+  return body;
+}
+
+export async function executeDragonBreath(
+  expectedRevision: number, targetRow: CombatRow, fetcher: typeof fetch = fetch,
+): Promise<DragonBreathResponse> {
+  let response: Response;
+  try { response = await fetcher("/api/combat/dragon-breath", {
+    method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+    body: JSON.stringify({ expectedRevision, targetRow }),
+  }); } catch { throw new Error("龍息暫時無法使用，請重新讀取戰鬥狀態。"); }
+  if (response.status >= 500) throw new Error("目前無法完成龍息判定，請再試一次。");
+  if (!response.ok) throw await saveApiError(response, "龍息暫時無法使用，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try { body = await response.json(); } catch { throw new Error("龍息回應格式不正確。"); }
+  if (!isDragonBreathResponse(body) || body.state.revision !== expectedRevision + 1
+    || body.state.combat?.lastAction?.type !== "dragon-breath"
+    || body.state.combat.lastAction.targetRow !== targetRow) throw new Error("龍息回應格式不正確。");
   return body;
 }
 

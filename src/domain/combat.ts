@@ -14,6 +14,7 @@ import {
   type CastingState,
   type CastingActionResolution,
   type CombatParticipant,
+  type DragonBreathActionResolution,
 } from "./combat-state.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
 import { getActiveSkillDefinition } from "./physical-skills.js";
@@ -25,6 +26,7 @@ import {
   getLegalNormalAttackTargets,
 } from "./combat-targeting.js";
 import { createGameState, type GameState } from "./game.js";
+import { getEnemyRowTargets, resolveRowAoE } from "./row-aoe.js";
 
 export interface DiceRoller {
   d20(): number;
@@ -565,6 +567,7 @@ export function rollInitiative(
     lastAction: null,
     skillCooldowns: [],
     activeCastings: [],
+    racialAbilityCooldowns: [],
   });
 }
 
@@ -981,4 +984,117 @@ export function resolveNormalAttack(
     state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
     effect: { type: "normal-attack-resolved", outcome: check.outcome },
   };
+}
+
+export type DragonBreathCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "combat-ended" | "not-player-turn" | "not-dragonborn" | "element-unresolved"
+  | "casting-active" | "ability-on-cooldown" | "empty-target-row" | "invalid-roll";
+
+export interface DragonBreathRowOption {
+  readonly row: CombatRow;
+  readonly targetCount: number;
+  readonly available: boolean;
+  readonly unavailableReason?: "empty-target-row";
+}
+
+export interface DragonBreathOptions {
+  readonly currentActorId: string;
+  readonly currentRound: number;
+  readonly element: GameState["character"]["dragonBreathElement"];
+  readonly readyRound: number | null;
+  readonly available: boolean;
+  readonly unavailableReason?: Exclude<DragonBreathCode, "invalid-command" | "stale-revision" | "revision-limit" | "invalid-roll" | "empty-target-row"> | "no-target-row";
+  readonly rows: readonly DragonBreathRowOption[];
+}
+
+export type DragonBreathOptionsResult =
+  | { readonly ok: true; readonly revision: number; readonly options: DragonBreathOptions }
+  | { readonly ok: false; readonly code: "not-in-combat"; readonly message: string };
+
+export type DragonBreathResult =
+  | { readonly ok: true; readonly state: GameState; readonly effect: { readonly type: "dragon-breath-resolved" } }
+  | { readonly ok: false; readonly code: DragonBreathCode; readonly message: string };
+
+const dragonBreathMessages: Record<DragonBreathCode, string> = {
+  "invalid-command": "龍息請求格式不正確。", "stale-revision": "戰鬥狀態已更新，請重新選擇攻擊區域。",
+  "revision-limit": "狀態版本已達工程上限。", "not-in-combat": "目前沒有進行中的戰鬥。",
+  "combat-ended": "戰鬥已結束，不能使用龍息。", "not-player-turn": "目前不是可操作角色的回合。",
+  "not-dragonborn": "只有龍裔可以使用龍息。", "element-unresolved": "角色的龍息元素尚未確定。",
+  "casting-active": "請先繼續或取消目前的詠唱。", "ability-on-cooldown": "龍息仍在冷卻中。",
+  "empty-target-row": "該排目前沒有可攻擊目標。", "invalid-roll": "龍息骰子服務暫時無法使用。",
+};
+
+function rejectDragonBreath(code: DragonBreathCode): DragonBreathResult {
+  return { ok: false, code, message: dragonBreathMessages[code] };
+}
+
+export function getCurrentDragonBreathOptions(state: GameState): DragonBreathOptionsResult {
+  if (state.activity !== "in-combat" || state.combat === null || state.combat.status === "ended") {
+    return { ok: false, code: "not-in-combat", message: dragonBreathMessages["not-in-combat"] };
+  }
+  const combat = state.combat;
+  const actor = combat.participants.find((entry) => entry.id === combat.currentActorId)!;
+  const playerActor = isPlayerActionParticipant(actor) ? actor
+    : combat.participants.find((entry) => isPlayerActionParticipant(entry));
+  const readyRound = combat.racialAbilityCooldowns.find((entry) => entry.actorId === actor.id
+    && entry.abilityId === "dragon-breath")?.readyRound ?? null;
+  const rows: DragonBreathRowOption[] = (["front", "back"] as const).map((row) => {
+    const targetCount = playerActor ? getEnemyRowTargets(combat, playerActor, row).length : 0;
+    return { row, targetCount, available: targetCount > 0,
+      ...(targetCount === 0 ? { unavailableReason: "empty-target-row" as const } : {}) };
+  });
+  const unavailableReason: DragonBreathOptions["unavailableReason"] = !isPlayerActionParticipant(actor)
+    ? "not-player-turn" : state.character.raceId !== "dragonborn" ? "not-dragonborn"
+      : state.character.dragonBreathElement === null ? "element-unresolved"
+        : actorCasting(combat, actor.id) ? "casting-active"
+          : readyRound !== null && combat.round < readyRound ? "ability-on-cooldown"
+            : rows.every((row) => !row.available) ? "no-target-row" : undefined;
+  return { ok: true, revision: state.revision, options: Object.freeze({
+    currentActorId: actor.id, currentRound: combat.round,
+    element: state.character.dragonBreathElement, readyRound,
+    available: unavailableReason === undefined,
+    ...(unavailableReason ? { unavailableReason } : {}), rows: Object.freeze(rows),
+  }) };
+}
+
+/** 嚴格只收 revision 與 row；骰子結果完成後才建構唯一狀態提交。 */
+export function useDragonBreath(state: GameState, input: unknown, roller: DiceRoller): DragonBreathResult {
+  if (!isRecord(input) || Object.keys(input).length !== 2 || !Object.hasOwn(input, "expectedRevision")
+    || !Object.hasOwn(input, "targetRow") || !Number.isSafeInteger(input.expectedRevision)
+    || (input.expectedRevision as number) < 0 || (input.targetRow !== "front" && input.targetRow !== "back")) {
+    return rejectDragonBreath("invalid-command");
+  }
+  if (input.expectedRevision !== state.revision) return rejectDragonBreath("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectDragonBreath("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectDragonBreath("not-in-combat");
+  if (state.combat.status === "ended") return rejectDragonBreath("combat-ended");
+  const combat = state.combat;
+  const actor = combat.participants.find((entry) => entry.id === combat.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor)) return rejectDragonBreath("not-player-turn");
+  if (state.character.raceId !== "dragonborn") return rejectDragonBreath("not-dragonborn");
+  const element = state.character.dragonBreathElement;
+  if (element === null) return rejectDragonBreath("element-unresolved");
+  if (actorCasting(combat, actor.id)) return rejectDragonBreath("casting-active");
+  const oldCooldown = combat.racialAbilityCooldowns.find((entry) => entry.actorId === actor.id
+    && entry.abilityId === "dragon-breath");
+  if (oldCooldown && combat.round < oldCooldown.readyRound) return rejectDragonBreath("ability-on-cooldown");
+  const targetRow = input.targetRow as CombatRow;
+  const targets = getEnemyRowTargets(combat, actor, targetRow);
+  if (targets.length === 0) return rejectDragonBreath("empty-target-row");
+  const readyRound = combat.round + 3;
+  if (!Number.isSafeInteger(readyRound)) return rejectDragonBreath("revision-limit");
+  let results: DragonBreathActionResolution["results"];
+  try { results = resolveRowAoE(actor, targets, roller, (attacker) => attacker.normalAttack!.perceptionModifier); }
+  catch { return rejectDragonBreath("invalid-roll"); }
+  const lastAction: DragonBreathActionResolution = Object.freeze({
+    type: "dragon-breath", actorId: actor.id, round: combat.round, element,
+    targetRow, readyRound, results,
+  });
+  const racialAbilityCooldowns = [
+    ...combat.racialAbilityCooldowns.filter((entry) => entry.actorId !== actor.id || entry.abilityId !== "dragon-breath"),
+    { actorId: actor.id, abilityId: "dragon-breath" as const, readyRound },
+  ];
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), racialAbilityCooldowns, lastAction });
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "dragon-breath-resolved" } };
 }
