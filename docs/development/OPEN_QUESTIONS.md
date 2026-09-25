@@ -40,9 +40,10 @@
 - 龍息火／冰／雷的生成機率。
 - 正式創角時龍息元素生成的實作與舊正式龍裔快照缺值處理仍待決定；Phase 20 僅讓已知 TEST 角色安全補固定火元素，未知角色保持未解決且龍息不可用。
 - 龍息各元素是否有額外效果。
-- Phase 21 的 `TEST-tactic-a`／`TEST-tactic-b` 是工程測試 fixture。These are engineering fixtures only. They do not define final canonical tactic presets or behavior.
+- Phase 21 的 `TEST-tactic-a`／`TEST-tactic-b` 是工程測試 fixture。Phase 22 工程 policy 暫以 **TEST-tactic-a = 普通攻擊（無合法目標時防禦）、TEST-tactic-b = 防禦** 驗證偏好接通行動；only for engineering verification，**不是正式 canonical 戰術語意**。正式 policy 可替換此對應。
 - 正式 tactic preset 的名稱與數量尚未定案。
-- 每個正式 tactic preset 的精確語意尚未定案；Phase 21 只保存 opaque preference ID，Phase 22 才處理讀取偏好後的隊友行動。
+- 每個正式 tactic preset 的精確語意尚未定案。Phase 22 對 `null`、未知正式偏好與不支援的 opaque ID 安全拒絕隊友行動；正式 production policy、沒有支援偏好時如何處理回合仍待決定，不可預設為攻擊。
+- 正式隊友職業／技能、HP／MP、治療優先序、保護主角門檻、MP 節省門檻、最弱目標判準、物品使用、法術選擇與逃跑政策尚未定案。
 - 正式 companion 的預設戰術偏好尚未定案。
 - 是否允許在戰鬥外修改隊友戰術偏好尚未定案。
 - ended-but-unsettled combat 期間是否允許修改偏好尚未定案；Phase 21 在 ended combat 僅允許讀取並安全拒絕修改。

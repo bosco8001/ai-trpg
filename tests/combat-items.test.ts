@@ -194,7 +194,7 @@ test("enemy turn, stale, unknown, depleted, malformed and no-combat uses all rej
 
 test("combat item GET/POST routes validate unknown input and return server-derived state and options", async (t) => {
   const session = createDomainSession(seed());
-  const app = await buildApp({ domainSession: session, combatSandbox: true, combatRoller: createCombatFixtureRoller("normal") });
+  const app = await buildApp({ domainSession: session, combatSandbox: true, combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   t.after(() => app.close());
   assert.equal((await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } })).statusCode, 200);
   const before = structuredClone(session.getState());

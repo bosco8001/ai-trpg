@@ -27,6 +27,7 @@ export interface CombatParticipantView {
   readonly initiative: CombatInitiativeView;
   readonly normalAttack: CombatNormalAttackProfileView | null;
   readonly racialEscapeModifier: number;
+  readonly controlledBy?: "companion";
 }
 
 export interface NormalAttackResolutionView {
@@ -47,9 +48,10 @@ export interface NormalAttackResolutionView {
     readonly total: number;
   };
   readonly outcome: "hit" | "miss";
+  readonly tacticPreferenceId?: string;
 }
 
-export interface PhysicalSkillResolutionView extends Omit<NormalAttackResolutionView, "type"> {
+export interface PhysicalSkillResolutionView extends Omit<NormalAttackResolutionView, "type" | "tacticPreferenceId"> {
   readonly type: "physical-skill";
   readonly skillId: string;
   readonly readyRound: number;
@@ -129,6 +131,7 @@ export interface DefendResolutionView {
   readonly type: "defend";
   readonly actorId: string;
   readonly round: number;
+  readonly tacticPreferenceId?: string;
 }
 
 export interface RunResolutionView {
@@ -346,6 +349,23 @@ export interface CombatSandboxAdvanceResponse extends AuthoritativeGameStateResp
   readonly effect: { readonly type: "combat-turn-advanced" };
 }
 
+export interface CompanionActResponse extends AuthoritativeGameStateResponse {
+  readonly effect: { readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend" };
+}
+
+export function isCompanionActResponse(value: unknown): value is CompanionActResponse {
+  if (!isRecord(value) || !exact(value, ["sandbox", "storage", "effect", "state"])
+    || typeof value.sandbox !== "boolean" || (value.storage !== "memory" && value.storage !== "postgres")
+    || !isAuthoritativeGameStateView(value.state) || !isRecord(value.effect)
+    || !exact(value.effect, ["type", "selectedAction"])
+    || value.effect.type !== "companion-action-resolved"
+    || (value.effect.selectedAction !== "normal-attack" && value.effect.selectedAction !== "defend")) return false;
+  const action = value.state.combat?.lastAction;
+  return action?.type === value.effect.selectedAction && action.tacticPreferenceId !== undefined
+    && value.state.combat?.participants.some((participant) => participant.id === action.actorId
+      && participant.controlledBy === "companion") === true;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -380,9 +400,11 @@ function isNormalAttackProfile(value: unknown): value is CombatNormalAttackProfi
 }
 
 function parseParticipant(value: unknown): CombatParticipantView | undefined {
-  if (!isRecord(value) || !exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
+  if (!isRecord(value) || !(exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
+    || exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "controlledBy"]))
     || !isId(value.id) || !isId(value.displayName)
     || (value.side !== "party" && value.side !== "enemy")
+    || (Object.hasOwn(value, "controlledBy") && (value.controlledBy !== "companion" || value.side !== "party"))
     || (value.row !== "front" && value.row !== "back")
     || !isNormalAttackProfile(value.normalAttack)
     || (value.racialEscapeModifier !== 0 && value.racialEscapeModifier !== -2)
@@ -400,9 +422,11 @@ function parseParticipant(value: unknown): CombatParticipantView | undefined {
 function isPhysicalAttackResolution(value: unknown): value is NormalAttackResolutionView | PhysicalSkillResolutionView {
   const skill = isRecord(value) && value.type === "physical-skill";
   return isRecord(value)
-    && exact(value, skill
+    && (exact(value, skill
       ? ["type", "round", "actorId", "skillId", "targetId", "attack", "evasion", "outcome", "readyRound"]
       : ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
+      || (!skill && exact(value, ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome", "tacticPreferenceId"])))
+    && (!Object.hasOwn(value, "tacticPreferenceId") || isId(value.tacticPreferenceId))
     && (value.type === "normal-attack" || skill)
     && (!skill || (value.skillId === "TEST-skill-1" && isSafeInteger(value.readyRound)
       && value.readyRound === (value.round as number) + 2))
@@ -447,8 +471,10 @@ function isItemUseResolution(value: unknown): value is ItemUseResolutionView {
 }
 
 function isDefendResolution(value: unknown): value is DefendResolutionView {
-  return isRecord(value) && exact(value, ["type", "actorId", "round"])
+  return isRecord(value) && (exact(value, ["type", "actorId", "round"])
+    || exact(value, ["type", "actorId", "round", "tacticPreferenceId"]))
     && value.type === "defend" && isId(value.actorId)
+    && (!Object.hasOwn(value, "tacticPreferenceId") || isId(value.tacticPreferenceId))
     && isSafeInteger(value.round) && value.round > 0;
 }
 
@@ -609,6 +635,8 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
         && lastAction?.type === "run" && lastAction.outcome === "success" && lastAction.round === value.round)
     && (lastAction === null || (lastAction.round <= value.round
       && ids.includes(lastAction.actorId) && actor?.side === "party"))
+    && (lastAction === null || (lastAction.type !== "normal-attack" && lastAction.type !== "defend")
+      || (actor?.controlledBy === "companion") === (lastAction.tacticPreferenceId !== undefined))
     && (lastAction === null || (lastAction.type !== "normal-attack" && lastAction.type !== "physical-skill")
       || (ids.includes(lastAction.targetId)
         && validatedParticipants.find((participant) => participant.id === lastAction.targetId)?.side === "enemy"))

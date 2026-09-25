@@ -1,10 +1,10 @@
-/** Phase 21 專用工程 fixture；不定義最終 canonical 戰術選項或行為。 */
+/** Phase 21/22 工程 fixture；catalog 不定義最終 canonical 戰術選項或行為。 */
 export const TEST_PARTY_COMPANION_ID = "TEST-companion-1";
 
 export interface PartyMemberState {
   readonly id: string;
   readonly displayName: string;
-  /** Opaque preference identifier; its meaning is never interpreted by combat code. */
+  /** Opaque preference identifier; Phase 22 engineering policy interprets only known TEST IDs. */
   readonly tacticPreferenceId: string | null;
 }
 
@@ -16,7 +16,7 @@ export interface TacticPreferenceDefinition {
 }
 
 /** These are engineering fixtures only. They do not define final canonical tactic presets or behavior. */
-/** 這些 TEST 選項只供驗證選取、保存與重新讀取流程，沒有任何戰鬥語意。 */
+/** 這些 TEST catalog 項目只定義顯示資料；Phase 22 行為只存在於可替換的工程 policy。 */
 export const ENGINEERING_TEST_TACTIC_PREFERENCES: readonly TacticPreferenceDefinition[] = Object.freeze([
   Object.freeze({
     id: "TEST-tactic-a",

@@ -220,7 +220,7 @@ test("Phase 13–16 的四種 lastAction 舊快照都 hydrate active；未結算
 test("Run route 精確 request、stale、成功 terminal 及結束後 action guard", async (t) => {
   const session = createDomainSession(createTestGameState());
   const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal"), combatEscapeRoller: createCombatEscapeFixtureRoller("success") });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"), combatEscapeRoller: createCombatEscapeFixtureRoller("success") });
   t.after(() => app.close());
   assert.equal((await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } })).statusCode, 200);
   assert.equal((await app.inject({ method: "POST", url: "/api/combat/run", payload: { expectedRevision: 1 } })).json().error, "not-player-turn");

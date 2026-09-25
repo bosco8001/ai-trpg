@@ -18,6 +18,7 @@ import {
   isDragonBreathResponse,
   isCombatPartyOptionsResponse,
   isCompanionTacticPreferenceResponse,
+  isCompanionActResponse,
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
@@ -201,6 +202,22 @@ export function registerCombatActionRoutes(
   storage: "memory" | "postgres",
   sandbox: boolean,
 ) {
+  app.post<{ Body: unknown }>("/api/combat/companion/act", {
+    bodyLimit: 1024,
+    errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => reply.code(400)
+      .send({ error: "invalid-command", message: "隊友行動請求格式不正確。" }),
+  }, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.actCompanion(request.body);
+      if (!result.ok) return reply.code(result.code === "invalid-command" ? 400
+        : result.code === "invalid-roll" ? 500 : 409)
+        .send({ error: result.code, message: result.message });
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      if (!isCompanionActResponse(response)) throw new Error("隊友行動回應未通過驗證。");
+      return response;
+    } catch (error) { return safeActionFailure(app, reply, error); }
+  });
   app.get("/api/combat/party", async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
     try {

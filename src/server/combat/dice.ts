@@ -25,13 +25,19 @@ export type CombatActionRollFixtureMode = "hit" | "miss" | "raw-one-hit";
 export type CombatEscapeRollFixtureMode = "success" | "failure";
 
 /**
- * normal：12, 17, 8，依序給玩家、敵人 1、敵人 2。
- * tie：10, 11, 6 造成玩家與敵人 1 同為 12；7, 7 再平手；4, 15 才排定。
+ * Legacy three-participant fixture retained for focused Phase 11–21 rule tests.
  */
 export function createCombatFixtureRoller(mode: CombatRollFixtureMode): DiceRoller {
   return new SequenceD20Roller(mode === "tie"
     ? [10, 11, 6, 7, 7, 4, 15]
     : [12, 17, 8]);
+}
+
+/** Phase 22 four-participant TEST battle; companion receives its own opening D20. */
+export function createPhase22CombatFixtureRoller(mode: CombatRollFixtureMode): DiceRoller {
+  return new SequenceD20Roller(mode === "tie"
+    ? [10, 11, 6, 3, 7, 7, 4, 15]
+    : [12, 17, 8, 4]);
 }
 
 /** 固定攻擊測試骰與先攻骰分開，避免兩種 fixture 共用或消耗彼此的序列。 */

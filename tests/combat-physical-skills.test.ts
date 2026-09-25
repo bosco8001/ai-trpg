@@ -285,7 +285,7 @@ test("舊 CombatState 補空冷卻；新裁定與既有 action 經 snapshot 驗�
 test("API exact body、唯讀 options、權威 response 與 UI 技能顯示", async () => {
   const session = createDomainSession(equippedState());
   const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal"), combatActionRoller: createCombatActionFixtureRoller("hit") });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"), combatActionRoller: createCombatActionFixtureRoller("hit") });
   try {
     const start = await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 1 } });
     assert.equal(start.statusCode, 200);
@@ -344,7 +344,7 @@ test("API exact body、唯讀 options、權威 response 與 UI 技能顯示", as
 test("API 擲骰失敗保持 revision、Turn、冷卻與最近裁定", async () => {
   const session = createDomainSession(equippedState());
   const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal"), combatActionRoller: new SequenceD20Roller([10]) });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"), combatActionRoller: new SequenceD20Roller([10]) });
   try {
     await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 1 } });
     await app.inject({ method: "POST", url: "/api/dev/combat/advance", payload: { expectedRevision: 2 } });

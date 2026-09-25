@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–20 已由使用者確認。Phase 21「隊伍資訊與戰術偏好介面」工程完成，等待使用者手動確認；Phase 22 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–21 已由使用者確認。Phase 22「半自動隊友戰鬥行為」工程完成，等待使用者手動確認；Phase 23 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -393,4 +393,8 @@ Phase 17 已由使用者完成手動驗收，包括 PostgreSQL 重啟後保留 `
 
 ## Phase 21：隊伍資訊與戰術偏好介面
 
-Phase 21 工程已完成，等待使用者手動確認。「隊伍」可讀取伺服器提供的隊友資料與可選偏好。開啟、關閉及讀取不消耗回合；更新偏好只保存識別碼與增加一次 revision，不改目前 actor 或戰鬥狀態。Phase 21 使用沒有戰鬥語意的 TEST 選項，不會讓隊友自動行動，也不假造隊友 HP／MP。完整 Memory、敵方回合、詠唱、刷新、stale／欄位注入、PostgreSQL 重啟、手機及鍵盤測試見 [Phase 21 手動驗收文件](docs/development/PHASE_21_PARTY_TACTICS.md)。
+Phase 21 已由使用者手動確認。「隊伍」可讀取伺服器提供的隊友資料與可選偏好。開啟、關閉及讀取不消耗回合；更新偏好只保存識別碼與增加一次 revision，不改目前 actor 或戰鬥狀態。Phase 21 的 TEST catalog 本身沒有戰鬥語意；Phase 22 另以工程 policy 暫時對應測試行動。完整 Phase 21 驗收步驟見 [Phase 21 文件](docs/development/PHASE_21_PARTY_TACTICS.md)。
+
+## Phase 22：半自動隊友戰鬥行為
+
+新 TEST 戰鬥包含「TEST 隊友」的 CombatParticipant、先攻與 Turn。玩家只設定偏好；隊友輪到時按「TEST：執行隊友回合」，由伺服器選擇行動和目標。TEST A 暫選普通攻擊，TEST B 暫選防禦，純屬工程驗證，並非正式戰術規則。沒有 HP／傷害或 LLM 決策。完整 Memory、PostgreSQL 重啟、注入、手機與鍵盤手動驗收指令見 [Phase 22 文件](docs/development/PHASE_22_SEMI_AUTO_COMPANION.md)。Phase 22 等待使用者手動確認。

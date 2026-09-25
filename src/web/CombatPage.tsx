@@ -30,6 +30,7 @@ import {
   executeDragonBreath,
   loadCombatPartyOptions,
   setCombatCompanionTacticPreference,
+  executeCompanionTurn,
 } from "./api.js";
 import {
   getCombatPresentationLanes,
@@ -164,6 +165,7 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
         <p className="combat-eyebrow">最近行動・第 {action.round} 回合</p>
         <h2 id="combat-last-action-heading">最近行動</h2>
         <p className="combat-last-action__pair">{actor}</p>
+        {action.tacticPreferenceId ? <p>TEST 隊友自主選擇：防禦（{action.tacticPreferenceId}）</p> : null}
         <p className="combat-last-action__row-move">選擇：防禦</p>
         <p className="combat-last-action__outcome">防禦行動已完成。實際減傷效果尚未接入。</p>
       </Panel>
@@ -216,6 +218,8 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
       <p className="combat-eyebrow">戰鬥裁定・第 {action.round} 回合</p>
       <h2 id="combat-last-action-heading">最近裁定</h2>
       {action.type === "physical-skill" ? <p>技能：{action.skillId === "TEST-skill-1" ? "TEST 物理技能" : action.skillId}</p> : null}
+      {action.type === "normal-attack" && action.tacticPreferenceId
+        ? <p>TEST 隊友自主選擇：普通攻擊（{action.tacticPreferenceId}）</p> : null}
       <p className="combat-last-action__pair">{actor} → {target}</p>
       <dl className="combat-last-action__checks">
         <div>
@@ -253,7 +257,8 @@ export function CombatPage({
   const combat = gameState.state.combat;
   const currentActor = combat?.participants.find((participant) => participant.id === combat.currentActorId);
   const currentActorId = combat?.currentActorId ?? "";
-  const hasPlayerActionActor = currentActor?.side === "party" && currentActor.normalAttack !== null;
+  const hasPlayerActionActor = currentActor?.side === "party" && currentActor.controlledBy !== "companion"
+    && currentActor.normalAttack !== null;
   const currentCasting = combat?.activeCastings.find((entry) => entry.actorId === currentActorId);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -1080,7 +1085,7 @@ export function CombatPage({
   }
 
   function advanceTestTurn() {
-    if (!gameState.sandbox || requestInFlight) return;
+    if (!gameState.sandbox || requestInFlight || currentActor?.controlledBy === "companion") return;
     setIsAdvancing(true);
     setFeedback("正在請裁判推進 TEST 回合……");
     void advanceTestCombatTurn(gameState.state.revision).then((response) => {
@@ -1093,6 +1098,19 @@ export function CombatPage({
       setFeedback("TEST 回合已由權威戰鬥引擎推進。");
     }).catch(() => {
       setFeedback("目前無法推進 TEST 戰鬥回合。請重新讀取狀態後再試。");
+    }).finally(() => setIsAdvancing(false));
+  }
+
+  function actCompanionTurn() {
+    if (!gameState.sandbox || requestInFlight || currentActor?.controlledBy !== "companion") return;
+    setIsAdvancing(true);
+    setFeedback("正在請伺服器執行 TEST 隊友回合……");
+    void executeCompanionTurn(gameState.state.revision).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      setFeedback(response.effect.selectedAction === "normal-attack"
+        ? "TEST 隊友自主選擇：普通攻擊。" : "TEST 隊友自主選擇：防禦。");
+    }).catch((error: unknown) => {
+      setFeedback(error instanceof Error ? error.message : "隊友回合暫時無法執行。");
     }).finally(() => setIsAdvancing(false));
   }
 
@@ -1539,6 +1557,7 @@ export function CombatPage({
                 </Button>
               ) : null}
               {currentActor?.side === "enemy" ? <p className="combat-rail__notice">目前是敵方回合，玩家不能執行攻擊、移動或防禦。</p> : null}
+              {currentActor?.controlledBy === "companion" ? <p className="combat-rail__notice">目前是 TEST 隊友回合；伺服器會自行選擇行動與目標。</p> : null}
             </Panel>
 
             {gameState.sandbox ? (
@@ -1546,7 +1565,12 @@ export function CombatPage({
                 <p className="combat-eyebrow">工程測試</p>
                 <h2 id="combat-test-heading">TEST 控制</h2>
                 <p>此控制只在 COMBAT_SANDBOX 開啟時出現，並由後端決定下一回合。</p>
-                <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight || selectionModeActive || Boolean(currentCasting)} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
+                {currentActor?.controlledBy === "companion" ? (
+                  <Button loading={isAdvancing} loadingLabel="正在執行……" disabled={requestInFlight || selectionModeActive}
+                    onClick={actCompanionTurn}>TEST：執行隊友回合</Button>
+                ) : (
+                  <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight || selectionModeActive || Boolean(currentCasting)} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
+                )}
               </Panel>
             ) : null}
           </aside>

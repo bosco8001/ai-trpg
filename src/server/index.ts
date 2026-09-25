@@ -10,7 +10,7 @@ import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
 import {
   createCombatActionFixtureRoller,
-  createCombatFixtureRoller,
+  createPhase22CombatFixtureRoller,
   createCombatEscapeFixtureRoller,
   type CombatActionRollFixtureMode,
   type CombatRollFixtureMode,
@@ -65,7 +65,7 @@ const app = await buildApp({
   domainSandbox,
   combatSandbox,
   combatRoller: combatSandbox
-    ? createCombatFixtureRoller(combatRollMode as CombatRollFixtureMode)
+    ? createPhase22CombatFixtureRoller(combatRollMode as CombatRollFixtureMode)
     : undefined,
   combatActionRoller: combatSandbox && combatActionRollMode
     ? createCombatActionFixtureRoller(combatActionRollMode as CombatActionRollFixtureMode)

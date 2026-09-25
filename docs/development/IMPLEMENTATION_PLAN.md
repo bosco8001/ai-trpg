@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–20 已由使用者確認。Phase 21「隊伍資訊與戰術偏好介面」工程完成，等待使用者手動確認；Phase 22 尚未開始。
+Phase 1–21 已由使用者確認。Phase 22「半自動隊友戰鬥行為」工程完成，等待使用者手動確認；Phase 23 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -265,4 +265,14 @@ Phase 21 新增 server-derived Party 讀取與 tactic catalog，以及只接受 
 
 GameState snapshot 將 party preference 存入既有 PostgreSQL `game_states.snapshot` JSONB，沒有新增 migration；Save Format v1 與 active-combat Save／Load safeguard 不變。舊 Phase 1–20 TEST snapshot hydrate 後獲得確定性 TEST 隊友／A 偏好；其他角色不會被補入 TEST party 或生產預設偏好。正式 catalog 定義屬靜態 gameplay design/data，玩家當前選擇屬 runtime mutable state。完整 API、Memory、敵方回合、casting、refresh、stale／注入、PostgreSQL、mobile、keyboard 指令見 [Phase 21 文件](PHASE_21_PARTY_TACTICS.md)。
 
-工程檢查：`npm test` 對隔離 `ai_trpg_phase21_test` 執行，共 222 項通過、0 項失敗、0 項略過；包含 Phase 18–20 regression 與新 repository／session 的 PostgreSQL 偏好保存重載測試。`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過；dry-run 沒有待執行 migration。PostgreSQL restart 的瀏覽器/API 手動流程、Party 開關與偏好操作、手機、鍵盤和 Phase 21 接受狀態仍待使用者手動確認。Phase 1–20 已確認；Phase 21 工程完成、等待手動確認；Phase 22 尚未開始。
+工程檢查：`npm test` 對隔離 `ai_trpg_phase21_test` 執行，共 222 項通過、0 項失敗、0 項略過；包含 Phase 18–20 regression 與新 repository／session 的 PostgreSQL 偏好保存重載測試。`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過；dry-run 沒有待執行 migration。Phase 21 其後已由使用者完成手動驗收並 commit。
+
+## Phase 22 交付紀錄
+
+TEST 隊友現在於新戰鬥建立為共用 CombatParticipant，使用 D20 + DEX 擲一次先攻並按既有平手重擲規則加入 turnOrder。玩家可操作指令明確排除隊友；TEST advance 不能略過隊友。`POST /api/combat/companion/act` 僅接受 revision，伺服器每次從最新 GameState 讀偏好、呼叫可替換的 deterministic policy，接著以現有目標限制、物理命中／閃避及 Turn helper 執行，單次保存 action、推進 Turn、revision +1。
+
+Phase 22 工程 policy 暫定 **TEST-tactic-a = 普通攻擊（無合法目標時防禦）、TEST-tactic-b = 防禦**，只供接通驗證，並非正式 canonical tactic semantics。`null`／未知／不支援偏好安全拒絕，不擲骰、不改狀態。攻擊只記 hit／miss，防禦只記主要行動，沒有 HP、傷害、減傷、LLM 決策或 Phase 24 節奏動畫。
+
+CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migration。舊 active combat hydrate 後保留原名冊，不插入隊友；只有新開戰才加入。Phase 11–21 三人名冊測試明確使用舊 fixture 驗證原規則；新四人測試驗證隊友行動與保存。手動驗收指令見 [Phase 22 文件](PHASE_22_SEMI_AUTO_COMPANION.md)。Phase 22 工程完成，等待使用者確認；Phase 23 尚未開始。
+
+工程檢查：`npm test` 使用獨立 `ai_trpg_phase22_test`，232 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，dry-run 無待執行 migration。另以同一隔離資料庫實際停止／重啟 API，重啟後完整讀回隊友先攻、順序、偏好、最近行動、Round、actor 與 revision，並繼續推進戰鬥。瀏覽器、手機、鍵盤與 Phase 22 是否接受仍由使用者手動確認。

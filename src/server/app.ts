@@ -14,9 +14,9 @@ import type { SaveGameRepository } from "./save-game/contracts.js";
 import { InMemorySaveGameRepository } from "./save-game/memory-repository.js";
 import { createSaveGameService } from "./save-game/service.js";
 import { registerSaveGameRoutes } from "./save-game/routes.js";
-import type { DiceRoller } from "../domain/combat.js";
+import type { CombatParticipantSeed, DiceRoller } from "../domain/combat.js";
 import { RandomD20Roller } from "./combat/dice.js";
-import { TEST_COMBAT_PARTICIPANTS } from "./combat/fixtures.js";
+import { PHASE22_TEST_COMBAT_PARTICIPANTS } from "./combat/fixtures.js";
 import { createCombatService } from "./combat/service.js";
 import { registerCombatActionRoutes, registerCombatSandbox } from "./combat/routes.js";
 import { registerGameStateRoute } from "./game-state-route.js";
@@ -35,6 +35,8 @@ export async function buildApp(options: {
   combatRoller?: DiceRoller;
   combatActionRoller?: DiceRoller;
   combatEscapeRoller?: DiceRoller;
+  /** Allows focused legacy three-participant tests to keep their original roster. */
+  combatParticipants?: readonly CombatParticipantSeed[];
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
@@ -46,7 +48,7 @@ export async function buildApp(options: {
   const combatSandboxEnabled = options.combatSandbox === true && process.env.NODE_ENV !== "production";
   const combatService = createCombatService(
     session,
-    TEST_COMBAT_PARTICIPANTS,
+    options.combatParticipants ?? PHASE22_TEST_COMBAT_PARTICIPANTS,
     options.combatRoller ?? new RandomD20Roller(),
     options.combatActionRoller ?? new RandomD20Roller(),
     options.combatEscapeRoller ?? new RandomD20Roller(),

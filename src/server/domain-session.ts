@@ -21,6 +21,7 @@ import {
   getCurrentDragonBreathOptions,
   useDragonBreath,
   runFromCombat,
+  resolveCompanionTurn,
   useCombatItem as useCombatItemTransition,
   startCombat as startCombatTransition,
   type CombatParticipantSeed,
@@ -34,6 +35,8 @@ export interface GameStateSession {
   partyOptions(): ReturnType<typeof getCombatPartyOptions> | Promise<ReturnType<typeof getCombatPartyOptions>>;
   setCompanionTacticPreference(input: unknown): ReturnType<typeof setCompanionTacticPreferenceTransition>
     | Promise<ReturnType<typeof setCompanionTacticPreferenceTransition>>;
+  actCompanion(input: unknown, roller: DiceRoller): ReturnType<typeof resolveCompanionTurn>
+    | Promise<ReturnType<typeof resolveCompanionTurn>>;
   execute(input: unknown): ReturnType<typeof applyCommand> | Promise<ReturnType<typeof applyCommand>>;
   replaceContents(expectedRevision: unknown, contents: unknown): ReturnType<typeof replaceGameStateContents>
     | Promise<ReturnType<typeof replaceGameStateContents>>;
@@ -71,6 +74,11 @@ export function createDomainSession(initialState: GameState) {
     setCompanionTacticPreference(input: unknown) {
       const result = setCompanionTacticPreferenceTransition(state, input);
       if (result.ok && result.state.revision !== state.revision) state = result.state;
+      return result;
+    },
+    actCompanion(input: unknown, roller: DiceRoller) {
+      const result = resolveCompanionTurn(state, input, roller);
+      if (result.ok) state = result.state;
       return result;
     },
     execute(input: unknown) {
@@ -189,6 +197,20 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
         code: "stale-revision" as const,
         message: "遊戲狀態已更新，請重新讀取隊伍資料後再試。",
       };
+    },
+    async actCompanion(input: unknown, roller: DiceRoller) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = resolveCompanionTurn(state, input, roller);
+          return { result, ...(result.ok ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = resolveCompanionTurn(state, input, roller);
+      if (!result.ok) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : { ok: false as const, code: "stale-revision" as const,
+        message: "戰鬥狀態已更新，請重新讀取後再執行隊友回合。" };
     },
     async execute(input: unknown) {
       const state = await repository.createIfAbsent(seed);

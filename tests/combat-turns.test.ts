@@ -238,7 +238,7 @@ test("戰鬥中的 Save 與 Load 暫時安全拒絕，Save Format v1 不含 comb
 });
 
 test("dev combat sandbox 驗證 request、structured state、stale 與 production 關閉", async (t) => {
-  const app = await buildApp({ combatSandbox: true, combatRoller: createCombatFixtureRoller("normal") });
+  const app = await buildApp({ combatSandbox: true, combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   t.after(() => app.close());
   const initial = await app.inject("/api/dev/combat");
   assert.equal(initial.statusCode, 200);
@@ -281,7 +281,7 @@ test("Save / Load API 在 active combat 回安全 engineering safeguard，不修
     domainSession: session,
     saveGameRepository: saveRepository,
     combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal"),
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"),
   });
   t.after(() => app.close());
   assert.equal((await app.inject({

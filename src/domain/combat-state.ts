@@ -27,13 +27,15 @@ export interface CombatParticipant {
   readonly initiative: CombatInitiative;
   readonly normalAttack: CombatNormalAttackProfile | null;
   readonly racialEscapeModifier: 0 | -2;
+  /** Present only for a semi-autonomous party member; absent on legacy snapshots. */
+  readonly controlledBy?: "companion";
 }
 
 /** Existing player-action boundary: the controllable party actor has the player's action profile. */
 export function isPlayerActionParticipant(
-  participant: Pick<CombatParticipant, "side" | "normalAttack">,
+  participant: Pick<CombatParticipant, "side" | "normalAttack" | "controlledBy">,
 ): participant is Pick<CombatParticipant, "side"> & { readonly normalAttack: CombatNormalAttackProfile } {
-  return participant.side === "party" && participant.normalAttack !== null;
+  return participant.side === "party" && participant.normalAttack !== null && participant.controlledBy !== "companion";
 }
 
 export interface NormalAttackActionResolution {
@@ -54,9 +56,10 @@ export interface NormalAttackActionResolution {
     readonly total: number;
   };
   readonly outcome: "hit" | "miss";
+  readonly tacticPreferenceId?: string;
 }
 
-export interface PhysicalSkillActionResolution extends Omit<NormalAttackActionResolution, "type"> {
+export interface PhysicalSkillActionResolution extends Omit<NormalAttackActionResolution, "type" | "tacticPreferenceId"> {
   readonly type: "physical-skill";
   readonly skillId: string;
   readonly readyRound: number;
@@ -136,6 +139,7 @@ export interface DefendActionResolution {
   readonly type: "defend";
   readonly actorId: string;
   readonly round: number;
+  readonly tacticPreferenceId?: string;
 }
 
 export interface RunActionResolution {
@@ -251,10 +255,12 @@ function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): Combat
   if (exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack"])) {
     normalized = { ...normalized, racialEscapeModifier: 0 };
   }
-  if (!exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
+  if (!(exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
+    || exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "controlledBy"]))
     || !isId(normalized.id) || !isId(normalized.displayName)
     || (normalized.side !== "party" && normalized.side !== "enemy")
     || (normalized.row !== "front" && normalized.row !== "back")
+    || (Object.hasOwn(normalized, "controlledBy") && (normalized.controlledBy !== "companion" || normalized.side !== "party"))
     || !isRecord(normalized.initiative)
     || !exact(normalized.initiative, ["baseD20", "dexterityModifier", "total", "tieBreakRolls"])) {
     throw new Error("戰鬥參與者格式不正確。");
@@ -282,6 +288,7 @@ function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): Combat
     }),
     normalAttack,
     racialEscapeModifier: normalized.racialEscapeModifier as 0 | -2,
+    ...(normalized.controlledBy === "companion" ? { controlledBy: "companion" as const } : {}),
   });
 }
 
@@ -326,10 +333,12 @@ function expectedTurnOrder(participants: readonly CombatParticipant[]): string[]
 
 function parsePhysicalAttackAction(value: Record<string, unknown>): NormalAttackActionResolution | PhysicalSkillActionResolution | undefined {
   const skill = value.type === "physical-skill";
-  if (!exact(value, skill
+  if (!(exact(value, skill
     ? ["type", "round", "actorId", "skillId", "targetId", "attack", "evasion", "outcome", "readyRound"]
     : ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome"])
+    || (!skill && exact(value, ["type", "round", "actorId", "targetId", "attack", "evasion", "outcome", "tacticPreferenceId"])))
     || (value.type !== "normal-attack" && !skill) || !isPositiveSafeInteger(value.round)
+    || (Object.hasOwn(value, "tacticPreferenceId") && !isId(value.tacticPreferenceId))
     || !isId(value.actorId) || !isId(value.targetId)
     || (skill && (!isId(value.skillId)
       || getActiveSkillDefinition(value.skillId)?.category !== "physical-active"
@@ -366,6 +375,7 @@ function parsePhysicalAttackAction(value: Record<string, unknown>): NormalAttack
       total: value.evasion.total,
     }),
     outcome: value.outcome,
+    ...(typeof value.tacticPreferenceId === "string" ? { tacticPreferenceId: value.tacticPreferenceId } : {}),
     ...(skill ? { skillId: value.skillId as string, readyRound: value.readyRound as number } : {}),
   }) as NormalAttackActionResolution | PhysicalSkillActionResolution;
 }
@@ -401,9 +411,12 @@ function parseItemUseAction(value: Record<string, unknown>): ItemUseActionResolu
 }
 
 function parseDefendAction(value: Record<string, unknown>): DefendActionResolution | undefined {
-  if (!exact(value, ["type", "actorId", "round"])
-    || value.type !== "defend" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)) return undefined;
-  return Object.freeze({ type: "defend", actorId: value.actorId, round: value.round });
+  if (!(exact(value, ["type", "actorId", "round"])
+    || exact(value, ["type", "actorId", "round", "tacticPreferenceId"]))
+    || value.type !== "defend" || !isId(value.actorId) || !isPositiveSafeInteger(value.round)
+    || (Object.hasOwn(value, "tacticPreferenceId") && !isId(value.tacticPreferenceId))) return undefined;
+  return Object.freeze({ type: "defend", actorId: value.actorId, round: value.round,
+    ...(typeof value.tacticPreferenceId === "string" ? { tacticPreferenceId: value.tacticPreferenceId } : {}) });
 }
 
 function parseRunAction(value: Record<string, unknown>): RunActionResolution | undefined {
@@ -566,6 +579,9 @@ export function createCombatState(value: unknown): CombatState {
     || (lastAction !== null && (lastAction.round > value.round
       || !ids.includes(lastAction.actorId)
       || participants.find((participant) => participant.id === lastAction.actorId)?.side !== "party"))
+    || (lastAction !== null && (lastAction.type === "normal-attack" || lastAction.type === "defend")
+      && (participants.find((participant) => participant.id === lastAction.actorId)?.controlledBy === "companion")
+        !== (lastAction.tacticPreferenceId !== undefined))
     || ((lastAction?.type === "normal-attack" || lastAction?.type === "physical-skill")
       && (!ids.includes(lastAction.targetId)
         || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "enemy"))
@@ -587,8 +603,10 @@ export function createCombatState(value: unknown): CombatState {
         : activeCastings.some((entry) => entry.actorId === lastAction.actorId)))
     || (lastAction?.type === "row-move"
       && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
-    || ((lastAction?.type === "item-use" || lastAction?.type === "defend" || lastAction?.type === "run")
+    || ((lastAction?.type === "item-use" || lastAction?.type === "run")
       && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!))
+    || (lastAction?.type === "defend" && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!)
+      && participants.find((participant) => participant.id === lastAction.actorId)?.controlledBy !== "companion")
     || (lastAction?.type === "run" && (lastAction.dexterityModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.initiative.dexterityModifier
       || lastAction.racialModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.racialEscapeModifier))) {
     throw new Error("CombatState 行動順序或最近裁定不一致。");

@@ -186,7 +186,7 @@ test("舊 TEST 快照只補工程 MP／空詠唱；UI 顯示權威進度與完�
 test("詠唱 API 精確 body、Memory persistence、frontend runtime validation", async () => {
   const session = createDomainSession(equipped());
   const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal") });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   try {
     assert.equal((await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 1 } })).statusCode, 200);
     assert.equal((await app.inject({ method: "POST", url: "/api/dev/combat/advance", payload: { expectedRevision: 2 } })).statusCode, 200);

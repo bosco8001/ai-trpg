@@ -27,6 +27,7 @@ import {
 } from "./combat-targeting.js";
 import { createGameState, type GameState } from "./game.js";
 import { getEnemyRowTargets, resolveRowAoE } from "./row-aoe.js";
+import { decideCompanionAction, type CompanionDecisionPolicy } from "./companion-policy.js";
 
 export interface DiceRoller {
   d20(): number;
@@ -40,10 +41,11 @@ export interface CombatParticipantSeed {
   readonly dexterityModifier: number;
   readonly normalAttack: CombatNormalAttackProfile | null;
   readonly racialEscapeModifier?: 0 | -2;
+  readonly controlledBy?: "companion";
 }
 
 export type CombatTransitionCode = "invalid-command" | "stale-revision" | "revision-limit"
-  | "already-in-combat" | "not-in-combat" | "combat-ended" | "invalid-combat-setup" | "casting-active";
+  | "already-in-combat" | "not-in-combat" | "combat-ended" | "invalid-combat-setup" | "casting-active" | "companion-turn";
 
 export type CombatTransitionResult =
   | {
@@ -367,6 +369,7 @@ const messages: Record<CombatTransitionCode, string> = {
   "not-in-combat": "目前沒有進行中的戰鬥。",
   "combat-ended": "戰鬥已結束，不能再推進回合。",
   "invalid-combat-setup": "TEST 戰鬥設定或骰子結果不符合規則。",
+  "companion-turn": "目前是隊友回合，請執行隊友行動。",
 };
 
 const attackMessages: Record<NormalAttackCode, string> = {
@@ -483,6 +486,7 @@ function validateSeeds(seeds: readonly CombatParticipantSeed[]): void {
       || typeof seed.displayName !== "string" || seed.displayName.trim() !== seed.displayName
       || seed.displayName.length === 0 || (seed.side !== "party" && seed.side !== "enemy")
       || (seed.row !== "front" && seed.row !== "back")
+      || (seed.controlledBy !== undefined && (seed.controlledBy !== "companion" || seed.side !== "party"))
       || !Number.isSafeInteger(seed.dexterityModifier)
       || (seed.racialEscapeModifier !== undefined && seed.racialEscapeModifier !== 0 && seed.racialEscapeModifier !== -2)
       || (seed.normalAttack !== null && (typeof seed.normalAttack !== "object"
@@ -563,6 +567,7 @@ export function rollInitiative(
       },
       normalAttack: participant.normalAttack,
       racialEscapeModifier: participant.racialEscapeModifier ?? 0,
+      ...(participant.controlledBy === "companion" ? { controlledBy: "companion" as const } : {}),
     })),
     lastAction: null,
     skillCooldowns: [],
@@ -688,7 +693,9 @@ export function startCombat(
   if (state.revision === Number.MAX_SAFE_INTEGER) return reject("revision-limit");
   if (state.activity === "in-combat" || state.combat !== null) return reject("already-in-combat");
   try {
-    const combat = rollInitiative(participants, roller);
+    const roster = participants.filter((participant) => participant.controlledBy !== "companion"
+      || state.partyMembers.some((member) => member.id === participant.id));
+    const combat = rollInitiative(roster, roller);
     return {
       ok: true,
       state: createGameState({
@@ -711,6 +718,9 @@ export function advanceCombatTurn(state: GameState, input: unknown): CombatTrans
   if (state.revision === Number.MAX_SAFE_INTEGER) return reject("revision-limit");
   if (state.activity !== "in-combat" || state.combat === null) return reject("not-in-combat");
   if (state.combat.status === "ended") return reject("combat-ended");
+  if (state.combat.participants.find((participant) => participant.id === state.combat?.currentActorId)?.controlledBy === "companion") {
+    return reject("companion-turn");
+  }
   if (actorCasting(state.combat, state.combat.currentActorId)) return reject("casting-active");
   const combat = advanceToNextTurn(state.combat);
   return {
@@ -984,6 +994,66 @@ export function resolveNormalAttack(
     state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
     effect: { type: "normal-attack-resolved", outcome: check.outcome },
   };
+}
+
+export type CompanionActCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "combat-ended" | "not-companion-turn" | "unsupported-companion-tactic" | "invalid-roll";
+export type CompanionActResult =
+  | { readonly ok: true; readonly state: GameState; readonly effect: {
+    readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend";
+  } }
+  | { readonly ok: false; readonly code: CompanionActCode; readonly message: string };
+
+const companionActMessages: Record<CompanionActCode, string> = {
+  "invalid-command": "隊友行動請求格式不正確。",
+  "stale-revision": "戰鬥狀態已更新，請重新讀取後再執行隊友回合。",
+  "revision-limit": "狀態版本已達工程上限。",
+  "not-in-combat": "目前沒有進行中的戰鬥。",
+  "combat-ended": "戰鬥已結束，不能執行隊友回合。",
+  "not-companion-turn": "目前不是隊友的回合。",
+  "unsupported-companion-tactic": "這名隊友目前沒有可支援的戰術行為。",
+  "invalid-roll": "隊友攻擊骰子服務暫時無法使用。",
+};
+
+function rejectCompanionAct(code: CompanionActCode): CompanionActResult {
+  return { ok: false, code, message: companionActMessages[code] };
+}
+
+/** Latest authoritative preference, decision, check and one Turn transition are committed together. */
+export function resolveCompanionTurn(
+  state: GameState, input: unknown, roller: DiceRoller,
+  policy: CompanionDecisionPolicy = decideCompanionAction,
+): CompanionActResult {
+  const expectedRevision = parseExpectedRevision(input);
+  if (expectedRevision === undefined) return rejectCompanionAct("invalid-command");
+  if (expectedRevision !== state.revision) return rejectCompanionAct("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return rejectCompanionAct("revision-limit");
+  if (state.activity !== "in-combat" || state.combat === null) return rejectCompanionAct("not-in-combat");
+  if (state.combat.status === "ended") return rejectCompanionAct("combat-ended");
+  const combat = state.combat;
+  const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
+  if (!actor || actor.controlledBy !== "companion") return rejectCompanionAct("not-companion-turn");
+  const preference = state.partyMembers.find((member) => member.id === actor.id)?.tacticPreferenceId ?? null;
+  const intent = policy(combat, actor, preference);
+  if (!intent || preference === null) return rejectCompanionAct("unsupported-companion-tactic");
+  let lastAction: NormalAttackActionResolution | DefendActionResolution;
+  if (intent.type === "normal-attack") {
+    const target = combat.participants.find((participant) => participant.id === intent.targetId);
+    if (!actor.normalAttack || !target || !checkNormalAttackTarget(combat, actor, target.id, actor.normalAttack.range).legal) {
+      return rejectCompanionAct("unsupported-companion-tactic");
+    }
+    let check: ReturnType<typeof resolvePhysicalAttackCheck>;
+    try { check = resolvePhysicalAttackCheck(actor.normalAttack, target, roller); }
+    catch { return rejectCompanionAct("invalid-roll"); }
+    lastAction = { type: "normal-attack", actorId: actor.id, round: combat.round,
+      targetId: target.id, tacticPreferenceId: preference, ...check };
+  } else {
+    lastAction = { type: "defend", actorId: actor.id, round: combat.round,
+      tacticPreferenceId: preference };
+  }
+  const nextCombat = createCombatState({ ...advanceToNextTurn(combat), lastAction });
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
+    effect: { type: "companion-action-resolved", selectedAction: intent.type } };
 }
 
 export type DragonBreathCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"

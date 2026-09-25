@@ -1,6 +1,6 @@
 # Phase 21：隊伍資訊與戰術偏好介面
 
-> Phase 1–20 已由使用者確認。Phase 21 工程完成，等待使用者手動確認；Phase 22 尚未開始。
+> Phase 1–21 已由使用者確認。本文記錄 Phase 21 當時的交付邊界；Phase 22 工程完成，等待使用者手動確認。
 
 ## 階段範圍
 
@@ -274,4 +274,4 @@ curl -s http://127.0.0.1:3002/api/combat/party
 
 ## 刻意延後
 
-Phase 21 不實作 companion initiative、turn、AI 決策、攻擊、法術、物品使用、自動回合推進、戰術語意解讀、HP／MP／傷害／治療、LLM narration 或從 Prototype 複製戰術行為。Phase 22 尚未開始。
+Phase 21 當時未實作 companion initiative、turn、行動、法術、物品使用、自動回合推進、戰術語意解讀、HP／MP／傷害／治療、LLM narration 或從 Prototype 複製戰術行為。Phase 22 已另以工程 policy 接入最小隊友行動；正式戰術仍未定案。

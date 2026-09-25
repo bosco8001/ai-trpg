@@ -138,7 +138,7 @@ test("runtime contract 接受四種 lastAction，拒絕偷偷加入防禦效果�
 
 test("Defend route 只接收 expectedRevision，回應保存權威 state", async (t) => {
   const session = createDomainSession(createTestGameState());
-  const app = await buildApp({ domainSession: session, combatSandbox: true, combatRoller: createCombatFixtureRoller("normal") });
+  const app = await buildApp({ domainSession: session, combatSandbox: true, combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   t.after(() => app.close());
   assert.equal((await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } })).statusCode, 200);
   const enemy = await app.inject({ method: "POST", url: "/api/combat/defend", payload: { expectedRevision: 1 } });

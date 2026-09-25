@@ -64,7 +64,7 @@ export function initiativeDetail(participant: CombatParticipantView): string {
 export function canPlayerUseNormalAttack(combat: CombatStateView, requestInFlight: boolean): boolean {
   if (combat.status === "ended") return false;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null
+  return !requestInFlight && actor?.side === "party" && actor.controlledBy !== "companion" && actor.normalAttack !== null
     && !combat.activeCastings.some((casting) => casting.actorId === actor.id);
 }
 
@@ -80,7 +80,7 @@ export function canPlayerUseRowMove(
 ): boolean {
   if (combat.status === "ended") return false;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  return !requestInFlight && actor?.side === "party" && actor.normalAttack !== null
+  return !requestInFlight && actor?.side === "party" && actor.controlledBy !== "companion" && actor.normalAttack !== null
     && !combat.activeCastings.some((casting) => casting.actorId === actor.id)
     && options !== null && options.revision === revision
     && options.currentActorId === actor.id && options.currentRow === actor.row

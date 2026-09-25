@@ -145,7 +145,7 @@ test("唯讀 game-state API 回傳經驗證的 activity 與 CombatState，並禁
   const app = await buildApp({
     domainSession: session,
     combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal"),
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"),
   });
   t.after(() => app.close());
   const initial = await app.inject("/api/game-state");

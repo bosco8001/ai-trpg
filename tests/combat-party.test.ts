@@ -164,7 +164,7 @@ test("同一偏好選擇是無 revision 的 idempotent no-op", () => {
 
 test("嚴格驗證 stale revision、不明隊友、不明偏好與注入欄位，全部拒絕且不改 state", async (t) => {
   const session = createDomainSession(seed());
-  const app = await buildApp({ domainSession: session, combatSandbox: true, combatRoller: createCombatFixtureRoller("normal") });
+  const app = await buildApp({ domainSession: session, combatSandbox: true, combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   t.after(() => app.close());
   const started = await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } });
   assert.equal(started.statusCode, 200);
@@ -187,7 +187,7 @@ test("嚴格驗證 stale revision、不明隊友、不明偏好與注入欄位�
 test("GET Party options 不改狀態； ended combat 保持可讀且偏好唯讀", async (t) => {
   const session = createDomainSession(seed());
   const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal"), combatEscapeRoller: createCombatEscapeFixtureRoller("success") });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"), combatEscapeRoller: createCombatEscapeFixtureRoller("success") });
   t.after(() => app.close());
   await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } });
   const readBefore = session.getState();
@@ -218,7 +218,7 @@ test("GET Party options 不改狀態； ended combat 保持可讀且偏好唯讀
 test("Memory API 設定偏好後再次 GET，偏好保存且 combat snapshot 不變", async (t) => {
   const session = createDomainSession(seed());
   const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal") });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   t.after(() => app.close());
   const started = await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } });
   assert.equal(started.statusCode, 200);
@@ -353,7 +353,7 @@ test("PostgreSQL Party preference survives a new API session and pool", {
   const repositoryA = new PostgresGameStateRepository(poolA);
   const sessionA = createPersistedDomainSession(repositoryA, initial);
   const appA = await buildApp({ domainSession: sessionA, storage: "postgres", combatSandbox: true,
-    combatRoller: createCombatFixtureRoller("normal") });
+    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
   let poolB: pg.Pool | undefined;
   let appB: Awaited<ReturnType<typeof buildApp>> | undefined;
   let appAClosed = false;
@@ -378,7 +378,7 @@ test("PostgreSQL Party preference survives a new API session and pool", {
     const repositoryB = new PostgresGameStateRepository(poolB);
     const sessionB = createPersistedDomainSession(repositoryB, initial);
     appB = await buildApp({ domainSession: sessionB, storage: "postgres", combatSandbox: true,
-      combatRoller: createCombatFixtureRoller("normal") });
+      combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
     const stateResponse = await appB.inject("/api/game-state");
     assert.equal(stateResponse.statusCode, 200);
     const reloaded = stateResponse.json().state;

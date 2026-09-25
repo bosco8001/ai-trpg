@@ -31,6 +31,7 @@ import {
   isDragonBreathResponse,
   isCombatPartyOptionsResponse,
   isCompanionTacticPreferenceResponse,
+  isCompanionActResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
@@ -48,6 +49,7 @@ import {
   type DragonBreathResponse,
   type CombatPartyOptionsResponse,
   type CompanionTacticPreferenceResponse,
+  type CompanionActResponse,
   type CombatRow,
 } from "../shared/game-state.js";
 
@@ -183,6 +185,27 @@ export async function advanceTestCombatTurn(
     throw new Error("TEST 戰鬥回應格式不正確。");
   }
   if (!isCombatSandboxAdvanceResponse(body)) throw new Error("TEST 戰鬥回應格式不正確。");
+  return body;
+}
+
+/** Only revision crosses the client boundary; the server chooses action, target and dice. */
+export async function executeCompanionTurn(
+  expectedRevision: number,
+  fetcher: typeof fetch = fetch,
+): Promise<CompanionActResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/companion/act", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision }), cache: "no-store",
+    });
+  } catch { throw new Error("目前無法執行隊友回合，請重新讀取戰鬥狀態。"); }
+  if (!response.ok) throw await saveApiError(response, "目前無法執行隊友回合。");
+  let body: unknown;
+  try { body = await response.json(); } catch { throw new Error("隊友行動回應格式不正確。"); }
+  if (!isCompanionActResponse(body) || body.state.revision !== expectedRevision + 1) {
+    throw new Error("隊友行動回應格式不正確。");
+  }
   return body;
 }
 

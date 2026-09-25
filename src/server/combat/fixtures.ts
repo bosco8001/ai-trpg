@@ -32,3 +32,16 @@ export const TEST_COMBAT_PARTICIPANTS: readonly CombatParticipantSeed[] = Object
     normalAttack: null,
   }),
 ]);
+
+/** Phase 22 shared TEST battle. Values are engineering fixtures, not companion balance. */
+export const PHASE22_TEST_COMBAT_PARTICIPANTS: readonly CombatParticipantSeed[] = Object.freeze([
+  ...TEST_COMBAT_PARTICIPANTS,
+  Object.freeze({
+    id: "TEST-companion-1", displayName: "TEST 隊友", side: "party" as const,
+    row: "back" as const, dexterityModifier: 0, controlledBy: "companion" as const,
+    normalAttack: Object.freeze({
+      range: "melee" as const, perceptionModifier: 1,
+      weaponMainStatModifier: 1, proficiencyModifier: 0,
+    }),
+  }),
+]);
