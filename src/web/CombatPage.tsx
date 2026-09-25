@@ -10,7 +10,9 @@ import type {
   RowMoveOptionsResponse,
   PhysicalSkillOptionsResponse,
   DragonBreathOptionsResponse,
+  CombatPartyOptionsResponse,
 } from "../shared/game-state.js";
+import { CombatPartyDialog } from "./CombatPartyDialog.js";
 import {
   advanceTestCombatTurn,
   executeCombatItemUse,
@@ -26,9 +28,10 @@ import {
   executeCasting,
   loadDragonBreathOptions,
   executeDragonBreath,
+  loadCombatPartyOptions,
+  setCombatCompanionTacticPreference,
 } from "./api.js";
 import {
-  disabledCombatCommands,
   getCombatPresentationLanes,
   getTurnOrderEntries,
   initiativeDetail,
@@ -267,6 +270,13 @@ export function CombatPage({
   const [bagOptions, setBagOptions] = useState<CombatItemOptionsResponse | null>(null);
   const [bagOptionsError, setBagOptionsError] = useState<string | null>(null);
   const [bagOptionsReloadId, setBagOptionsReloadId] = useState(0);
+  const [isPartyOpen, setIsPartyOpen] = useState(false);
+  const [partyOptions, setPartyOptions] = useState<CombatPartyOptionsResponse | null>(null);
+  const [isLoadingParty, setIsLoadingParty] = useState(false);
+  const [partyError, setPartyError] = useState<string | null>(null);
+  const [partyStatus, setPartyStatus] = useState("");
+  const [partyReloadId, setPartyReloadId] = useState(0);
+  const [partyMutationCompanionId, setPartyMutationCompanionId] = useState<string | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [isUsingItem, setIsUsingItem] = useState(false);
   const [isDefendConfirmationOpen, setIsDefendConfirmationOpen] = useState(false);
@@ -313,6 +323,8 @@ export function CombatPage({
   const runRequestInFlight = useRef(false);
   const rowMoveButton = useRef<HTMLButtonElement>(null);
   const bagButton = useRef<HTMLButtonElement>(null);
+  const partyButton = useRef<HTMLButtonElement>(null);
+  const restorePartyFocus = useRef(false);
   const bagHeading = useRef<HTMLHeadingElement>(null);
   const bagUseButton = useRef<HTMLButtonElement>(null);
   const itemConfirmButton = useRef<HTMLButtonElement>(null);
@@ -326,6 +338,12 @@ export function CombatPage({
   const stateUpdateRef = useRef(onStateUpdate);
   retryStateRef.current = onRetryState;
   stateUpdateRef.current = onStateUpdate;
+
+  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem
+    || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation || isUsingBreath
+    || partyMutationCompanionId !== null;
+  const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions
+    || isLoadingBagOptions || isLoadingSkillOptions;
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
   useEffect(() => {
@@ -458,6 +476,106 @@ export function CombatPage({
   }, [pendingItemId]);
   useEffect(() => {
     let active = true;
+    if (!isPartyOpen) {
+      setIsLoadingParty(false);
+      return () => { active = false; };
+    }
+    setPartyOptions(null);
+    setPartyError(null);
+    setIsLoadingParty(true);
+    void loadCombatPartyOptions().then(async (options) => {
+      if (!active) return;
+      if (options.revision !== gameState.state.revision) {
+        setPartyError("隊伍狀態已更新，正在重新讀取。");
+        try {
+          const latest = await retryStateRef.current();
+          if (active) {
+            stateUpdateRef.current(latest);
+            setPartyReloadId((value) => value + 1);
+          }
+        } catch {
+          if (active) setPartyError("目前無法確認最新隊伍狀態，請稍後重新讀取。");
+        }
+        return;
+      }
+      setPartyOptions(options);
+    }).catch((error: unknown) => {
+      if (active) setPartyError(error instanceof Error ? error.message : "目前無法讀取隊伍資料，請稍後再試。");
+    }).finally(() => {
+      if (active) setIsLoadingParty(false);
+    });
+    return () => { active = false; };
+  }, [isPartyOpen, gameState.state.revision, partyReloadId]);
+  function closeParty() {
+    if (!isPartyOpen) return;
+    restorePartyFocus.current = true;
+    setIsPartyOpen(false);
+    setFeedback("已關閉隊伍資訊；遊戲狀態沒有改變。");
+  }
+
+  function restoreFocusToPartyButton() {
+    if (!restorePartyFocus.current) return;
+    partyButton.current?.focus();
+    restorePartyFocus.current = false;
+  }
+
+  function toggleParty() {
+    if (mutationInFlight) return;
+    if (isPartyOpen) {
+      closeParty();
+      return;
+    }
+    setIsTargeting(false);
+    setTargetOptions(null);
+    setSelectedSkillId(null);
+    setIsRowMoveMode(false);
+    setIsBagOpen(false);
+    setPendingItemId(null);
+    setIsDefendConfirmationOpen(false);
+    setIsRunConfirmationOpen(false);
+    setIsStartCastingConfirmationOpen(false);
+    setIsBreathRowSelectionOpen(false);
+    setPartyStatus("");
+    setIsPartyOpen(true);
+  }
+
+  function retryParty() {
+    setPartyReloadId((value) => value + 1);
+  }
+
+  function changePartyPreference(companionId: string, tacticPreferenceId: string) {
+    if (partyMutationCompanionId !== null || !partyOptions?.canChangeTacticPreference
+      || partyOptions.revision !== gameState.state.revision
+      || !partyOptions.companions.some((member) => member.id === companionId)
+      || !partyOptions.tacticPreferences.some((option) => option.id === tacticPreferenceId)) return;
+    setPartyMutationCompanionId(companionId);
+    setPartyError(null);
+    setPartyStatus("正在保存戰術偏好……");
+    void setCombatCompanionTacticPreference(gameState.state.revision, companionId, tacticPreferenceId)
+      .then((response) => {
+        onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+        setPartyOptions((current) => current ? {
+          ...current,
+          revision: response.state.revision,
+          companions: current.companions.map((member) => member.id === companionId
+            ? { ...member, tacticPreferenceId } : member),
+        } : current);
+        setPartyStatus(response.effect.type === "tactic-preference-updated"
+          ? "已更新戰術偏好；不消耗回合，也不會讓隊友自動行動。"
+          : "目前已是這項偏好；遊戲狀態沒有改變。");
+      }).catch(async (error: unknown) => {
+        setPartyStatus(error instanceof Error ? error.message : "偏好未能更新，請重新讀取隊伍資料。");
+        try {
+          const latest = await retryStateRef.current();
+          stateUpdateRef.current(latest);
+          setPartyReloadId((value) => value + 1);
+        } catch {
+          setPartyError("目前無法確認最新狀態，請重新讀取隊伍資料。");
+        }
+      }).finally(() => setPartyMutationCompanionId(null));
+  }
+  useEffect(() => {
+    let active = true;
     setRowMoveOptions(null);
     if (!combat || !hasPlayerActionActor) {
       setIsLoadingRowMoveOptions(false);
@@ -562,14 +680,22 @@ export function CombatPage({
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-commands-heading">
                 <h2 id="combat-ended-commands-heading">基本指令</h2>
                 <div className="combat-commands">
-                  {(["普通攻擊", "移動", "背包", "防禦", "逃跑", ...(gameState.sandbox ? ["TEST：推進下一回合"] : [])]).map((label) => (
-                    <Button key={label} variant="secondary" disabled>{label}</Button>
-                  ))}
+                  <Button variant="secondary" data-command="attack" disabled>普通攻擊</Button>
+                  <Button variant="secondary" data-command="defend" disabled>防禦</Button>
+                  <Button variant="secondary" data-command="inventory" disabled>背包</Button>
+                  <Button ref={partyButton} variant="secondary" data-command="party"
+                    aria-expanded={isPartyOpen} aria-controls="combat-party-dialog" onClick={toggleParty}>隊伍</Button>
+                  <Button variant="secondary" data-command="move" disabled>站位</Button>
+                  <Button variant="secondary" data-command="flee" disabled>逃走</Button>
                 </div>
               </Panel>
             </aside>
           </div>
         </div>
+        <CombatPartyDialog open={isPartyOpen} party={partyOptions} loading={isLoadingParty}
+          error={partyError} busy={partyMutationCompanionId !== null} status={partyStatus}
+          onClose={closeParty} onClosed={restoreFocusToPartyButton}
+          onRetry={retryParty} onPreferenceChange={changePartyPreference} />
       </main>
     );
   }
@@ -578,9 +704,7 @@ export function CombatPage({
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
   const selectedSkill = skillOptions?.skills.find((skill) => skill.skillId === selectedSkillId);
   const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
-  const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation || isUsingBreath;
-  const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions || isLoadingBagOptions || isLoadingSkillOptions;
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen || isBreathRowSelectionOpen;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isPartyOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen || isBreathRowSelectionOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canDefend = canPlayerDefend(combat, mutationInFlight);
   const canRun = canPlayerUseNormalAttack(combat, mutationInFlight);
@@ -1332,7 +1456,7 @@ export function CombatPage({
             <Panel className="combat-rail__panel" aria-labelledby="combat-commands-heading">
               <p className="combat-eyebrow">指令</p>
               <h2 id="combat-commands-heading">基本指令</h2>
-              <p className="combat-rail__notice">普通攻擊、移動、背包、防禦及逃跑依目前回合開放。</p>
+              <p className="combat-rail__notice">主要行動依目前回合開放；隊伍資訊與偏好設定不消耗回合。</p>
               <div className="combat-commands">
                 <Button
                   ref={attackButton}
@@ -1346,15 +1470,15 @@ export function CombatPage({
                   普通攻擊
                 </Button>
                 <Button
-                  ref={rowMoveButton}
-                  variant="primary"
-                  data-command="move"
-                  disabled={!canPlayerMoveRow || requestInFlight || selectionModeActive}
-                  loading={isLoadingRowMoveOptions}
-                  loadingLabel="讀取移動選項……"
-                  onClick={beginRowMoveSelection}
+                  ref={defendButton}
+                  variant="secondary"
+                  data-command="defend"
+                  disabled={!canDefend || mutationInFlight || isDefendConfirmationOpen || isStartCastingConfirmationOpen || selectionModeActive}
+                  aria-expanded={isDefendConfirmationOpen}
+                  aria-controls="combat-defend-panel"
+                  onClick={beginDefendConfirmation}
                 >
-                  移動
+                  防禦
                 </Button>
                 <Button
                   ref={bagButton}
@@ -1368,15 +1492,26 @@ export function CombatPage({
                   {isBagOpen ? "關閉背包" : "背包"}
                 </Button>
                 <Button
-                  ref={defendButton}
-                  variant="secondary"
-                  data-command="defend"
-                  disabled={!canDefend || mutationInFlight || isDefendConfirmationOpen || isStartCastingConfirmationOpen}
-                  aria-expanded={isDefendConfirmationOpen}
-                  aria-controls="combat-defend-panel"
-                  onClick={beginDefendConfirmation}
+                  ref={partyButton}
+                  variant="primary"
+                  data-command="party"
+                  disabled={mutationInFlight}
+                  aria-expanded={isPartyOpen}
+                  aria-controls="combat-party-dialog"
+                  onClick={toggleParty}
                 >
-                  防禦
+                  隊伍
+                </Button>
+                <Button
+                  ref={rowMoveButton}
+                  variant="primary"
+                  data-command="move"
+                  disabled={!canPlayerMoveRow || requestInFlight || selectionModeActive}
+                  loading={isLoadingRowMoveOptions}
+                  loadingLabel="讀取移動選項……"
+                  onClick={beginRowMoveSelection}
+                >
+                  站位
                 </Button>
                 <Button
                   ref={runButton}
@@ -1389,9 +1524,6 @@ export function CombatPage({
                 >
                   逃跑
                 </Button>
-                {disabledCombatCommands.map((command) => (
-                  <Button key={command.id} variant="secondary" disabled data-command={command.id}>{command.label}</Button>
-                ))}
               </div>
               {hasPlayerActionActor && !rowMoveOptions && !isLoadingRowMoveOptions ? (
                 <Button
@@ -1426,6 +1558,10 @@ export function CombatPage({
           <Button variant="secondary" loading={isRetrying} loadingLabel="正在讀取……" disabled={requestInFlight && !isRetrying} onClick={retryState}>重新讀取戰鬥狀態</Button>
         </section>
       </div>
+      <CombatPartyDialog open={isPartyOpen} party={partyOptions} loading={isLoadingParty}
+        error={partyError} busy={partyMutationCompanionId !== null} status={partyStatus}
+        onClose={closeParty} onClosed={restoreFocusToPartyButton}
+        onRetry={retryParty} onPreferenceChange={changePartyPreference} />
     </main>
   );
 }

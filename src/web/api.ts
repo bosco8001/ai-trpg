@@ -29,6 +29,8 @@ import {
   isCastingResponse,
   isDragonBreathOptionsResponse,
   isDragonBreathResponse,
+  isCombatPartyOptionsResponse,
+  isCompanionTacticPreferenceResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
@@ -44,6 +46,8 @@ import {
   type CastingResponse,
   type DragonBreathOptionsResponse,
   type DragonBreathResponse,
+  type CombatPartyOptionsResponse,
+  type CompanionTacticPreferenceResponse,
   type CombatRow,
 } from "../shared/game-state.js";
 
@@ -114,6 +118,44 @@ export async function loadAuthoritativeGameState(
     throw new Error("戰鬥狀態回應格式不正確。");
   }
   if (!isAuthoritativeGameStateResponse(body)) throw new Error("戰鬥狀態回應格式不正確。");
+  return body;
+}
+
+export async function loadCombatPartyOptions(fetcher: typeof fetch = fetch): Promise<CombatPartyOptionsResponse> {
+  let response: Response;
+  try { response = await fetcher("/api/combat/party", { cache: "no-store" }); }
+  catch { throw new Error("目前無法讀取隊伍資料，請確認服務後再試。"); }
+  if (!response.ok) throw await saveApiError(response, "目前無法讀取隊伍資料，請重新讀取戰鬥狀態。");
+  let body: unknown;
+  try { body = await response.json(); } catch { throw new Error("隊伍資料回應格式不正確。"); }
+  if (!isCombatPartyOptionsResponse(body)) throw new Error("隊伍資料回應格式不正確。");
+  return body;
+}
+
+export async function setCombatCompanionTacticPreference(
+  expectedRevision: number,
+  companionId: string,
+  tacticPreferenceId: string,
+  fetcher: typeof fetch = fetch,
+): Promise<CompanionTacticPreferenceResponse> {
+  let response: Response;
+  try {
+    response = await fetcher("/api/combat/party/tactic", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedRevision, companionId, tacticPreferenceId }),
+      cache: "no-store",
+    });
+  } catch { throw new Error("目前無法更新隊友偏好，請重新讀取隊伍資料後再試。"); }
+  if (response.status >= 500) throw new Error("目前無法更新隊友偏好，請稍後再試。");
+  if (!response.ok) throw await saveApiError(response, "隊友偏好未能更新，請重新讀取隊伍資料後再試。");
+  let body: unknown;
+  try { body = await response.json(); } catch { throw new Error("隊友偏好回應格式不正確。"); }
+  if (!isCompanionTacticPreferenceResponse(body)
+    || body.effect.companionId !== companionId || body.effect.tacticPreferenceId !== tacticPreferenceId
+    || (body.effect.type === "tactic-preference-updated"
+      ? body.state.revision !== expectedRevision + 1
+      : body.state.revision !== expectedRevision)) throw new Error("隊友偏好回應格式不正確。");
   return body;
 }
 

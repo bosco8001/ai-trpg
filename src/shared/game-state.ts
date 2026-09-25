@@ -200,6 +200,45 @@ export interface InventoryStackView {
   readonly quantity: number;
 }
 
+export interface PartyMemberStateView {
+  readonly id: string;
+  readonly displayName: string;
+  readonly tacticPreferenceId: string | null;
+}
+
+export interface CombatPartyCompanionView {
+  readonly id: string;
+  readonly displayName: string;
+  readonly level: number | null;
+  readonly row: CombatRow | null;
+  readonly hp: { readonly current: number; readonly maximum: number } | null;
+  readonly mp: { readonly current: number; readonly maximum: number } | null;
+  readonly tacticPreferenceId: string | null;
+}
+
+export interface TacticPreferenceOptionView {
+  readonly id: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly engineeringOnly: boolean;
+}
+
+export interface CombatPartyOptionsResponse {
+  readonly revision: number;
+  readonly context: "outside-combat" | "active-combat" | "ended-combat";
+  readonly canChangeTacticPreference: boolean;
+  readonly companions: readonly CombatPartyCompanionView[];
+  readonly tacticPreferences: readonly TacticPreferenceOptionView[];
+}
+
+export interface CompanionTacticPreferenceResponse extends AuthoritativeGameStateResponse {
+  readonly effect: {
+    readonly type: "tactic-preference-updated" | "tactic-preference-unchanged";
+    readonly companionId: string;
+    readonly tacticPreferenceId: string;
+  };
+}
+
 export interface CombatItemOptionView {
   readonly itemId: typeof TEST_COMBAT_CONSUMABLE_ID;
   readonly displayName: typeof TEST_COMBAT_CONSUMABLE_NAME;
@@ -289,6 +328,7 @@ export interface AuthoritativeGameStateView {
     readonly dragonBreathElement: "fire" | "ice" | "lightning" | null;
   };
   readonly inventory: readonly InventoryStackView[];
+  readonly partyMembers: readonly PartyMemberStateView[];
   readonly exploration: {
     readonly locationId: "TEST-forest-edge" | "TEST-ruin-entrance";
     readonly lastObservationTargetId: "TEST-stone-door" | null;
@@ -599,7 +639,7 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
 }
 
 export function isAuthoritativeGameStateView(value: unknown): value is AuthoritativeGameStateView {
-  if (!isRecord(value) || !exact(value, ["revision", "activity", "character", "inventory", "exploration", "combat"])
+  if (!isRecord(value) || !exact(value, ["revision", "activity", "character", "inventory", "partyMembers", "exploration", "combat"])
     || !isSafeInteger(value.revision) || value.revision < 0
     || (value.activity !== "outside-combat" && value.activity !== "in-combat")
     || !isRecord(value.character)
@@ -617,6 +657,12 @@ export function isAuthoritativeGameStateView(value: unknown): value is Authorita
       && entry.itemId === TEST_COMBAT_CONSUMABLE_ID
       && isSafeInteger(entry.quantity) && entry.quantity >= 0)
     || new Set(value.inventory.map((entry) => (entry as Record<string, unknown>).itemId)).size !== value.inventory.length
+    || !Array.isArray(value.partyMembers)
+    || !value.partyMembers.every((member) => isRecord(member)
+      && exact(member, ["id", "displayName", "tacticPreferenceId"])
+      && isId(member.id) && isId(member.displayName)
+      && (member.tacticPreferenceId === null || isId(member.tacticPreferenceId)))
+    || new Set(value.partyMembers.map((member) => (member as Record<string, unknown>).id)).size !== value.partyMembers.length
     || !isRecord(value.exploration)
     || !exact(value.exploration, ["locationId", "lastObservationTargetId"])
     || (value.exploration.locationId !== "TEST-forest-edge" && value.exploration.locationId !== "TEST-ruin-entrance")
@@ -633,6 +679,51 @@ export function isAuthoritativeGameStateView(value: unknown): value is Authorita
   const stack = value.inventory.find((entry) => (entry as Record<string, unknown>).itemId === lastAction.itemId) as
     | Record<string, unknown> | undefined;
   return stack?.quantity === lastAction.quantityAfter;
+}
+
+function isCompanionStat(value: unknown): boolean {
+  return value === null || (isRecord(value) && exact(value, ["current", "maximum"])
+    && isSafeInteger(value.current) && value.current >= 0
+    && isSafeInteger(value.maximum) && value.maximum > 0 && value.current <= value.maximum);
+}
+
+export function isCombatPartyOptionsResponse(value: unknown): value is CombatPartyOptionsResponse {
+  if (!isRecord(value) || !exact(value, [
+    "revision", "context", "canChangeTacticPreference", "companions", "tacticPreferences",
+  ]) || !isSafeInteger(value.revision) || value.revision < 0
+    || (value.context !== "outside-combat" && value.context !== "active-combat" && value.context !== "ended-combat")
+    || typeof value.canChangeTacticPreference !== "boolean"
+    || value.canChangeTacticPreference !== (value.context === "active-combat")
+    || !Array.isArray(value.companions) || !Array.isArray(value.tacticPreferences)) return false;
+  const companionsValid = value.companions.every((member) => isRecord(member)
+    && exact(member, ["id", "displayName", "level", "row", "hp", "mp", "tacticPreferenceId"])
+    && isId(member.id) && isId(member.displayName)
+    && (member.level === null || (isSafeInteger(member.level) && member.level > 0))
+    && (member.row === null || member.row === "front" || member.row === "back")
+    && isCompanionStat(member.hp) && isCompanionStat(member.mp)
+    && (member.tacticPreferenceId === null || isId(member.tacticPreferenceId)));
+  const preferencesValid = value.tacticPreferences.every((preference) => isRecord(preference)
+    && exact(preference, ["id", "displayName", "description", "engineeringOnly"])
+    && isId(preference.id) && isId(preference.displayName)
+    && typeof preference.description === "string" && preference.description.trim() === preference.description
+    && typeof preference.engineeringOnly === "boolean");
+  return companionsValid && preferencesValid
+    && new Set(value.companions.map((member) => (member as Record<string, unknown>).id)).size === value.companions.length
+    && new Set(value.tacticPreferences.map((preference) => (preference as Record<string, unknown>).id)).size === value.tacticPreferences.length;
+}
+
+export function isCompanionTacticPreferenceResponse(value: unknown): value is CompanionTacticPreferenceResponse {
+  if (!isRecord(value)) return false;
+  const effect = value.effect;
+  const state = value.state;
+  if (!exact(value, ["sandbox", "storage", "effect", "state"])
+    || typeof value.sandbox !== "boolean" || (value.storage !== "memory" && value.storage !== "postgres")
+    || !isAuthoritativeGameStateView(state) || !isRecord(effect)
+    || !exact(effect, ["type", "companionId", "tacticPreferenceId"])
+    || (effect.type !== "tactic-preference-updated" && effect.type !== "tactic-preference-unchanged")
+    || !isId(effect.companionId) || !isId(effect.tacticPreferenceId)) return false;
+  return state.partyMembers.some((member) => member.id === effect.companionId
+    && member.tacticPreferenceId === effect.tacticPreferenceId);
 }
 
 export function isAuthoritativeGameStateResponse(value: unknown): value is AuthoritativeGameStateResponse {

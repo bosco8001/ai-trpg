@@ -18,7 +18,6 @@ import { advanceTestCombatTurn, loadAuthoritativeGameState } from "../src/web/ap
 import { CombatPage } from "../src/web/CombatPage.js";
 import {
   applicationMode,
-  disabledCombatCommands,
   getCombatPresentationLanes,
   getTurnOrderEntries,
   initiativeDetail,
@@ -80,9 +79,8 @@ test("CombatPage 呈現權威 Round、actor、四排、唯讀技能與 disabled 
   for (const text of ["TEST 戰鬥", "第 1 回合", "目前行動：", "TEST 敵人 1", "敵方後排", "敵方前排", "我方前排", "我方後排", "戰鬥敘事", "尚未接入", "TEST-skill-1", "目前行動"]) {
     assert.match(page, new RegExp(text));
   }
-  for (const command of disabledCombatCommands) {
-    assert.match(page, new RegExp(`data-command=\\"${command.id}\\"[^>]*disabled=\\"\\"`));
-  }
+  assert.match(page, /data-command="party"/);
+  assert.doesNotMatch(page, /data-command="party"[^>]*disabled=""/);
   assert.match(page, /TEST：推進下一回合/);
   assert.match(page, /目前是敵方回合/);
   assert.doesNotMatch(page, /HP\s*\d|MP\s*\d|選擇目標|攻擊成功/);

@@ -1,5 +1,6 @@
 import { createCombatState, type CombatState } from "./combat-state.js";
 import { isInventory, normalizeInventory, type InventoryStack } from "./combat-items.js";
+import { createLegacyPartyMembers, isPartyMemberStates, type PartyMemberState } from "./party-tactics.js";
 
 export type ExplorationLocationId = "TEST-forest-edge" | "TEST-ruin-entrance";
 
@@ -30,6 +31,8 @@ export interface GameState {
   };
   /** Authoritative item stacks; item definitions live in the static domain catalog. */
   readonly inventory: readonly InventoryStack[];
+  /** Party membership and opaque companion preference IDs; no companion turn behavior lives here. */
+  readonly partyMembers: readonly PartyMemberState[];
   readonly exploration: ExplorationState;
   readonly combat: CombatState | null;
 }
@@ -173,7 +176,8 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
-  if (!hasExactKeys(seed, ["revision", "activity", "character", "inventory", "exploration", "combat"])
+  if (!(hasExactKeys(seed, ["revision", "activity", "character", "inventory", "exploration", "combat"])
+      || hasExactKeys(seed, ["revision", "activity", "character", "inventory", "partyMembers", "exploration", "combat"]))
     || !(hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp", "raceId", "dragonBreathElement"])
       || hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp"])
       || (hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds"])
@@ -182,6 +186,8 @@ export function createGameState(seed: unknown): GameState {
     throw new Error("初始 domain 狀態不符合契約。");
   }
   const character = seed.character;
+  const partyMembers = Object.hasOwn(seed, "partyMembers") ? seed.partyMembers
+    : createLegacyPartyMembers(typeof character.id === "string" ? character.id : "");
   // 僅供已知 TEST-character 的 Phase 1–18 舊快照升級；正式角色須帶有 MP。
   const currentMp = Object.hasOwn(character, "currentMp") ? character.currentMp : 24;
   // 僅已知 TEST 角色補固定火元素；未知舊角色不產生種族或龍息元素。
@@ -208,6 +214,7 @@ export function createGameState(seed: unknown): GameState {
       && dragonBreathElement !== "ice" && dragonBreathElement !== "lightning")
     || (raceId !== "dragonborn" && dragonBreathElement !== null)
     || !isInventory(seed.inventory)
+    || !isPartyMemberStates(partyMembers)
     || new Set(character.learnedActiveSkillIds).size !== character.learnedActiveSkillIds.length
     || loadoutError(character.learnedActiveSkillIds, character.equippedSkillIds)
     || (exploration.locationId !== "TEST-forest-edge" && exploration.locationId !== "TEST-ruin-entrance")
@@ -236,6 +243,7 @@ export function createGameState(seed: unknown): GameState {
       dragonBreathElement,
     }),
     inventory: normalizeInventory(seed.inventory),
+    partyMembers: Object.freeze(partyMembers.map((member) => Object.freeze({ ...member }))),
     exploration: Object.freeze({
       locationId: exploration.locationId,
       lastObservationTargetId: exploration.lastObservationTargetId,

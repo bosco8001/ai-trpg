@@ -2,6 +2,10 @@ import { applyCommand, createGameState, replaceGameStateContents } from "../doma
 import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 import {
+  getCombatPartyOptions,
+  setCompanionTacticPreference as setCompanionTacticPreferenceTransition,
+} from "../domain/party.js";
+import {
   advanceCombatTurn,
   defendCombatTurn,
   getCurrentCombatItemOptions,
@@ -27,6 +31,9 @@ import {
 
 export interface GameStateSession {
   getState(): GameState | Promise<GameState>;
+  partyOptions(): ReturnType<typeof getCombatPartyOptions> | Promise<ReturnType<typeof getCombatPartyOptions>>;
+  setCompanionTacticPreference(input: unknown): ReturnType<typeof setCompanionTacticPreferenceTransition>
+    | Promise<ReturnType<typeof setCompanionTacticPreferenceTransition>>;
   execute(input: unknown): ReturnType<typeof applyCommand> | Promise<ReturnType<typeof applyCommand>>;
   replaceContents(expectedRevision: unknown, contents: unknown): ReturnType<typeof replaceGameStateContents>
     | Promise<ReturnType<typeof replaceGameStateContents>>;
@@ -60,6 +67,12 @@ export function createDomainSession(initialState: GameState) {
   let state = createGameState(initialState);
   return {
     getState: () => state,
+    partyOptions: () => getCombatPartyOptions(state),
+    setCompanionTacticPreference(input: unknown) {
+      const result = setCompanionTacticPreferenceTransition(state, input);
+      if (result.ok && result.state.revision !== state.revision) state = result.state;
+      return result;
+    },
     execute(input: unknown) {
       const result = applyCommand(state, input);
       if (result.ok) state = result.state;
@@ -157,6 +170,26 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
   }
   return {
     getState: () => repository.createIfAbsent(seed),
+    async partyOptions() {
+      return getCombatPartyOptions(await repository.createIfAbsent(seed));
+    },
+    async setCompanionTacticPreference(input: unknown) {
+      if (repository.withStateLocked) {
+        return repository.withStateLocked(seed, (state) => {
+          const result = setCompanionTacticPreferenceTransition(state, input);
+          return { result, ...(result.ok && result.state.revision !== state.revision ? { nextState: result.state } : {}) };
+        });
+      }
+      const state = await repository.createIfAbsent(seed);
+      const result = setCompanionTacticPreferenceTransition(state, input);
+      if (!result.ok || result.state.revision === state.revision) return result;
+      const saved = await repository.saveIfRevision(state.revision, result.state);
+      return saved ? result : {
+        ok: false as const,
+        code: "stale-revision" as const,
+        message: "遊戲狀態已更新，請重新讀取隊伍資料後再試。",
+      };
+    },
     async execute(input: unknown) {
       const state = await repository.createIfAbsent(seed);
       const result = applyCommand(state, input);

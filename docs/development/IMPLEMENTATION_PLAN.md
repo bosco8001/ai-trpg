@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–19 已由使用者確認。Phase 20「AoE 與龍息」工程完成，等待使用者手動確認；Phase 21 尚未開始。
+Phase 1–20 已由使用者確認。Phase 21「隊伍資訊與戰術偏好介面」工程完成，等待使用者手動確認；Phase 22 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -255,4 +255,14 @@ Phase 16 已由使用者手動確認。
 
 新增通用的逐目標 row-based AoE 解析：後端由玩家所選敵方排取得全體目標，每位目標分別擲攻擊／閃避，單一行動一次保存結果、一次推進 Turn 與增加 revision。首個使用者可操作能力只有龍裔天生能力「龍息」。龍息依角色權威種族與固定元素判定資格，使用 D20 + PER，命中後才判 raw 19／20 暴擊；R1 用後 R4 可再用。獨立 `racialAbilityCooldowns` 不與物理技能冷卻混用，也不佔六格、不扣 MP、不詠唱。空排、冷卻、進行中詠唱、舊 revision、額外欄位及終止戰鬥均安全拒絕。擲骰失敗不提交部分結果。
 
-元素、冷卻及最近逐目標裁定保存於既有 JSONB；已知 TEST 舊角色補固定火元素，未知正式舊角色保持未解決，舊 CombatState 補空冷卻。沒有 migration、傷害、HP、護甲或 LLM。介面新增緊湊「天生能力」及選排操作，開啟／取消不寫權威狀態。詳細規則與手動清單見 [Phase 20 文件](PHASE_20_AOE_DRAGON_BREATH.md)。工程檢查：`npm test` 在獨立 `ai_trpg_phase20_test` PostgreSQL 資料庫共 209 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，dry run 無待執行 migration。手機、鍵盤、遊戲操作與 API 重啟仍待使用者手動確認。Phase 21 尚未開始。
+元素、冷卻及最近逐目標裁定保存於既有 JSONB；已知 TEST 舊角色補固定火元素，未知正式舊角色保持未解決，舊 CombatState 補空冷卻。沒有 migration、傷害、HP、護甲或 LLM。介面新增緊湊「天生能力」及選排操作，開啟／取消不寫權威狀態。詳細規則與手動清單見 [Phase 20 文件](PHASE_20_AOE_DRAGON_BREATH.md)。工程檢查：`npm test` 在獨立 `ai_trpg_phase20_test` PostgreSQL 資料庫共 209 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，dry run 無待執行 migration。Phase 20 已由使用者完成 Memory、cooldown、casting guard、refresh、PostgreSQL API restart、mobile 與 keyboard 全部手動驗收。Phase 1–20 已由使用者確認。
+
+## Phase 21 交付紀錄
+
+Phase 21 新增 server-derived Party 讀取與 tactic catalog，以及只接受 `expectedRevision`、`companionId`、`tacticPreferenceId` 的嚴格偏好變更 API。TEST companion 只存在於 Party state，不加入 `CombatState.turnOrder`。TEST A／B 是沒有戰鬥語意的工程 fixture；正式戰術名稱、數量與語意保持未定。隊友缺少權威 level、row、HP、MP 時 UI 明確顯示未接入，不填造數值。
+
+偏好變更在 active combat 的任一 actor 回合都可使用，也允許 active casting 期間修改。成功時 revision 只增加一次，偏好 ID 更新；actor、Turn、Round、`lastAction`、casting、MP、技能／種族冷卻、inventory 與 row 均不變。同一偏好是 no-op、不增加 revision。Ended combat 保留 Party 唯讀，偏好修改安全拒絕。開啟／關閉只作用於前端，不變更狀態或 revision。
+
+GameState snapshot 將 party preference 存入既有 PostgreSQL `game_states.snapshot` JSONB，沒有新增 migration；Save Format v1 與 active-combat Save／Load safeguard 不變。舊 Phase 1–20 TEST snapshot hydrate 後獲得確定性 TEST 隊友／A 偏好；其他角色不會被補入 TEST party 或生產預設偏好。正式 catalog 定義屬靜態 gameplay design/data，玩家當前選擇屬 runtime mutable state。完整 API、Memory、敵方回合、casting、refresh、stale／注入、PostgreSQL、mobile、keyboard 指令見 [Phase 21 文件](PHASE_21_PARTY_TACTICS.md)。
+
+工程檢查：`npm test` 對隔離 `ai_trpg_phase21_test` 執行，共 222 項通過、0 項失敗、0 項略過；包含 Phase 18–20 regression 與新 repository／session 的 PostgreSQL 偏好保存重載測試。`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過；dry-run 沒有待執行 migration。PostgreSQL restart 的瀏覽器/API 手動流程、Party 開關與偏好操作、手機、鍵盤和 Phase 21 接受狀態仍待使用者手動確認。Phase 1–20 已確認；Phase 21 工程完成、等待手動確認；Phase 22 尚未開始。

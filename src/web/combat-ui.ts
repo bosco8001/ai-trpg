@@ -21,10 +21,6 @@ export interface TurnOrderEntry {
   readonly current: boolean;
 }
 
-export const disabledCombatCommands = Object.freeze([
-  { id: "party", label: "隊伍" },
-] as const);
-
 const laneLabels: Readonly<Record<CombatPresentationLaneId, string>> = Object.freeze({
   "enemy-back": "敵方後排",
   "enemy-front": "敵方前排",

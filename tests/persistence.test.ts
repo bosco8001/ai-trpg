@@ -3,6 +3,7 @@ import test from "node:test";
 import pg from "pg";
 import { randomUUID } from "node:crypto";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
+import { createLegacyPartyMembers } from "../src/domain/party-tactics.js";
 import type { GameState } from "../src/domain/game.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { buildApp } from "../src/server/app.js";
@@ -27,6 +28,7 @@ function seed(id = "TEST-character"): GameState {
       dragonBreathElement: id === "TEST-character" ? "fire" : null,
     },
     inventory: createTestCombatInventory(),
+    partyMembers: createLegacyPartyMembers(id),
     exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
     combat: null,
   };

@@ -1,5 +1,6 @@
 import { createGameState, createInitialTestExplorationState, type GameState } from "../domain/game.js";
 import { createTestCombatInventory } from "../domain/combat-items.js";
+import { createLegacyPartyMembers } from "../domain/party-tactics.js";
 
 /** 所有識別碼與技能都是工程 fixture，不代表正式角色、地圖或世界內容。 */
 export function createTestGameState(): GameState {
@@ -15,6 +16,7 @@ export function createTestGameState(): GameState {
       dragonBreathElement: "fire", // TEST fixture only；不是正式元素生成機率。
     },
     inventory: createTestCombatInventory(),
+    partyMembers: createLegacyPartyMembers("TEST-character"),
     exploration: createInitialTestExplorationState(),
     combat: null,
   });

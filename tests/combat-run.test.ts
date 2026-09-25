@@ -283,7 +283,9 @@ test("前端 request 只有 revision；畫面呈現成功或失敗的機械結�
   assert.match(page(succeeded.state), /結果：逃跑成功/);
   assert.match(page(succeeded.state), /戰鬥結算與返回探索尚未接入/);
   assert.doesNotMatch(page(succeeded.state), /目前行動：TEST 敵人 2|戰鬥敘事|成功率|進入探索/);
-  assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 7);
+  assert.match(page(succeeded.state), /data-command="party"/);
+  assert.doesNotMatch(page(succeeded.state), /data-command="party"[^>]*disabled=""/);
+  assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 6);
   assert.equal(canPlayerUseNormalAttack(succeeded.state.combat!, false), false);
   const source = await readFile(new URL("../src/web/CombatPage.tsx", import.meta.url), "utf8");
   assert.match(source, /確定要嘗試逃跑嗎？/);

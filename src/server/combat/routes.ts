@@ -16,6 +16,8 @@ import {
   isCastingResponse,
   isDragonBreathOptionsResponse,
   isDragonBreathResponse,
+  isCombatPartyOptionsResponse,
+  isCompanionTacticPreferenceResponse,
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
@@ -181,6 +183,17 @@ function safeBreathFailure(app: FastifyInstance, reply: FastifyReply, error: unk
   return reply.code(500).send({ error: "dragon-breath-failed", message: "目前無法處理龍息，請重新讀取戰鬥狀態。" });
 }
 
+function safePartyFailure(app: FastifyInstance, reply: FastifyReply, error: unknown) {
+  app.log.error({ err: error }, "隊伍資料操作失敗");
+  if (error instanceof PersistenceUnavailableError) {
+    return reply.code(503).send({ error: "state-unavailable", message: "隊伍資料暫時無法使用，請稍後再試。" });
+  }
+  if (error instanceof InvalidPersistedStateError) {
+    return reply.code(500).send({ error: "state-invalid", message: "已保存的隊伍資料無法安全讀取。" });
+  }
+  return reply.code(500).send({ error: "party-failed", message: "目前無法處理隊伍資料，請重新讀取後再試。" });
+}
+
 /** Formal read/action boundary. Legal targets are derived; only the attack transition writes state. */
 export function registerCombatActionRoutes(
   app: FastifyInstance,
@@ -188,6 +201,36 @@ export function registerCombatActionRoutes(
   storage: "memory" | "postgres",
   sandbox: boolean,
 ) {
+  app.get("/api/combat/party", async (_request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const response = await service.partyOptions();
+      if (!isCombatPartyOptionsResponse(response)) throw new Error("隊伍資料未通過 runtime validation。");
+      return response;
+    } catch (error) { return safePartyFailure(app, reply, error); }
+  });
+
+  app.post<{ Body: unknown }>("/api/combat/party/tactic", {
+    bodyLimit: 1024,
+    errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.code(400).send({ error: "invalid-request", message: "請送出有效的隊友偏好設定。" });
+    },
+  }, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.setCompanionTacticPreference(request.body);
+      if (!result.ok) {
+        const code = result.code === "invalid-command" ? 400
+          : result.code === "companion-not-found" || result.code === "tactic-preference-not-found" ? 404 : 409;
+        return reply.code(code).send({ error: result.code, message: result.message });
+      }
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      if (!isCompanionTacticPreferenceResponse(response)) throw new Error("隊友偏好回應未通過 runtime validation。");
+      return response;
+    } catch (error) { return safePartyFailure(app, reply, error); }
+  });
+
   app.get("/api/combat/dragon-breath/options", async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
     try {

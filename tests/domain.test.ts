@@ -6,6 +6,7 @@ import { startCombat } from "../src/domain/combat.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { buildApp } from "../src/server/app.js";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
+import { createLegacyPartyMembers } from "../src/domain/party-tactics.js";
 
 const learned = Array.from({ length: 7 }, (_, i) => `TEST-skill-${i + 1}`);
 const seed = (): GameState => ({
@@ -13,6 +14,7 @@ const seed = (): GameState => ({
   character: { id: "TEST-character", learnedActiveSkillIds: [...learned], equippedSkillIds: [], currentMp: 24,
     raceId: "dragonborn", dragonBreathElement: "fire" },
   inventory: createTestCombatInventory(),
+  partyMembers: createLegacyPartyMembers("TEST-character"),
   exploration: { locationId: "TEST-forest-edge", lastObservationTargetId: null },
   combat: null,
 });

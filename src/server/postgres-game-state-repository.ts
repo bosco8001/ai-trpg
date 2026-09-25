@@ -3,6 +3,7 @@ import { createGameState, createInitialTestExplorationState } from "../domain/ga
 import type { GameState } from "../domain/game.js";
 import type { GameStateRepository } from "../domain/game-state-repository.js";
 import { createTestCombatInventory } from "../domain/combat-items.js";
+import { createLegacyPartyMembers } from "../domain/party-tactics.js";
 
 export class PersistenceUnavailableError extends Error {
   constructor(cause: unknown) {
@@ -27,6 +28,7 @@ function snapshotOf(state: GameState) {
     activity: state.activity,
     character: state.character,
     inventory: state.inventory,
+    partyMembers: state.partyMembers,
     exploration: state.exploration,
     combat: state.combat,
   };
@@ -52,12 +54,16 @@ export function hydrateStateRow(row: StateRow): GameState {
     const current = snapshotKeys.length === 5 && snapshotKeys.includes("activity")
       && snapshotKeys.includes("character") && snapshotKeys.includes("exploration")
       && snapshotKeys.includes("combat") && snapshotKeys.includes("inventory");
-    if (!legacy && !explorationOnly && !currentWithoutInventory && !current) {
+    const currentWithParty = snapshotKeys.length === 6 && snapshotKeys.includes("activity")
+      && snapshotKeys.includes("character") && snapshotKeys.includes("exploration")
+      && snapshotKeys.includes("combat") && snapshotKeys.includes("inventory")
+      && snapshotKeys.includes("partyMembers");
+    if (!legacy && !explorationOnly && !currentWithoutInventory && !current && !currentWithParty) {
       throw new Error("快照欄位格式錯誤。");
     }
     const revision = Number(row.revision);
     if (!Number.isSafeInteger(revision)) throw new Error("狀態版本超出安全範圍。");
-    const missingInventory = !current;
+    const missingInventory = !current && !currentWithParty;
     if (missingInventory && row.character_id !== "TEST-character") {
       throw new Error("未知角色的舊快照缺少背包欄位。");
     }
@@ -65,7 +71,8 @@ export function hydrateStateRow(row: StateRow): GameState {
       ...snapshot,
       exploration: legacy ? createInitialTestExplorationState() : snapshot.exploration,
       inventory: missingInventory ? createTestCombatInventory() : snapshot.inventory,
-      combat: current || currentWithoutInventory ? snapshot.combat : null,
+      combat: current || currentWithParty || currentWithoutInventory ? snapshot.combat : null,
+      partyMembers: currentWithParty ? snapshot.partyMembers : createLegacyPartyMembers(row.character_id),
       revision,
     });
     if (state.character.id !== row.character_id) throw new Error("角色識別碼不一致。");
