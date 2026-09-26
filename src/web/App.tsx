@@ -13,6 +13,9 @@ export function App() {
   const [attempt, setAttempt] = useState(0);
   const [authoritativeState, setAuthoritativeState] = useState<AuthoritativeGameStateResponse | null>(null);
   const [stateError, setStateError] = useState<string | null>(null);
+  const acceptAuthoritativeState = (next: AuthoritativeGameStateResponse) => {
+    setAuthoritativeState((current) => current && current.state.revision > next.state.revision ? current : next);
+  };
 
   useEffect(() => {
     let disposed = false;
@@ -35,7 +38,7 @@ export function App() {
     let disposed = false;
     void loadAuthoritativeGameState().then((next) => {
       if (disposed) return;
-      setAuthoritativeState(next);
+      acceptAuthoritativeState(next);
       setStateError(null);
     }).catch(() => {
       if (!disposed) setStateError("目前無法讀取遊戲狀態。");
@@ -45,7 +48,7 @@ export function App() {
 
   async function retryAuthoritativeState(): Promise<AuthoritativeGameStateResponse> {
     const next = await loadAuthoritativeGameState();
-    setAuthoritativeState(next);
+    acceptAuthoritativeState(next);
     setStateError(null);
     return next;
   }
@@ -64,7 +67,7 @@ export function App() {
         <CombatPage
           gameState={authoritativeState}
           stateError={stateError}
-          onStateUpdate={setAuthoritativeState}
+          onStateUpdate={acceptAuthoritativeState}
           onRetryState={retryAuthoritativeState}
         />
       ) : authoritativeState ? (

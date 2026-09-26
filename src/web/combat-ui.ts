@@ -54,6 +54,16 @@ export function getTurnOrderEntries(combat: CombatStateView): readonly TurnOrder
   });
 }
 
+/** Rotates the server's fixed base order for display; never edits turnOrder. */
+export function getVisualTurnOrderEntries(combat: CombatStateView, visualActorId = combat.currentActorId): readonly TurnOrderEntry[] {
+  const entries = getTurnOrderEntries(combat);
+  const index = entries.findIndex((entry) => entry.participant.id === visualActorId);
+  if (index < 0) return entries;
+  return [...entries.slice(index), ...entries.slice(0, index)].map((entry) => ({
+    participant: entry.participant, current: entry.participant.id === visualActorId,
+  }));
+}
+
 export function initiativeDetail(participant: CombatParticipantView): string {
   const modifier = participant.initiative.dexterityModifier >= 0
     ? `+ ${participant.initiative.dexterityModifier}`

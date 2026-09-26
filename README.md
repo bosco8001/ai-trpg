@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–22 已由使用者確認。Phase 23「AI 戰鬥敘事」工程完成，等待使用者手動確認；Phase 24 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–23 已由使用者確認。Phase 24「回合順序動畫與 NPC 節奏」工程完成，等待使用者手動確認；Phase 25 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -401,4 +401,8 @@ Phase 21 已由使用者手動確認。「隊伍」可讀取伺服器提供的�
 
 ## Phase 23：AI 戰鬥敘事手動驗收
 
-成功的戰鬥行動先由伺服器保存權威結果，再把最少量的已確認事實交給既有 `LanguageModel`。敘事只隨這次 action response 回傳；不保存於 `GameState`，重新整理不重建舊敘事。模型故障時會顯示確定事實的系統備援文字，戰鬥仍成功且 revision 只增加一次。詳細的 HIT／MISS、隊友、詠唱、龍息、故障、PostgreSQL 重啟、手機與鍵盤指令見 [Phase 23 文件](docs/development/PHASE_23_AI_COMBAT_NARRATION.md)。Phase 23 等待使用者手動確認。
+成功的戰鬥行動先由伺服器保存權威結果，再把最少量的已確認事實交給既有 `LanguageModel`。敘事只隨這次 action response 回傳；不保存於 `GameState`，重新整理不重建舊敘事。模型故障時會顯示確定事實的系統備援文字，戰鬥仍成功且 revision 只增加一次。詳細的 HIT／MISS、隊友、詠唱、龍息、故障、PostgreSQL 重啟、手機與鍵盤指令見 [Phase 23 文件](docs/development/PHASE_23_AI_COMBAT_NARRATION.md)。Phase 23 已由使用者手動確認。
+
+## Phase 24：回合順序動畫與 NPC 節奏
+
+TEST 戰鬥會從權威 current actor 自動接續：TEST 敵方只呼叫既有 sandbox advance；隊友只呼叫既有 companion action。玩家回合停下等待指令。行動順序 chip 會輪轉，戰場同步標示目前角色；隊友敘事與機械結果先停留供閱讀。暫定毫秒值只屬前端呈現，不改 GameState 或資料庫。完整可複製的 Memory／PostgreSQL 指令、預期 revision、refresh、錯誤、手機、減少動態效果與鍵盤檢查見 [Phase 24 文件](docs/development/PHASE_24_TURN_PACING.md)。Phase 24 等待使用者手動確認。

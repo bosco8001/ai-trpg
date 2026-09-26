@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–22 已由使用者確認。Phase 23「AI 戰鬥敘事」工程完成，等待使用者手動確認；Phase 24 尚未開始。
+Phase 1–23 已由使用者確認。Phase 24「回合順序動畫與 NPC 節奏」工程完成，等待使用者手動確認；Phase 25 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -281,6 +281,12 @@ CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migrati
 
 正式戰鬥 action 的 domain transition 與既有 session/repository 保存先完成，才從成功結果的 `lastAction` 建立最小 `CombatNarrationFacts`。`CombatNarrationService` 沿用 Phase 5 `LanguageModel`、Phase 9 的 fake fixture mode 與逾時方式，要求模型回傳 exact `{ "text": "..." }` JSON。輸出經長度、形狀與基本事實一致性驗證；模型故障或錯誤輸出直接使用由已確認事實組成的 deterministic fallback。成功 action 的 response 同時包含原本權威 `effect`／`state` 與非權威 `narration`。拒絕、讀取、TEST advance、Party 偏好修改及 repository save 失敗不呼叫模型。
 
-支援普通攻擊、換排、物品、防禦、逃跑、物理技能、四種詠唱階段、龍息逐目標結果與隊友攻擊／防禦。敘事 actor 取自 `lastAction.actorId`，不取已推進的 current actor。未實作的傷害、HP、治療、防禦減傷、法術成功與死亡不得敘述。Combat UI 的 AI 區只顯示當次成功回應，與系統機械裁定分開；刷新與 hydrate 不重叫 LLM。AI prose 不進 `CombatState` 或 PostgreSQL `game_states.snapshot`，沒有 migration、額外 revision 或敘事保存 endpoint。正式 provider、歷史保存與 Phase 24 節奏仍未定；完整命令見 [Phase 23 手動驗收文件](PHASE_23_AI_COMBAT_NARRATION.md)。Phase 23 工程完成，等待使用者手動確認；Phase 24 尚未開始。
+支援普通攻擊、換排、物品、防禦、逃跑、物理技能、四種詠唱階段、龍息逐目標結果與隊友攻擊／防禦。敘事 actor 取自 `lastAction.actorId`，不取已推進的 current actor。未實作的傷害、HP、治療、防禦減傷、法術成功與死亡不得敘述。Combat UI 的 AI 區只顯示當次成功回應，與系統機械裁定分開；刷新與 hydrate 不重叫 LLM。AI prose 不進 `CombatState` 或 PostgreSQL `game_states.snapshot`，沒有 migration、額外 revision 或敘事保存 endpoint。正式 provider、歷史保存仍未定；完整命令見 [Phase 23 手動驗收文件](PHASE_23_AI_COMBAT_NARRATION.md)。Phase 23 已由使用者手動確認並 commit。
 
-工程檢查：`npm test` 使用獨立 `ai_trpg_phase23_test` PostgreSQL 資料庫，242 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過，dry-run 無待執行 migration。專門整合測試以新 pool／repository／session 讀回模型故障後已提交的機械狀態，並確認 snapshot 無敘事欄位。瀏覽器、手機、鍵盤、敘事品質與實際 API process restart 留待使用者手動驗收。
+工程檢查：`npm test` 使用獨立 `ai_trpg_phase23_test` PostgreSQL 資料庫，242 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過，dry-run 無待執行 migration。專門整合測試以新 pool／repository／session 讀回模型故障後已提交的機械狀態，並確認 snapshot 無敘事欄位。Phase 23 其後已由使用者手動驗收並 commit。
+
+## Phase 24 交付紀錄
+
+前端新增獨立 NPC 節奏控制器：從權威 GameState 判斷目前角色，以暫定呈現停頓安排既有 TEST advance 或 companion action。玩家回合、ended combat、非 sandbox 敵人與不支援 NPC 都不自動送 mutation。成功回應先採用伺服器狀態與 Phase 23 敘事，再讓結果停留、輪轉 chip 與戰場高亮；前端不改 `turnOrder`、Round、骰值或 `lastAction`。每個 `revision:actorId` 只送一次、同時只允許一個自動 mutation；StrictMode cleanup、舊 timer／舊回應、stale revision、refresh 與網路故障有獨立處理。動畫、計時與節奏 phase 不保存，無 migration。完整流程及手動指令見 [Phase 24 文件](PHASE_24_TURN_PACING.md)。Phase 24 工程完成，等待使用者手動確認；Phase 25 尚未開始。
+
+工程檢查：`npm test` 在隔離 `ai_trpg_phase24_test` PostgreSQL 資料庫執行，254 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，migration 後 dry run 無待執行項目。另於隔離 `ai_trpg_phase24_restart` 以實際 API process 停止／重啟驗證 revision 6、Round 2、玩家 actor、turnOrder、lastAction 與戰術偏好讀回一致。瀏覽器動畫、手機、減少動態效果與鍵盤仍待使用者手動驗收。

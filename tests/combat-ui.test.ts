@@ -82,7 +82,7 @@ test("CombatPage 呈現權威 Round、actor、四排、唯讀技能與 disabled 
   assert.match(page, /data-command="party"/);
   assert.doesNotMatch(page, /data-command="party"[^>]*disabled=""/);
   assert.match(page, /TEST：推進下一回合/);
-  assert.match(page, /目前是敵方回合/);
+  assert.match(page, /TEST 敵方回合/);
   assert.doesNotMatch(page, /HP\s*\d|MP\s*\d|選擇目標|攻擊成功/);
 });
 

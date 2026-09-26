@@ -549,11 +549,15 @@ function isSafeApiError(value: unknown): value is { error: string; message: stri
 async function saveApiError(response: Response, fallback: string): Promise<Error> {
   try {
     const body: unknown = await response.json();
-    if (isSafeApiError(body) && body.message.trim().length > 0) return new Error(body.message);
+    if (isSafeApiError(body) && body.message.trim().length > 0) return new ApiRequestError(body.message, body.error);
   } catch {
     // 使用固定安全訊息；不顯示原始 response 或內部錯誤。
   }
   return new Error(fallback);
+}
+
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly code: string) { super(message); }
 }
 
 export async function listSaveSlots(fetcher: typeof fetch = fetch): Promise<SaveSlotsResponse> {

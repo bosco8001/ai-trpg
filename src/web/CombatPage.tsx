@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   AuthoritativeGameStateResponse,
   CombatRow,
@@ -34,7 +34,7 @@ import {
 } from "./api.js";
 import {
   getCombatPresentationLanes,
-  getTurnOrderEntries,
+  getVisualTurnOrderEntries,
   initiativeDetail,
   canPlayerUseRowMove,
   canPlayerUseNormalAttack,
@@ -47,6 +47,7 @@ import { getCombatItemDisplayName } from "../shared/combat-items.js";
 import type { CombatNarrationPresentation } from "../shared/combat-narration.js";
 import { Button } from "./ui/Button.js";
 import { Panel } from "./ui/Panel.js";
+import { useCombatPacing } from "./useCombatPacing.js";
 
 function modifierTerm(value: number): string {
   return (value >= 0 ? "+ " : "− ") + Math.abs(value);
@@ -106,11 +107,34 @@ function ParticipantCard({
   );
 }
 
-function CombatTurnOrder({ state }: { state: CombatStateView }) {
+function CombatTurnOrder({ state, visualActorId }: { state: CombatStateView; visualActorId: string | null }) {
+  const list = useRef<HTMLOListElement>(null);
+  const previousPositions = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const element = list.current;
+    if (!element) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const currentPositions = new Map<string, number>();
+    for (const chip of Array.from(element.children) as HTMLElement[]) {
+      const id = chip.dataset.actorId;
+      if (!id) continue;
+      const left = chip.getBoundingClientRect().left;
+      currentPositions.set(id, left);
+      const oldLeft = previousPositions.current.get(id);
+      if (!reduced && oldLeft !== undefined && oldLeft !== left) {
+        chip.getAnimations().forEach((animation) => animation.cancel());
+        chip.animate([{ transform: `translateX(${oldLeft - left}px)` }, { transform: "translateX(0)" }],
+          { duration: 320, easing: "ease-out" });
+      }
+    }
+    previousPositions.current = currentPositions;
+    const current = Array.from(element.children).find((child) => (child as HTMLElement).dataset.actorId === visualActorId) as HTMLElement | undefined;
+    if (current) element.scrollTo({ left: Math.max(0, current.offsetLeft - element.offsetLeft), behavior: reduced ? "instant" : "smooth" });
+  }, [state, visualActorId]);
   return (
-    <ol className="combat-turn-order" aria-label="權威行動順序">
-      {getTurnOrderEntries(state).map(({ participant, current }, index) => (
-        <li key={participant.id} data-current={current || undefined}>
+    <ol ref={list} className="combat-turn-order" aria-label="行動順序；由權威順序輪轉顯示">
+      {getVisualTurnOrderEntries(state, visualActorId).map(({ participant, current }, index) => (
+        <li key={participant.id} data-actor-id={participant.id} data-current={current || undefined} aria-current={current ? "step" : undefined}>
           <span className="combat-turn-order__index" aria-hidden="true">{index + 1}</span>
           <span>{participant.displayName}</span>
           {current ? <span className="combat-turn-order__current">目前行動</span> : null}
@@ -346,6 +370,7 @@ export function CombatPage({
   const restoreBagFocus = useRef(false);
   const restoreBagUseFocus = useRef(false);
   const rowMoveRequestInFlight = useRef(false);
+  const debugRequestInFlight = useRef(false);
   const retryStateRef = useRef(onRetryState);
   const stateUpdateRef = useRef(onStateUpdate);
   retryStateRef.current = onRetryState;
@@ -354,7 +379,17 @@ export function CombatPage({
   const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem
     || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation || isUsingBreath
     || partyMutationCompanionId !== null;
-  const requestInFlight = mutationInFlight || isLoadingTargets || isLoadingRowMoveOptions
+  const pacing = useCombatPacing(gameState, mutationInFlight, onStateUpdate, onRetryState, (response) => {
+    showNarration(response);
+    setFeedback(response.effect.selectedAction === "normal-attack"
+      ? "TEST 隊友自主選擇：普通攻擊。" : "TEST 隊友自主選擇：防禦。");
+  });
+  const visualActorId = pacing.visualActorId ?? currentActorId;
+  const visualActor = combat?.participants.find((participant) => participant.id === visualActorId);
+  const controlMutationBusy = mutationInFlight || pacing.phase !== "idle";
+  const requestInFlight = controlMutationBusy || isLoadingTargets || isLoadingRowMoveOptions
+    || isLoadingBagOptions || isLoadingSkillOptions;
+  const debugDisabled = mutationInFlight || pacing.inFlight || isLoadingTargets || isLoadingRowMoveOptions
     || isLoadingBagOptions || isLoadingSkillOptions;
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
@@ -556,7 +591,7 @@ export function CombatPage({
   }
 
   function changePartyPreference(companionId: string, tacticPreferenceId: string) {
-    if (partyMutationCompanionId !== null || !partyOptions?.canChangeTacticPreference
+    if (partyMutationCompanionId !== null || pacing.isMutationInFlight() || !partyOptions?.canChangeTacticPreference
       || partyOptions.revision !== gameState.state.revision
       || !partyOptions.companions.some((member) => member.id === companionId)
       || !partyOptions.tacticPreferences.some((option) => option.id === tacticPreferenceId)) return;
@@ -715,7 +750,7 @@ export function CombatPage({
           </div>
         </div>
         <CombatPartyDialog open={isPartyOpen} party={partyOptions} loading={isLoadingParty}
-          error={partyError} busy={partyMutationCompanionId !== null} status={partyStatus}
+          error={partyError} busy={partyMutationCompanionId !== null || pacing.inFlight} status={partyStatus}
           onClose={closeParty} onClosed={restoreFocusToPartyButton}
           onRetry={retryParty} onPreferenceChange={changePartyPreference} />
       </main>
@@ -728,15 +763,15 @@ export function CombatPage({
   const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
   const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isPartyOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen || isBreathRowSelectionOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
-  const canDefend = canPlayerDefend(combat, mutationInFlight);
-  const canRun = canPlayerUseNormalAttack(combat, mutationInFlight);
+  const canDefend = canPlayerDefend(combat, controlMutationBusy);
+  const canRun = canPlayerUseNormalAttack(combat, controlMutationBusy);
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
 
   function beginBreathRowSelection() {
     if (!breathOptions?.available || breathOptions.revision !== gameState.state.revision
-      || breathOptions.currentActorId !== currentActorId || mutationInFlight || selectionModeActive) return;
+      || breathOptions.currentActorId !== currentActorId || controlMutationBusy || selectionModeActive) return;
     setIsBreathRowSelectionOpen(true);
     setFeedback("");
   }
@@ -752,7 +787,7 @@ export function CombatPage({
     if (!isBreathRowSelectionOpen || !breathOptions?.available
       || breathOptions.revision !== gameState.state.revision
       || !breathOptions.rows.some((entry) => entry.row === row && entry.available)
-      || mutationInFlight) return;
+      || controlMutationBusy) return;
     setIsUsingBreath(true);
     focusStatusAfterBreath.current = true;
     setFeedback("正在逐一裁定龍息目標……");
@@ -770,7 +805,7 @@ export function CombatPage({
   }
 
   function beginCastingConfirmation() {
-    if (!hasPlayerActionActor || currentCasting || gameState.state.character.currentMp < 18 || mutationInFlight) return;
+    if (!hasPlayerActionActor || currentCasting || gameState.state.character.currentMp < 18 || controlMutationBusy) return;
     setIsTargeting(false); setTargetOptions(null); setSelectedSkillId(null); setIsRowMoveMode(false);
     setIsBagOpen(false); setPendingItemId(null); setIsDefendConfirmationOpen(false);
     setIsRunConfirmationOpen(false); setCastingError(null); setIsStartCastingConfirmationOpen(true);
@@ -784,7 +819,7 @@ export function CombatPage({
   }
 
   function submitCasting(kind: "start" | "continue" | "cancel") {
-    if (mutationInFlight || !hasPlayerActionActor || (kind !== "start" && !currentCasting)
+    if (controlMutationBusy || !hasPlayerActionActor || (kind !== "start" && !currentCasting)
       || (kind === "start" && !isStartCastingConfirmationOpen)) return;
     setIsCastingMutation(true);
     focusStatusAfterCasting.current = true;
@@ -828,7 +863,7 @@ export function CombatPage({
   }
 
   function beginDefendConfirmation() {
-    if (!canDefend || mutationInFlight) return;
+    if (!canDefend || controlMutationBusy) return;
     setIsTargeting(false);
     setSelectedSkillId(null);
     setTargetOptions(null);
@@ -841,7 +876,7 @@ export function CombatPage({
   }
 
   function beginRunConfirmation() {
-    if (!canRun || mutationInFlight) return;
+    if (!canRun || controlMutationBusy) return;
     setIsTargeting(false);
     setSelectedSkillId(null);
     setTargetOptions(null);
@@ -861,7 +896,7 @@ export function CombatPage({
   }
 
   function confirmRun() {
-    if (!isRunConfirmationOpen || !canRun || mutationInFlight || runRequestInFlight.current) return;
+    if (!isRunConfirmationOpen || !canRun || controlMutationBusy || runRequestInFlight.current) return;
     runRequestInFlight.current = true;
     setIsSubmittingRun(true);
     setFeedback("正在裁定逃跑……");
@@ -893,7 +928,7 @@ export function CombatPage({
   }
 
   function confirmDefend() {
-    if (!isDefendConfirmationOpen || !canDefend || mutationInFlight || defendRequestInFlight.current) return;
+    if (!isDefendConfirmationOpen || !canDefend || controlMutationBusy || defendRequestInFlight.current) return;
     defendRequestInFlight.current = true;
     setIsSubmittingDefend(true);
     setFeedback("正在提交防禦並結束目前回合……");
@@ -1015,7 +1050,7 @@ export function CombatPage({
   function beginSkillTargetSelection(skillId: string) {
     const option = skillOptions?.skills.find((entry) => entry.skillId === skillId);
     if (!option?.usable || skillOptions?.revision !== gameState.state.revision
-      || skillOptions.currentActorId !== currentActorId || mutationInFlight) return;
+      || skillOptions.currentActorId !== currentActorId || controlMutationBusy) return;
     setIsTargeting(false);
     setTargetOptions(null);
     setIsRowMoveMode(false);
@@ -1038,7 +1073,7 @@ export function CombatPage({
   function selectSkillTarget(targetId: string) {
     if (!selectedSkillId || !selectedSkill?.usable || !skillTargetsById.get(targetId)?.legal
       || skillOptions?.revision !== gameState.state.revision
-      || skillOptions.currentActorId !== currentActorId || mutationInFlight) return;
+      || skillOptions.currentActorId !== currentActorId || controlMutationBusy) return;
     setIsUsingSkill(true);
     setSelectedSkillId(null);
     setSkillUseError(null);
@@ -1110,7 +1145,9 @@ export function CombatPage({
   }
 
   function advanceTestTurn() {
-    if (!gameState.sandbox || requestInFlight || currentActor?.controlledBy === "companion") return;
+    if (!gameState.sandbox || debugDisabled || pacing.phase !== "error" || debugRequestInFlight.current
+      || currentActor?.side !== "enemy") return;
+    debugRequestInFlight.current = true;
     setIsAdvancing(true);
     setFeedback("正在請裁判推進 TEST 回合……");
     void advanceTestCombatTurn(gameState.state.revision).then((response) => {
@@ -1123,11 +1160,13 @@ export function CombatPage({
       setFeedback("TEST 回合已由權威戰鬥引擎推進。");
     }).catch(() => {
       setFeedback("目前無法推進 TEST 戰鬥回合。請重新讀取狀態後再試。");
-    }).finally(() => setIsAdvancing(false));
+    }).finally(() => { debugRequestInFlight.current = false; setIsAdvancing(false); });
   }
 
   function actCompanionTurn() {
-    if (!gameState.sandbox || requestInFlight || currentActor?.controlledBy !== "companion") return;
+    if (!gameState.sandbox || debugDisabled || pacing.phase !== "error" || debugRequestInFlight.current
+      || currentActor?.controlledBy !== "companion") return;
+    debugRequestInFlight.current = true;
     setIsAdvancing(true);
     setFeedback("正在請伺服器執行 TEST 隊友回合並整理戰鬥敘事……");
     void executeCompanionTurn(gameState.state.revision).then((response) => {
@@ -1137,7 +1176,7 @@ export function CombatPage({
         ? "TEST 隊友自主選擇：普通攻擊。" : "TEST 隊友自主選擇：防禦。");
     }).catch((error: unknown) => {
       setFeedback(error instanceof Error ? error.message : "隊友回合暫時無法執行。");
-    }).finally(() => setIsAdvancing(false));
+    }).finally(() => { debugRequestInFlight.current = false; setIsAdvancing(false); });
   }
 
   function retryState() {
@@ -1170,9 +1209,9 @@ export function CombatPage({
           <section className="combat-header__turns" aria-labelledby="combat-turn-heading">
             <div className="combat-header__turn-heading">
               <h2 id="combat-turn-heading">行動順序</h2>
-              <p>目前行動：<strong>{currentActor?.displayName ?? combat.currentActorId}</strong></p>
+              <p>目前行動：<strong>{visualActor?.displayName ?? combat.currentActorId}</strong></p>
             </div>
-            <CombatTurnOrder state={combat} />
+            <CombatTurnOrder state={combat} visualActorId={visualActorId} />
           </section>
         </header>
 
@@ -1326,7 +1365,7 @@ export function CombatPage({
                   <Button
                     variant="primary"
                     data-action="confirm-defend"
-                    disabled={mutationInFlight}
+                    disabled={controlMutationBusy}
                     loading={isSubmittingDefend}
                     loadingLabel="正在防禦……"
                     onClick={confirmDefend}
@@ -1345,7 +1384,7 @@ export function CombatPage({
                   <p>一般逃跑判定：D20 + 敏捷修正，DC 8。</p>
                 </div>
                 <div className="combat-row-move-mode__choices">
-                  <Button variant="primary" data-action="confirm-run" disabled={mutationInFlight}
+                  <Button variant="primary" data-action="confirm-run" disabled={controlMutationBusy}
                     loading={isSubmittingRun} loadingLabel="正在逃跑……" onClick={confirmRun}>確認逃跑</Button>
                   <Button variant="secondary" disabled={isSubmittingRun} onClick={cancelRunConfirmation}>取消</Button>
                 </div>
@@ -1362,7 +1401,7 @@ export function CombatPage({
                         <ParticipantCard
                           key={participant.id}
                           participant={participant}
-                          current={participant.id === combat.currentActorId}
+                          current={participant.id === visualActorId}
                           targeting={(isTargeting && !isLoadingTargets) || selectedSkillId !== null}
                           targetOption={selectedSkillId ? skillTargetsById.get(participant.id) : targetOptionsById.get(participant.id)}
                           canSubmitTarget={!requestInFlight}
@@ -1382,7 +1421,7 @@ export function CombatPage({
               <h2 id="combat-status-heading" ref={statusHeading} tabIndex={-1}>目前狀態</h2>
               <dl className="combat-status-list">
                 <div><dt>回合</dt><dd>第 {combat.round} 回合</dd></div>
-                <div><dt>目前行動</dt><dd>{currentActor?.displayName ?? combat.currentActorId}</dd></div>
+                <div><dt>目前行動</dt><dd>{visualActor?.displayName ?? combat.currentActorId}</dd></div>
                 <div><dt>參戰者</dt><dd>{combat.participants.length} 名</dd></div>
                 <div><dt>活動</dt><dd>戰鬥中</dd></div>
                 <div><dt>MP</dt><dd>{gameState.state.character.currentMp} <small>（TEST 數值）</small></dd></div>
@@ -1399,8 +1438,8 @@ export function CombatPage({
               <p>已投入：{casting.mpSpent} / {casting.totalMpCost} MP</p>
               <p>下一次繼續：6 MP</p>
               {casting.actorId === currentActorId && hasPlayerActionActor ? <div className="combat-row-move-mode__choices">
-                <Button variant="primary" disabled={mutationInFlight} onClick={() => submitCasting("continue")}>繼續詠唱</Button>
-                <Button variant="secondary" disabled={mutationInFlight} onClick={() => submitCasting("cancel")}>取消詠唱</Button>
+                <Button variant="primary" disabled={controlMutationBusy} onClick={() => submitCasting("continue")}>繼續詠唱</Button>
+                <Button variant="secondary" disabled={controlMutationBusy} onClick={() => submitCasting("cancel")}>取消詠唱</Button>
               </div> : <p>等待施法者的下一個回合。</p>}
               <p>取消後，已投入的 MP 不會返還。</p>
             </Panel>)}
@@ -1427,7 +1466,7 @@ export function CombatPage({
                 <h3 id="combat-innate-heading">天生能力</h3>
                 <Button ref={breathButton} variant="secondary" aria-expanded={isBreathRowSelectionOpen}
                   aria-controls="combat-breath-rows"
-                  disabled={!breathOptions?.available || mutationInFlight || selectionModeActive}
+                  disabled={!breathOptions?.available || controlMutationBusy || selectionModeActive}
                   onClick={beginBreathRowSelection}>
                   龍息{breathOptions?.element === "fire" ? "・火" : breathOptions?.element === "ice" ? "・冰"
                     : breathOptions?.element === "lightning" ? "・雷" : ""}
@@ -1447,13 +1486,13 @@ export function CombatPage({
                   <h3 ref={breathHeading} tabIndex={-1}>選擇攻擊區域</h3>
                   <div className="combat-row-move-mode__choices">
                     {breathOptions?.rows.map((row) => <div key={row.row}>
-                      <Button variant="secondary" disabled={!row.available || mutationInFlight}
+                      <Button variant="secondary" disabled={!row.available || controlMutationBusy}
                         onClick={() => selectBreathRow(row.row)}>
                         敵方{row.row === "front" ? "前排" : "後排"}（{row.targetCount}）
                       </Button>
                       {!row.available ? <p>該排目前沒有可攻擊目標。</p> : null}
                     </div>)}
-                    <Button variant="secondary" disabled={mutationInFlight} onClick={cancelBreathRowSelection}>取消</Button>
+                    <Button variant="secondary" disabled={controlMutationBusy} onClick={cancelBreathRowSelection}>取消</Button>
                   </div>
                 </div> : null}
               </section>
@@ -1498,8 +1537,8 @@ export function CombatPage({
                 <p>總消耗：18 MP・詠唱：3 回合・本回合消耗：6 MP。</p>
                 <p>開始後本回合主要行動將結束。</p>
                 <div className="combat-row-move-mode__choices">
-                  <Button variant="primary" disabled={mutationInFlight} onClick={() => submitCasting("start")}>確認開始</Button>
-                  <Button variant="secondary" disabled={mutationInFlight} onClick={cancelCastingConfirmation}>取消</Button>
+                  <Button variant="primary" disabled={controlMutationBusy} onClick={() => submitCasting("start")}>確認開始</Button>
+                  <Button variant="secondary" disabled={controlMutationBusy} onClick={cancelCastingConfirmation}>取消</Button>
                 </div>
               </section> : null}
               {skillOptionsError ? <Button variant="secondary" disabled={isLoadingSkillOptions}
@@ -1526,7 +1565,7 @@ export function CombatPage({
                   ref={defendButton}
                   variant="secondary"
                   data-command="defend"
-                  disabled={!canDefend || mutationInFlight || isDefendConfirmationOpen || isStartCastingConfirmationOpen || selectionModeActive}
+                  disabled={!canDefend || controlMutationBusy || isDefendConfirmationOpen || isStartCastingConfirmationOpen || selectionModeActive}
                   aria-expanded={isDefendConfirmationOpen}
                   aria-controls="combat-defend-panel"
                   onClick={beginDefendConfirmation}
@@ -1570,7 +1609,7 @@ export function CombatPage({
                   ref={runButton}
                   variant="secondary"
                   data-command="flee"
-                  disabled={!canRun || mutationInFlight || selectionModeActive}
+                  disabled={!canRun || controlMutationBusy || selectionModeActive}
                   aria-expanded={isRunConfirmationOpen}
                   aria-controls="combat-run-panel"
                   onClick={beginRunConfirmation}
@@ -1591,7 +1630,7 @@ export function CombatPage({
                   重新載入移動選項
                 </Button>
               ) : null}
-              {currentActor?.side === "enemy" ? <p className="combat-rail__notice">目前是敵方回合，玩家不能執行攻擊、移動或防禦。</p> : null}
+                  {currentActor?.side === "enemy" ? <p className="combat-rail__notice">{gameState.sandbox ? "TEST 敵方回合；只推進權威順序，不產生敵方攻擊或敘事。" : "目前是敵方回合，玩家不能執行攻擊、移動或防禦。"}</p> : null}
               {currentActor?.controlledBy === "companion" ? <p className="combat-rail__notice">目前是 TEST 隊友回合；伺服器會自行選擇行動與目標。</p> : null}
             </Panel>
 
@@ -1601,10 +1640,10 @@ export function CombatPage({
                 <h2 id="combat-test-heading">TEST 控制</h2>
                 <p>此控制只在 COMBAT_SANDBOX 開啟時出現，並由後端決定下一回合。</p>
                 {currentActor?.controlledBy === "companion" ? (
-                  <Button loading={isAdvancing} loadingLabel="正在執行……" disabled={requestInFlight || selectionModeActive}
+                  <Button loading={isAdvancing} loadingLabel="正在執行……" disabled={debugDisabled || pacing.phase !== "error" || selectionModeActive}
                     onClick={actCompanionTurn}>TEST：執行隊友回合</Button>
                 ) : (
-                  <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={requestInFlight || selectionModeActive || Boolean(currentCasting)} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
+                  <Button loading={isAdvancing} loadingLabel="正在推進……" disabled={debugDisabled || pacing.phase !== "error" || selectionModeActive || Boolean(currentCasting)} onClick={advanceTestTurn}>TEST：推進下一回合</Button>
                 )}
               </Panel>
             ) : null}
@@ -1612,13 +1651,16 @@ export function CombatPage({
         </div>
 
         <section className="combat-feedback" aria-label="戰鬥狀態回饋">
+          {pacing.phase !== "idle" && pacing.phase !== "error" ? <p>{pacing.phase === "pre-action" ? "目前角色準備行動……" : pacing.phase === "resolving" ? "伺服器正在裁定……" : pacing.phase === "transitioning" ? "行動順序輪轉中……" : "正在顯示最近結果……"}</p> : null}
+          {pacing.error ? <p className="combat-feedback__error" role="alert">{pacing.error}</p> : null}
+          {pacing.error ? <Button variant="secondary" disabled={pacing.inFlight} onClick={() => void pacing.retry()}>重新讀取並恢復回合</Button> : null}
           {feedback ? <p role="status" aria-live="polite">{feedback}</p> : null}
           {stateError ? <p className="combat-feedback__error" role="alert">目前無法讀取戰鬥狀態。</p> : null}
           <Button variant="secondary" loading={isRetrying} loadingLabel="正在讀取……" disabled={requestInFlight && !isRetrying} onClick={retryState}>重新讀取戰鬥狀態</Button>
         </section>
       </div>
       <CombatPartyDialog open={isPartyOpen} party={partyOptions} loading={isLoadingParty}
-        error={partyError} busy={partyMutationCompanionId !== null} status={partyStatus}
+        error={partyError} busy={partyMutationCompanionId !== null || pacing.inFlight} status={partyStatus}
         onClose={closeParty} onClosed={restoreFocusToPartyButton}
         onRetry={retryParty} onPreferenceChange={changePartyPreference} />
     </main>
