@@ -22,6 +22,9 @@ import {
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
+import { buildCombatNarrationFacts, buildCombatNarrationFallback, type CombatNarrationService } from "./narration.js";
+import type { GameState } from "../../domain/game.js";
+import { isCombatNarrationPresentation } from "../../shared/combat-narration.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -201,7 +204,19 @@ export function registerCombatActionRoutes(
   service: CombatService,
   storage: "memory" | "postgres",
   sandbox: boolean,
+  narrator?: CombatNarrationService,
 ) {
+  async function narrationFor(state: GameState) {
+    const facts = buildCombatNarrationFacts(state);
+    const fallback = { text: buildCombatNarrationFallback(facts), source: "fallback" as const };
+    if (!narrator) return fallback;
+    try {
+      const narration = await narrator.narrate(facts);
+      return isCombatNarrationPresentation(narration) ? narration : fallback;
+    } catch {
+      return fallback;
+    }
+  }
   app.post<{ Body: unknown }>("/api/combat/companion/act", {
     bodyLimit: 1024,
     errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => reply.code(400)
@@ -213,7 +228,8 @@ export function registerCombatActionRoutes(
       if (!result.ok) return reply.code(result.code === "invalid-command" ? 400
         : result.code === "invalid-roll" ? 500 : 409)
         .send({ error: result.code, message: result.message });
-      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state),
+        narration: await narrationFor(result.state) };
       if (!isCompanionActResponse(response)) throw new Error("隊友行動回應未通過驗證。");
       return response;
     } catch (error) { return safeActionFailure(app, reply, error); }
@@ -270,7 +286,8 @@ export function registerCombatActionRoutes(
       const result = await service.useDragonBreath(request.body);
       if (!result.ok) return reply.code(result.code === "invalid-command" ? 400
         : result.code === "invalid-roll" ? 500 : 409).send({ error: result.code, message: result.message });
-      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state),
+        narration: await narrationFor(result.state) };
       if (!isDragonBreathResponse(response)) throw new Error("龍息回應未通過 runtime validation。");
       return response;
     } catch (error) { return safeBreathFailure(app, reply, error); }
@@ -290,7 +307,8 @@ export function registerCombatActionRoutes(
             : await service.cancelCasting(request.body);
         if (!result.ok) return reply.code(result.code === "invalid-command" ? 400 : 409)
           .send({ error: result.code, message: result.message });
-        const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+        const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state),
+          narration: await narrationFor(result.state) };
         if (!isCastingResponse(response)) throw new Error("詠唱回應未通過 runtime validation。");
         return response;
       } catch (error) {
@@ -323,7 +341,8 @@ export function registerCombatActionRoutes(
       const result = await service.usePhysicalSkill(request.body);
       if (!result.ok) return reply.code(result.code === "invalid-command" ? 400
         : result.code === "invalid-roll" ? 500 : 409).send({ error: result.code, message: result.message });
-      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state),
+        narration: await narrationFor(result.state) };
       if (!isPhysicalSkillUseResponse(response)) throw new Error("物理技能回應未通過 runtime validation。");
       return response;
     } catch (error) {
@@ -364,6 +383,7 @@ export function registerCombatActionRoutes(
         storage,
         effect: result.effect,
         state: validatedState(result.state),
+        narration: await narrationFor(result.state),
       };
       if (!isCombatNormalAttackResponse(response)) throw new Error("普通攻擊回應未通過 runtime validation。");
       return response;
@@ -403,6 +423,7 @@ export function registerCombatActionRoutes(
         storage,
         effect: result.effect,
         state: validatedState(result.state),
+        narration: await narrationFor(result.state),
       };
       if (!isCombatRowMoveResponse(response)) throw new Error("換排回應未通過 runtime validation。");
       return response;
@@ -443,6 +464,7 @@ export function registerCombatActionRoutes(
         effect: result.effect,
         state: validatedState(result.state),
         options: { revision: derived.revision, ...derived.options },
+        narration: await narrationFor(result.state),
       };
       if (!isCombatItemUseResponse(response)) throw new Error("戰鬥物品回應未通過 runtime validation。");
       return response;
@@ -467,6 +489,7 @@ export function registerCombatActionRoutes(
         storage,
         effect: result.effect,
         state: validatedState(result.state),
+        narration: await narrationFor(result.state),
       };
       if (!isCombatDefendResponse(response)) throw new Error("防禦回應未通過 runtime validation。");
       return response;
@@ -487,7 +510,8 @@ export function registerCombatActionRoutes(
       const result: RunResult = await service.run(request.body);
       if (!result.ok) return reply.code(result.code === "invalid-command" ? 400 : result.code === "invalid-roll" ? 500 : 409)
         .send({ error: result.code, message: result.message });
-      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state) };
+      const response = { sandbox, storage, effect: result.effect, state: validatedState(result.state),
+        narration: await narrationFor(result.state) };
       if (!isCombatRunResponse(response)) throw new Error("逃跑回應未通過 runtime validation。");
       return response;
     } catch (error) {

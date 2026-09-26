@@ -44,6 +44,7 @@ import {
   isServerListedUsableCombatItem,
 } from "./combat-ui.js";
 import { getCombatItemDisplayName } from "../shared/combat-items.js";
+import type { CombatNarrationPresentation } from "../shared/combat-narration.js";
 import { Button } from "./ui/Button.js";
 import { Panel } from "./ui/Panel.js";
 
@@ -316,6 +317,12 @@ export function CombatPage({
   const skillTargetHeading = useRef<HTMLHeadingElement>(null);
   const restoreSkillFocus = useRef(false);
   const [feedback, setFeedback] = useState(stateError ?? "");
+  const [narrationEntry, setNarrationEntry] = useState<{
+    revision: number; narration: CombatNarrationPresentation;
+  } | null>(null);
+  const showNarration = (response: { state: { revision: number }; narration?: CombatNarrationPresentation }) => {
+    if (response.narration) setNarrationEntry({ revision: response.state.revision, narration: response.narration });
+  };
   const [skillUseError, setSkillUseError] = useState<string | null>(null);
   const attackButton = useRef<HTMLButtonElement>(null);
   const defendButton = useRef<HTMLButtonElement>(null);
@@ -671,6 +678,16 @@ export function CombatPage({
             </Panel>
             <aside className="combat-rail" aria-label="戰鬥結束資訊">
               <LastActionPanel combat={combat} />
+              <Panel className="combat-rail__panel" aria-labelledby="combat-ended-narration-heading">
+                <p className="combat-eyebrow">AI 戰鬥敘事</p>
+                <h2 id="combat-ended-narration-heading">最近敘事</h2>
+                <div className="combat-narration" aria-live="polite" aria-atomic="true">
+                  {narrationEntry?.revision === gameState.state.revision
+                    ? <><p>{narrationEntry.narration.text}</p>
+                      {narrationEntry.narration.source === "fallback" ? <small>系統敘述</small> : null}</>
+                    : <p>目前沒有戰鬥敘事。</p>}
+                </div>
+              </Panel>
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-breath-heading">
                 <h2 id="combat-ended-breath-heading">天生能力</h2>
                 <Button variant="secondary" disabled>龍息</Button>
@@ -741,6 +758,7 @@ export function CombatPage({
     setFeedback("正在逐一裁定龍息目標……");
     void executeDragonBreath(gameState.state.revision, row).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setIsBreathRowSelectionOpen(false);
       setFeedback("龍息裁定完成；目前回合已結束。");
     }).catch(async (error: unknown) => {
@@ -775,6 +793,7 @@ export function CombatPage({
     void executeCasting(kind, gameState.state.revision, kind === "start" ? "TEST-skill-2" : undefined)
       .then((response) => {
         onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+        showNarration(response);
         setFeedback(response.effect.type === "casting-started" ? "已開始詠唱，本回合投入 6 MP。"
           : response.effect.type === "casting-continued" ? "已繼續詠唱，本回合投入 6 MP。"
             : response.effect.type === "casting-completed" ? "詠唱完成，總投入 18 MP；法術效果尚未裁定。"
@@ -848,6 +867,7 @@ export function CombatPage({
     setFeedback("正在裁定逃跑……");
     void executeRun(gameState.state.revision).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setIsRunConfirmationOpen(false);
       setFeedback(response.effect.outcome === "success" ? "逃跑成功；戰鬥已結束。" : "逃跑失敗；目前回合已結束。");
     }).catch(async (error: unknown) => {
@@ -879,6 +899,7 @@ export function CombatPage({
     setFeedback("正在提交防禦並結束目前回合……");
     void executeDefend(gameState.state.revision).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setIsDefendConfirmationOpen(false);
       setFeedback("防禦行動已完成；目前回合已結束。實際減傷效果尚未接入。");
     }).catch(async (error: unknown) => {
@@ -910,6 +931,7 @@ export function CombatPage({
     setFeedback("正在提交物品使用並結束目前回合……");
     void executeCombatItemUse(gameState.state.revision, itemId).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setBagOptions(response.options);
       setPendingItemId(null);
       bagHeading.current?.focus();
@@ -977,6 +999,7 @@ export function CombatPage({
         storage: response.storage,
         state: response.state,
       });
+      showNarration(response);
       setFeedback(response.effect.outcome === "hit" ? "普通攻擊裁定完成：命中。" : "普通攻擊裁定完成：未命中。");
     }).catch(async (error: unknown) => {
       setFeedback(error instanceof Error ? error.message : "普通攻擊暫時無法使用，請重新讀取戰鬥狀態。");
@@ -1022,6 +1045,7 @@ export function CombatPage({
     setFeedback("正在由戰鬥系統裁定物理技能……");
     void executePhysicalSkill(gameState.state.revision, selectedSkillId, targetId).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setFeedback(response.effect.outcome === "hit" ? "物理技能裁定完成：命中。" : "物理技能裁定完成：未命中。");
     }).catch(async (error: unknown) => {
       const message = error instanceof Error ? error.message : "物理技能暫時無法使用，請重新讀取戰鬥狀態。";
@@ -1062,6 +1086,7 @@ export function CombatPage({
     setFeedback("正在提交換排並結束目前回合……");
     void executeRowMove(gameState.state.revision, targetRow).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setIsRowMoveMode(false);
       setIsDefendConfirmationOpen(false);
       setRowMoveOptions(null);
@@ -1104,9 +1129,10 @@ export function CombatPage({
   function actCompanionTurn() {
     if (!gameState.sandbox || requestInFlight || currentActor?.controlledBy !== "companion") return;
     setIsAdvancing(true);
-    setFeedback("正在請伺服器執行 TEST 隊友回合……");
+    setFeedback("正在請伺服器執行 TEST 隊友回合並整理戰鬥敘事……");
     void executeCompanionTurn(gameState.state.revision).then((response) => {
       onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
       setFeedback(response.effect.selectedAction === "normal-attack"
         ? "TEST 隊友自主選擇：普通攻擊。" : "TEST 隊友自主選擇：防禦。");
     }).catch((error: unknown) => {
@@ -1380,9 +1406,18 @@ export function CombatPage({
             </Panel>)}
 
             <Panel className="combat-rail__panel" aria-labelledby="combat-narration-heading">
-              <p className="combat-eyebrow">戰鬥敘事</p>
-              <h2 id="combat-narration-heading">尚未接入</h2>
-              <p>本階段只顯示系統裁定，不產生戰鬥敘事。</p>
+              <p className="combat-eyebrow">AI 戰鬥敘事</p>
+              <h2 id="combat-narration-heading">最近敘事</h2>
+              <div className="combat-narration" aria-live="polite" aria-atomic="true">
+                {narrationEntry?.revision === gameState.state.revision
+                  ? <><p>{narrationEntry.narration.text}</p>
+                    {narrationEntry.narration.source === "fallback"
+                      ? <small>系統敘述</small> : null}</>
+                  : isResolving || isMovingRow || isUsingItem || isSubmittingDefend || isSubmittingRun
+                    || isUsingSkill || isCastingMutation || isUsingBreath
+                    || (isAdvancing && currentActor?.controlledBy === "companion")
+                    ? <p>正在整理戰鬥敘事……</p> : <p>目前沒有戰鬥敘事。</p>}
+              </div>
             </Panel>
 
             <Panel className="combat-rail__panel" aria-labelledby="combat-skills-heading">

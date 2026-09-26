@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–21 已由使用者確認。Phase 22「半自動隊友戰鬥行為」工程完成，等待使用者手動確認；Phase 23 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–22 已由使用者確認。Phase 23「AI 戰鬥敘事」工程完成，等待使用者手動確認；Phase 24 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -397,4 +397,8 @@ Phase 21 已由使用者手動確認。「隊伍」可讀取伺服器提供的�
 
 ## Phase 22：半自動隊友戰鬥行為
 
-新 TEST 戰鬥包含「TEST 隊友」的 CombatParticipant、先攻與 Turn。玩家只設定偏好；隊友輪到時按「TEST：執行隊友回合」，由伺服器選擇行動和目標。TEST A 暫選普通攻擊，TEST B 暫選防禦，純屬工程驗證，並非正式戰術規則。沒有 HP／傷害或 LLM 決策。完整 Memory、PostgreSQL 重啟、注入、手機與鍵盤手動驗收指令見 [Phase 22 文件](docs/development/PHASE_22_SEMI_AUTO_COMPANION.md)。Phase 22 等待使用者手動確認。
+新 TEST 戰鬥包含「TEST 隊友」的 CombatParticipant、先攻與 Turn。玩家只設定偏好；隊友輪到時按「TEST：執行隊友回合」，由伺服器選擇行動和目標。TEST A 暫選普通攻擊，TEST B 暫選防禦，純屬工程驗證，並非正式戰術規則。沒有 HP／傷害或 LLM 決策。完整 Memory、PostgreSQL 重啟、注入、手機與鍵盤手動驗收指令見 [Phase 22 文件](docs/development/PHASE_22_SEMI_AUTO_COMPANION.md)。Phase 22 已由使用者手動確認。
+
+## Phase 23：AI 戰鬥敘事手動驗收
+
+成功的戰鬥行動先由伺服器保存權威結果，再把最少量的已確認事實交給既有 `LanguageModel`。敘事只隨這次 action response 回傳；不保存於 `GameState`，重新整理不重建舊敘事。模型故障時會顯示確定事實的系統備援文字，戰鬥仍成功且 revision 只增加一次。詳細的 HIT／MISS、隊友、詠唱、龍息、故障、PostgreSQL 重啟、手機與鍵盤指令見 [Phase 23 文件](docs/development/PHASE_23_AI_COMBAT_NARRATION.md)。Phase 23 等待使用者手動確認。

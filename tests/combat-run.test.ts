@@ -282,7 +282,8 @@ test("前端 request 只有 revision；畫面呈現成功或失敗的機械結�
   assert.match(page(succeeded.state), /逃跑判定：8 \+ 2 = 10/);
   assert.match(page(succeeded.state), /結果：逃跑成功/);
   assert.match(page(succeeded.state), /戰鬥結算與返回探索尚未接入/);
-  assert.doesNotMatch(page(succeeded.state), /目前行動：TEST 敵人 2|戰鬥敘事|成功率|進入探索/);
+  assert.doesNotMatch(page(succeeded.state), /目前行動：TEST 敵人 2|成功率|進入探索/);
+  assert.match(page(succeeded.state), /目前沒有戰鬥敘事/);
   assert.match(page(succeeded.state), /data-command="party"/);
   assert.doesNotMatch(page(succeeded.state), /data-command="party"[^>]*disabled=""/);
   assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 6);

@@ -76,7 +76,7 @@ test("CombatPage 呈現權威 Round、actor、四排、唯讀技能與 disabled 
     onStateUpdate: () => undefined,
     onRetryState: async () => combatResponse(),
   }));
-  for (const text of ["TEST 戰鬥", "第 1 回合", "目前行動：", "TEST 敵人 1", "敵方後排", "敵方前排", "我方前排", "我方後排", "戰鬥敘事", "尚未接入", "TEST-skill-1", "目前行動"]) {
+  for (const text of ["TEST 戰鬥", "第 1 回合", "目前行動：", "TEST 敵人 1", "敵方後排", "敵方前排", "我方前排", "我方後排", "戰鬥敘事", "目前沒有戰鬥敘事", "TEST-skill-1", "目前行動"]) {
     assert.match(page, new RegExp(text));
   }
   assert.match(page, /data-command="party"/);
@@ -191,10 +191,10 @@ test("前端安全拒絕 malformed 或不可用的戰鬥回應", async () => {
   await assert.rejects(advanceTestCombatTurn(1, async () => Response.json({ error: "stale-revision", message: "安全訊息" }, { status: 409 })), /安全訊息/);
 });
 
-test("Combat UI 不匯入 domain、LLM 或 exploration narration；disabled commands 沒有 action API", async () => {
+test("Combat UI 不匯入 domain、LLM service 或 exploration narration；disabled commands 沒有 action API", async () => {
   for (const file of ["CombatPage.tsx", "combat-ui.ts"]) {
     const source = await readFile(new URL(`../src/web/${file}`, import.meta.url), "utf8");
-    assert.doesNotMatch(source, /from\s+["'][^"']*(?:\/domain\/|\/server\/llm\/|narration)/);
+    assert.doesNotMatch(source, /from\s+["'][^"']*(?:\/domain\/|\/server\/llm\/|\/server\/narration\/)/);
   }
   const source = await readFile(new URL("../src/web/CombatPage.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(source, /executeExplorationAction|fetch\(|attack.*fetch/i);

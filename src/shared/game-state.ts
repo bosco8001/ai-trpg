@@ -1,4 +1,5 @@
 import { TEST_COMBAT_CONSUMABLE_ID, TEST_COMBAT_CONSUMABLE_NAME } from "./combat-items.js";
+import { isCombatNarrationPresentation, type CombatNarrationPresentation } from "./combat-narration.js";
 
 /** 前端讀取的最小權威狀態快照。所有資料仍必須經 runtime validation。 */
 export type CombatSide = "party" | "enemy";
@@ -258,23 +259,28 @@ export interface CombatItemOptionsResponse {
 
 export interface CombatNormalAttackResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "normal-attack-resolved"; readonly outcome: "hit" | "miss" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface CombatRowMoveResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "row-move-completed" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface CombatItemUseResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "combat-item-used" };
   readonly options: CombatItemOptionsResponse;
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface CombatDefendResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "defend-completed" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface CombatRunResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "run-resolved"; readonly outcome: "success" | "failure" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface PhysicalSkillOptionView {
@@ -297,10 +303,12 @@ export interface PhysicalSkillOptionsResponse {
 
 export interface PhysicalSkillUseResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "physical-skill-resolved"; readonly outcome: "hit" | "miss" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface CastingResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "casting-started" | "casting-continued" | "casting-cancelled" | "casting-completed" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface DragonBreathOptionsResponse {
@@ -317,6 +325,7 @@ export interface DragonBreathOptionsResponse {
 
 export interface DragonBreathResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "dragon-breath-resolved" };
+  readonly narration?: CombatNarrationPresentation;
 }
 
 export interface AuthoritativeGameStateView {
@@ -351,10 +360,16 @@ export interface CombatSandboxAdvanceResponse extends AuthoritativeGameStateResp
 
 export interface CompanionActResponse extends AuthoritativeGameStateResponse {
   readonly effect: { readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend" };
+  readonly narration?: CombatNarrationPresentation;
+}
+
+function actionShape(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return exact(value, keys) || (exact(value, [...keys, "narration"])
+    && isCombatNarrationPresentation(value.narration));
 }
 
 export function isCompanionActResponse(value: unknown): value is CompanionActResponse {
-  if (!isRecord(value) || !exact(value, ["sandbox", "storage", "effect", "state"])
+  if (!isRecord(value) || !actionShape(value, ["sandbox", "storage", "effect", "state"])
     || typeof value.sandbox !== "boolean" || (value.storage !== "memory" && value.storage !== "postgres")
     || !isAuthoritativeGameStateView(value.state) || !isRecord(value.effect)
     || !exact(value.effect, ["type", "selectedAction"])
@@ -794,7 +809,7 @@ export function isNormalAttackOptionsResponse(value: unknown): value is NormalAt
 }
 
 export function isCombatNormalAttackResponse(value: unknown): value is CombatNormalAttackResponse {
-  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+  return isRecord(value) && actionShape(value, ["sandbox", "storage", "effect", "state"])
     && typeof value.sandbox === "boolean"
     && (value.storage === "memory" || value.storage === "postgres")
     && isAuthoritativeGameStateView(value.state)
@@ -819,7 +834,7 @@ export function isRowMoveOptionsResponse(value: unknown): value is RowMoveOption
 }
 
 export function isCombatRowMoveResponse(value: unknown): value is CombatRowMoveResponse {
-  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+  return isRecord(value) && actionShape(value, ["sandbox", "storage", "effect", "state"])
     && typeof value.sandbox === "boolean"
     && (value.storage === "memory" || value.storage === "postgres")
     && isAuthoritativeGameStateView(value.state)
@@ -848,7 +863,7 @@ export function isCombatItemOptionsResponse(value: unknown): value is CombatItem
 }
 
 export function isCombatItemUseResponse(value: unknown): value is CombatItemUseResponse {
-  if (!isRecord(value) || !exact(value, ["sandbox", "storage", "effect", "state", "options"])
+  if (!isRecord(value) || !actionShape(value, ["sandbox", "storage", "effect", "state", "options"])
     || typeof value.sandbox !== "boolean"
     || (value.storage !== "memory" && value.storage !== "postgres")
     || !isAuthoritativeGameStateView(value.state)
@@ -867,7 +882,7 @@ export function isCombatItemUseResponse(value: unknown): value is CombatItemUseR
 }
 
 export function isCombatDefendResponse(value: unknown): value is CombatDefendResponse {
-  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+  return isRecord(value) && actionShape(value, ["sandbox", "storage", "effect", "state"])
     && typeof value.sandbox === "boolean"
     && (value.storage === "memory" || value.storage === "postgres")
     && isAuthoritativeGameStateView(value.state)
@@ -877,7 +892,7 @@ export function isCombatDefendResponse(value: unknown): value is CombatDefendRes
 }
 
 export function isCombatRunResponse(value: unknown): value is CombatRunResponse {
-  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+  return isRecord(value) && actionShape(value, ["sandbox", "storage", "effect", "state"])
     && typeof value.sandbox === "boolean"
     && (value.storage === "memory" || value.storage === "postgres")
     && isAuthoritativeGameStateView(value.state)
@@ -915,7 +930,7 @@ export function isPhysicalSkillOptionsResponse(value: unknown): value is Physica
 }
 
 export function isPhysicalSkillUseResponse(value: unknown): value is PhysicalSkillUseResponse {
-  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+  return isRecord(value) && actionShape(value, ["sandbox", "storage", "effect", "state"])
     && typeof value.sandbox === "boolean" && (value.storage === "memory" || value.storage === "postgres")
     && isAuthoritativeGameStateView(value.state)
     && isRecord(value.effect) && exact(value.effect, ["type", "outcome"])
@@ -926,7 +941,7 @@ export function isPhysicalSkillUseResponse(value: unknown): value is PhysicalSki
 }
 
 export function isCastingResponse(value: unknown): value is CastingResponse {
-  if (!isRecord(value) || !exact(value, ["sandbox", "storage", "effect", "state"])
+  if (!isRecord(value) || !actionShape(value, ["sandbox", "storage", "effect", "state"])
     || typeof value.sandbox !== "boolean" || (value.storage !== "memory" && value.storage !== "postgres")
     || !isAuthoritativeGameStateView(value.state) || !isRecord(value.effect)
     || !exact(value.effect, ["type"])) return false;
@@ -959,7 +974,7 @@ export function isDragonBreathOptionsResponse(value: unknown): value is DragonBr
 }
 
 export function isDragonBreathResponse(value: unknown): value is DragonBreathResponse {
-  return isRecord(value) && exact(value, ["sandbox", "storage", "effect", "state"])
+  return isRecord(value) && actionShape(value, ["sandbox", "storage", "effect", "state"])
     && typeof value.sandbox === "boolean" && (value.storage === "memory" || value.storage === "postgres")
     && isAuthoritativeGameStateView(value.state)
     && isRecord(value.effect) && exact(value.effect, ["type"])

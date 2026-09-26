@@ -6,6 +6,8 @@ import { createLanguageModel } from "./llm/language-model.js";
 import { createActionInterpreter } from "./interpretation/interpreter.js";
 import { FixtureInterpretationAdapter } from "./interpretation/fixture-adapter.js";
 import { createExplorationNarrator } from "./narration/narrator.js";
+import { createCombatNarrationService } from "./combat/narration.js";
+import { FixtureCombatNarrationAdapter } from "./combat/narration-fixture-adapter.js";
 import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
 import {
@@ -81,6 +83,9 @@ const app = await buildApp({
   )),
   narrator: createExplorationNarrator(createLanguageModel(
     new FixtureNarrationAdapter(narrationMode as NarrationFixtureMode), { timeoutMs: 250 },
+  )),
+  combatNarrator: createCombatNarrationService(createLanguageModel(
+    new FixtureCombatNarrationAdapter(narrationMode as NarrationFixtureMode), { timeoutMs: 250 },
   )),
   webRoot: process.env.NODE_ENV === "production"
     ? fileURLToPath(new URL("../web/", import.meta.url))

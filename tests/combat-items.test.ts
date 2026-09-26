@@ -310,12 +310,11 @@ test("戰鬥 UI 在敵方回合仍提供背包入口，item-use recent action �
   assert.doesNotMatch(page, /HP\s*\+|治療|傷害|buff|debuff/i);
 });
 
-test("Phase 15 item domain、service 與 routes 不連接 interpretation、narration 或 LLM", async () => {
+test("物品 domain 與權威 combat service 不連接 interpretation、narration 或 LLM", async () => {
   for (const file of [
     "../src/domain/combat-items.ts",
     "../src/domain/combat.ts",
     "../src/server/combat/service.ts",
-    "../src/server/combat/routes.ts",
   ]) {
     const source = await readFile(new URL(file, import.meta.url), "utf8");
     assert.doesNotMatch(source, /from\s+["'][^"']*(interpretation|narration|\/llm\/)/i);

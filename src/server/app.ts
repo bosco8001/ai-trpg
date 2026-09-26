@@ -19,6 +19,7 @@ import { RandomD20Roller } from "./combat/dice.js";
 import { PHASE22_TEST_COMBAT_PARTICIPANTS } from "./combat/fixtures.js";
 import { createCombatService } from "./combat/service.js";
 import { registerCombatActionRoutes, registerCombatSandbox } from "./combat/routes.js";
+import type { CombatNarrationService } from "./combat/narration.js";
 import { registerGameStateRoute } from "./game-state-route.js";
 
 export async function buildApp(options: {
@@ -35,6 +36,7 @@ export async function buildApp(options: {
   combatRoller?: DiceRoller;
   combatActionRoller?: DiceRoller;
   combatEscapeRoller?: DiceRoller;
+  combatNarrator?: CombatNarrationService;
   /** Allows focused legacy three-participant tests to keep their original roster. */
   combatParticipants?: readonly CombatParticipantSeed[];
 } = {}) {
@@ -55,7 +57,7 @@ export async function buildApp(options: {
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
-  registerCombatActionRoutes(app, combatService, storage, combatSandboxEnabled);
+  registerCombatActionRoutes(app, combatService, storage, combatSandboxEnabled, options.combatNarrator);
 
   if (options.domainSandbox && process.env.NODE_ENV !== "production") {
     registerDomainSandbox(app, session, storage);

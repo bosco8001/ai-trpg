@@ -1344,6 +1344,9 @@ h1 {
   font-size: 0.9375rem;
 }
 
+.combat-narration p { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+.combat-narration small { display: block; margin-top: var(--space-2); color: var(--text-muted); }
+
 .combat-skill-list {
   display: grid;
   gap: var(--space-2);

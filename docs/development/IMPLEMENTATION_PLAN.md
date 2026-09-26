@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–21 已由使用者確認。Phase 22「半自動隊友戰鬥行為」工程完成，等待使用者手動確認；Phase 23 尚未開始。
+Phase 1–22 已由使用者確認。Phase 23「AI 戰鬥敘事」工程完成，等待使用者手動確認；Phase 24 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -273,6 +273,14 @@ TEST 隊友現在於新戰鬥建立為共用 CombatParticipant，使用 D20 + DE
 
 Phase 22 工程 policy 暫定 **TEST-tactic-a = 普通攻擊（無合法目標時防禦）、TEST-tactic-b = 防禦**，只供接通驗證，並非正式 canonical tactic semantics。`null`／未知／不支援偏好安全拒絕，不擲骰、不改狀態。攻擊只記 hit／miss，防禦只記主要行動，沒有 HP、傷害、減傷、LLM 決策或 Phase 24 節奏動畫。
 
-CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migration。舊 active combat hydrate 後保留原名冊，不插入隊友；只有新開戰才加入。Phase 11–21 三人名冊測試明確使用舊 fixture 驗證原規則；新四人測試驗證隊友行動與保存。手動驗收指令見 [Phase 22 文件](PHASE_22_SEMI_AUTO_COMPANION.md)。Phase 22 工程完成，等待使用者確認；Phase 23 尚未開始。
+CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migration。舊 active combat hydrate 後保留原名冊，不插入隊友；只有新開戰才加入。Phase 11–21 三人名冊測試明確使用舊 fixture 驗證原規則；新四人測試驗證隊友行動與保存。手動驗收指令見 [Phase 22 文件](PHASE_22_SEMI_AUTO_COMPANION.md)。Phase 22 其後已由使用者手動確認並 commit。
 
-工程檢查：`npm test` 使用獨立 `ai_trpg_phase22_test`，232 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，dry-run 無待執行 migration。另以同一隔離資料庫實際停止／重啟 API，重啟後完整讀回隊友先攻、順序、偏好、最近行動、Round、actor 與 revision，並繼續推進戰鬥。瀏覽器、手機、鍵盤與 Phase 22 是否接受仍由使用者手動確認。
+工程檢查：`npm test` 使用獨立 `ai_trpg_phase22_test`，232 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，dry-run 無待執行 migration。另以同一隔離資料庫實際停止／重啟 API，重啟後完整讀回隊友先攻、順序、偏好、最近行動、Round、actor 與 revision，並繼續推進戰鬥。瀏覽器、手機、鍵盤其後由使用者完成手動驗收。
+
+## Phase 23 交付紀錄
+
+正式戰鬥 action 的 domain transition 與既有 session/repository 保存先完成，才從成功結果的 `lastAction` 建立最小 `CombatNarrationFacts`。`CombatNarrationService` 沿用 Phase 5 `LanguageModel`、Phase 9 的 fake fixture mode 與逾時方式，要求模型回傳 exact `{ "text": "..." }` JSON。輸出經長度、形狀與基本事實一致性驗證；模型故障或錯誤輸出直接使用由已確認事實組成的 deterministic fallback。成功 action 的 response 同時包含原本權威 `effect`／`state` 與非權威 `narration`。拒絕、讀取、TEST advance、Party 偏好修改及 repository save 失敗不呼叫模型。
+
+支援普通攻擊、換排、物品、防禦、逃跑、物理技能、四種詠唱階段、龍息逐目標結果與隊友攻擊／防禦。敘事 actor 取自 `lastAction.actorId`，不取已推進的 current actor。未實作的傷害、HP、治療、防禦減傷、法術成功與死亡不得敘述。Combat UI 的 AI 區只顯示當次成功回應，與系統機械裁定分開；刷新與 hydrate 不重叫 LLM。AI prose 不進 `CombatState` 或 PostgreSQL `game_states.snapshot`，沒有 migration、額外 revision 或敘事保存 endpoint。正式 provider、歷史保存與 Phase 24 節奏仍未定；完整命令見 [Phase 23 手動驗收文件](PHASE_23_AI_COMBAT_NARRATION.md)。Phase 23 工程完成，等待使用者手動確認；Phase 24 尚未開始。
+
+工程檢查：`npm test` 使用獨立 `ai_trpg_phase23_test` PostgreSQL 資料庫，242 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過，dry-run 無待執行 migration。專門整合測試以新 pool／repository／session 讀回模型故障後已提交的機械狀態，並確認 snapshot 無敘事欄位。瀏覽器、手機、鍵盤、敘事品質與實際 API process restart 留待使用者手動驗收。

@@ -51,6 +51,10 @@
 
 ## AI / LLM
 - 正式使用的 LLM 供應商與模型尚未決定。Phase 5 只建立中立介面與固定回應測試模型；不以測試模型代表正式選擇。
+- 戰鬥敘事是否永久保存、是否進入存檔歷史，以及每場戰鬥保留多少段敘事尚未決定。Phase 23 只在當次成功 action response 回傳文字；刷新或 PostgreSQL hydrate 不自動補敘事。
+- 正式戰鬥敘事模型、token budget、production retry policy 與 streaming 是否需要尚未決定。Phase 23 沿用本機 fake adapter、一次生成與現有逾時邊界。
+- Phase 24 的戰鬥敘事停頓與動畫毫秒數尚未定；Phase 23 不加入自動節奏。
+- 未來有權威 HP／傷害／瀕死／死亡後，各類敘事用語及其驗證規則需另行決定；Phase 23 不能預述這些結果。
 
 ## Rule
 - 遇到上述未定義內容：標記 unresolved / TODO，向使用者回報。
