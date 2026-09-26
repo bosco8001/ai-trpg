@@ -1,5 +1,6 @@
 import { getCombatItemDefinition } from "./combat-items.js";
 import { getActiveSkillDefinition } from "./physical-skills.js";
+import { initialTestHealth, isCombatHealth, type CombatHealth } from "./combat-health.js";
 
 export type CombatSide = "party" | "enemy";
 export type CombatRow = "front" | "back";
@@ -25,6 +26,7 @@ export interface CombatParticipant {
   readonly side: CombatSide;
   readonly row: CombatRow;
   readonly initiative: CombatInitiative;
+  readonly health: CombatHealth;
   readonly normalAttack: CombatNormalAttackProfile | null;
   readonly racialEscapeModifier: 0 | -2;
   /** Present only for a semi-autonomous party member; absent on legacy snapshots. */
@@ -142,6 +144,13 @@ export interface DefendActionResolution {
   readonly tacticPreferenceId?: string;
 }
 
+export interface RescueActionResolution {
+  readonly type: "rescue";
+  readonly actorId: string;
+  readonly targetId: string;
+  readonly round: number;
+}
+
 export interface RunActionResolution {
   readonly type: "run";
   readonly actorId: string;
@@ -154,7 +163,7 @@ export interface RunActionResolution {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RunActionResolution | CastingActionResolution | DragonBreathActionResolution;
+export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RescueActionResolution | RunActionResolution | CastingActionResolution | DragonBreathActionResolution;
 
 interface CombatStateBase {
   readonly round: number;
@@ -175,10 +184,9 @@ export interface ActiveCombatState extends CombatStateBase {
 
 export interface EndedCombatState extends CombatStateBase {
   readonly status: "ended";
-  readonly endReason: "escaped";
+  readonly endReason: "escaped" | "victory" | "party-defeat";
   readonly currentTurnIndex: null;
   readonly currentActorId: null;
-  readonly lastAction: RunActionResolution & { readonly outcome: "success" };
 }
 
 export type CombatState = ActiveCombatState | EndedCombatState;
@@ -255,12 +263,24 @@ function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): Combat
   if (exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack"])) {
     normalized = { ...normalized, racialEscapeModifier: 0 };
   }
-  if (!(exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
-    || exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "controlledBy"]))
+  if (!Object.hasOwn(normalized, "health")) {
+    const health = typeof normalized.id === "string" ? initialTestHealth(normalized.id) : undefined;
+    const known = typeof normalized.id === "string" ? legacyTestPositions[normalized.id] : undefined;
+    const companion = normalized.id === "TEST-companion-1" && normalized.displayName === "TEST 隊友"
+      && normalized.side === "party" && normalized.controlledBy === "companion";
+    if (!health || !(known && normalized.displayName === known.displayName && normalized.side === known.side
+      && normalized.controlledBy === undefined || companion)) {
+      throw new Error("未知舊版戰鬥參與者缺少權威 HP；須先遷移。");
+    }
+    normalized = { ...normalized, health };
+  }
+  if (!(exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "health"])
+    || exact(normalized, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "controlledBy", "health"]))
     || !isId(normalized.id) || !isId(normalized.displayName)
     || (normalized.side !== "party" && normalized.side !== "enemy")
     || (normalized.row !== "front" && normalized.row !== "back")
     || (Object.hasOwn(normalized, "controlledBy") && (normalized.controlledBy !== "companion" || normalized.side !== "party"))
+    || !isCombatHealth(normalized.health) || (normalized.side === "enemy" && normalized.health.lifeState === "dying")
     || !isRecord(normalized.initiative)
     || !exact(normalized.initiative, ["baseD20", "dexterityModifier", "total", "tieBreakRolls"])) {
     throw new Error("戰鬥參與者格式不正確。");
@@ -280,6 +300,7 @@ function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): Combat
     displayName: normalized.displayName,
     side: normalized.side,
     row: normalized.row,
+    health: Object.freeze({ ...normalized.health }),
     initiative: Object.freeze({
       baseD20: initiative.baseD20,
       dexterityModifier: initiative.dexterityModifier,
@@ -491,6 +512,9 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
   if (value.type === "row-move") return parseRowMoveAction(value);
   if (value.type === "item-use") return parseItemUseAction(value);
   if (value.type === "defend") return parseDefendAction(value);
+  if (value.type === "rescue") return exact(value, ["type", "actorId", "targetId", "round"])
+    && isId(value.actorId) && isId(value.targetId) && isPositiveSafeInteger(value.round)
+    ? Object.freeze({ type: "rescue", actorId: value.actorId, targetId: value.targetId, round: value.round }) : undefined;
   if (value.type === "run") return parseRunAction(value);
   if (value.type === "dragon-breath") return parseDragonBreathAction(value);
   if (typeof value.type === "string" && value.type.startsWith("casting-")) return parseCastingAction(value);
@@ -514,7 +538,7 @@ export function createCombatState(value: unknown): CombatState {
     || (status !== "active" && status !== "ended")
     || (status === "active" && (endReason !== null || !isSafeInteger(value.currentTurnIndex)
       || value.currentTurnIndex < 0 || !isId(value.currentActorId)))
-    || (status === "ended" && (endReason !== "escaped" || value.currentTurnIndex !== null
+    || (status === "ended" && (endReason !== "escaped" && endReason !== "victory" && endReason !== "party-defeat" || value.currentTurnIndex !== null
       || value.currentActorId !== null))
     || !Array.isArray(value.turnOrder) || !value.turnOrder.every(isId)
     || !Array.isArray(value.participants) || value.participants.length === 0) {
@@ -565,16 +589,26 @@ export function createCombatState(value: unknown): CombatState {
     || new Set(skillCooldowns.map((entry) => `${entry.actorId}\u0000${entry.skillId}`)).size !== skillCooldowns.length
     || new Set(activeCastings.map((entry) => entry.actorId)).size !== activeCastings.length
     || activeCastings.some((entry) => !ids.includes(entry.actorId) || entry.startedRound > (value.round as number)
+      || participants.find((participant) => participant.id === entry.actorId)?.health.lifeState !== "active"
       || !isPlayerActionParticipant(participants.find((participant) => participant.id === entry.actorId)!))
-    || (status === "ended" && activeCastings.length > 0)
     || value.turnOrder.length !== ids.length
     || new Set(value.turnOrder).size !== value.turnOrder.length
     || value.turnOrder.some((id) => !ids.includes(id))
     || value.turnOrder.some((id, index) => id !== expectedOrder[index])
     || (status === "active" && ((value.currentTurnIndex as number) >= value.turnOrder.length
       || value.currentActorId !== value.turnOrder[value.currentTurnIndex as number]))
-    || (status === "ended" && (lastAction?.type !== "run" || lastAction.outcome !== "success"
+    || (status === "ended" && endReason === "escaped" && (lastAction?.type !== "run" || lastAction.outcome !== "success"
       || lastAction.round !== value.round))
+    || (status === "ended" && endReason === "victory" && (participants.some((participant) => participant.side === "enemy" && participant.health.lifeState !== "dead")
+      || !participants.some((participant) => participant.side === "party" && participant.health.lifeState === "active")))
+    || (status === "ended" && endReason === "party-defeat" && !(
+      participants.some((participant) => participant.side === "party" && participant.controlledBy !== "companion" && participant.health.lifeState === "dead")
+      || !participants.some((participant) => participant.side === "party" && participant.health.lifeState === "active")))
+    || (status === "active" && (participants.some((participant) => participant.side === "party"
+      && participant.controlledBy !== "companion" && participant.health.lifeState === "dead")
+      || !participants.some((participant) => participant.side === "party" && participant.health.lifeState === "active")
+      || !participants.some((participant) => participant.side === "enemy" && participant.health.lifeState === "active")
+      || participants.find((participant) => participant.id === value.currentActorId)?.health.lifeState === "dead"))
     || (status === "active" && lastAction?.type === "run" && lastAction.outcome !== "failure")
     || (lastAction !== null && (lastAction.round > value.round
       || !ids.includes(lastAction.actorId)
@@ -590,19 +624,20 @@ export function createCombatState(value: unknown): CombatState {
         && entry.skillId === lastAction.skillId)?.readyRound !== lastAction.readyRound)
     || (lastAction?.type === "dragon-breath" && (racialAbilityCooldowns.find((entry) => entry.actorId === lastAction.actorId
       && entry.abilityId === "dragon-breath")?.readyRound !== lastAction.readyRound
-      || lastAction.results.length !== participants.filter((participant) => participant.side === "enemy"
-        && participant.row === lastAction.targetRow).length
       || lastAction.results.some((result) => participants.find((participant) => participant.id === result.targetId)?.side !== "enemy"
         || participants.find((participant) => participant.id === result.targetId)?.row !== lastAction.targetRow
         || result.evasion.dexterityModifier !== participants.find((participant) => participant.id === result.targetId)?.initiative.dexterityModifier
         || result.attack.perceptionModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.normalAttack?.perceptionModifier)))
     || (lastAction !== null && lastAction.type.startsWith("casting-")
       && ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
-        ? !activeCastings.some((entry) => entry.actorId === lastAction.actorId
-          && entry.skillId === lastAction.skillId && entry.mpSpent === lastAction.totalMpSpent)
+        ? (participants.find((entry) => entry.id === lastAction.actorId)?.health.lifeState === "active"
+          && !activeCastings.some((entry) => entry.actorId === lastAction.actorId
+            && entry.skillId === lastAction.skillId && entry.mpSpent === lastAction.totalMpSpent))
         : activeCastings.some((entry) => entry.actorId === lastAction.actorId)))
     || (lastAction?.type === "row-move"
       && participants.find((participant) => participant.id === lastAction.actorId)?.row !== lastAction.toRow)
+    || (lastAction?.type === "rescue" && (lastAction.actorId === lastAction.targetId
+      || participants.find((participant) => participant.id === lastAction.targetId)?.side !== "party"))
     || ((lastAction?.type === "item-use" || lastAction?.type === "run")
       && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!))
     || (lastAction?.type === "defend" && !isPlayerActionParticipant(participants.find((participant) => participant.id === lastAction.actorId)!)
@@ -621,8 +656,7 @@ export function createCombatState(value: unknown): CombatState {
     racialAbilityCooldowns: Object.freeze(racialAbilityCooldowns),
   };
   if (status === "ended") return Object.freeze({
-    ...base, status: "ended", endReason: "escaped", currentTurnIndex: null, currentActorId: null,
-    lastAction: lastAction as EndedCombatState["lastAction"],
+    ...base, status: "ended", endReason: endReason as EndedCombatState["endReason"], currentTurnIndex: null, currentActorId: null,
   });
   return Object.freeze({
     ...base, status: "active", endReason: null,

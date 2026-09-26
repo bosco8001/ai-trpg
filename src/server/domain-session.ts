@@ -23,6 +23,7 @@ import {
   runFromCombat,
   resolveCompanionTurn,
   useCombatItem as useCombatItemTransition,
+  applyCombatDamage, processDyingTurn, rescueCombatant,
   startCombat as startCombatTransition,
   type CombatParticipantSeed,
   type DiceRoller,
@@ -37,6 +38,9 @@ export interface GameStateSession {
     | Promise<ReturnType<typeof setCompanionTacticPreferenceTransition>>;
   actCompanion(input: unknown, roller: DiceRoller): ReturnType<typeof resolveCompanionTurn>
     | Promise<ReturnType<typeof resolveCompanionTurn>>;
+  applyCombatDamage(input: unknown): ReturnType<typeof applyCombatDamage> | Promise<ReturnType<typeof applyCombatDamage>>;
+  processDyingTurn(input: unknown): ReturnType<typeof processDyingTurn> | Promise<ReturnType<typeof processDyingTurn>>;
+  rescueCombatant(input: unknown): ReturnType<typeof rescueCombatant> | Promise<ReturnType<typeof rescueCombatant>>;
   execute(input: unknown): ReturnType<typeof applyCommand> | Promise<ReturnType<typeof applyCommand>>;
   replaceContents(expectedRevision: unknown, contents: unknown): ReturnType<typeof replaceGameStateContents>
     | Promise<ReturnType<typeof replaceGameStateContents>>;
@@ -70,6 +74,9 @@ export function createDomainSession(initialState: GameState) {
   let state = createGameState(initialState);
   return {
     getState: () => state,
+    applyCombatDamage(input: unknown) { const result = applyCombatDamage(state, input); if (result.ok) state = result.state; return result; },
+    processDyingTurn(input: unknown) { const result = processDyingTurn(state, input); if (result.ok) state = result.state; return result; },
+    rescueCombatant(input: unknown) { const result = rescueCombatant(state, input); if (result.ok) state = result.state; return result; },
     partyOptions: () => getCombatPartyOptions(state),
     setCompanionTacticPreference(input: unknown) {
       const result = setCompanionTacticPreferenceTransition(state, input);
@@ -162,6 +169,18 @@ export function createDomainSession(initialState: GameState) {
 /** 每次從 repository 取得最新快照；跨程序寫入由 repository 的 revision 條件守護。 */
 export function createPersistedDomainSession(repository: GameStateRepository, initialState: GameState) {
   const seed = createGameState(initialState);
+  async function persistLife(transition: typeof applyCombatDamage, input: unknown) {
+    if (repository.withStateLocked) return repository.withStateLocked(seed, (state) => {
+      const result = transition(state, input);
+      return { result, ...(result.ok ? { nextState: result.state } : {}) };
+    });
+    const state = await repository.createIfAbsent(seed);
+    const result = transition(state, input);
+    if (!result.ok) return result;
+    const saved = await repository.saveIfRevision(state.revision, result.state);
+    return saved ? result : { ok: false as const, code: "stale-revision" as const,
+      message: "戰鬥狀態已更新，請重新讀取。" };
+  }
   async function persistCasting(transition: typeof startCasting, input: unknown) {
     if (repository.withStateLocked) {
       return repository.withStateLocked(seed, (state) => {
@@ -178,6 +197,9 @@ export function createPersistedDomainSession(repository: GameStateRepository, in
   }
   return {
     getState: () => repository.createIfAbsent(seed),
+    applyCombatDamage: (input: unknown) => persistLife(applyCombatDamage, input),
+    processDyingTurn: (input: unknown) => persistLife(processDyingTurn, input),
+    rescueCombatant: (input: unknown) => persistLife(rescueCombatant, input),
     async partyOptions() {
       return getCombatPartyOptions(await repository.createIfAbsent(seed));
     },

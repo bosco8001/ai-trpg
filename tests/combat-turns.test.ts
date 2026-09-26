@@ -102,8 +102,10 @@ test("tie fixture 只重擲同分者，再次同點時只讓仍平手者繼續�
 
 test("平手順序由重擲決定，不以 ID、字母或輸入順序代替", () => {
   const started = requireStarted(startCombat(seed(), { expectedRevision: 0 }, [
-    { id: "TEST-a", displayName: "TEST A", side: "party", row: "front", dexterityModifier: 0, normalAttack: null },
-    { id: "TEST-z", displayName: "TEST Z", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null },
+    { id: "TEST-a", displayName: "TEST A", side: "party", row: "front", dexterityModifier: 0, normalAttack: null,
+      health: { maxHp: 10, currentHp: 10, lifeState: "active", dyingTurnsRemaining: null } },
+    { id: "TEST-z", displayName: "TEST Z", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null,
+      health: { maxHp: 6, currentHp: 6, lifeState: "active", dyingTurnsRemaining: null } },
   ], new SequenceD20Roller([10, 10, 1, 20])));
   assert.deepEqual(started.state.combat?.turnOrder, ["TEST-z", "TEST-a"]);
 });

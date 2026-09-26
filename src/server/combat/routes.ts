@@ -22,7 +22,8 @@ import {
 } from "../../shared/game-state.js";
 import { InvalidPersistedStateError, PersistenceUnavailableError } from "../postgres-game-state-repository.js";
 import type { CombatService } from "./service.js";
-import { buildCombatNarrationFacts, buildCombatNarrationFallback, type CombatNarrationService } from "./narration.js";
+import { buildCombatNarrationFacts, buildCombatNarrationFallback, buildLifeEventNarrationFacts, type CombatNarrationService } from "./narration.js";
+import type { LifeEvent } from "../../domain/combat.js";
 import type { GameState } from "../../domain/game.js";
 import { isCombatNarrationPresentation } from "../../shared/combat-narration.js";
 
@@ -59,6 +60,7 @@ export function registerCombatSandbox(
   app: FastifyInstance,
   service: CombatService,
   storage: "memory" | "postgres",
+  allowDamage = false,
 ) {
   app.get("/api/dev/combat", async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
@@ -92,6 +94,15 @@ export function registerCombatSandbox(
   };
   app.post<{ Body: unknown }>("/api/dev/combat/start", options, operation("start"));
   app.post<{ Body: unknown }>("/api/dev/combat/advance", options, operation("advance"));
+  if (allowDamage) app.post<{ Body: unknown }>("/api/dev/combat/apply-damage", options, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.applyDamage(request.body);
+      if (!result.ok) return reply.code(result.code === "invalid-command" ? 400 : 409)
+        .send({ error: result.code, message: result.message });
+      return { sandbox: true, storage, state: validatedState(result.state), event: result.event };
+    } catch (error) { return safeFailure(app, reply, error); }
+  });
 }
 
 function actionStatus(result: Extract<NormalAttackResult, { ok: false }>): number {
@@ -217,6 +228,37 @@ export function registerCombatActionRoutes(
       return fallback;
     }
   }
+  async function narrationForLife(state: GameState, event: LifeEvent) {
+    const facts = buildLifeEventNarrationFacts(state, event);
+    const fallback = { text: buildCombatNarrationFallback(facts), source: "fallback" as const };
+    if (!narrator) return fallback;
+    try {
+      const narration = await narrator.narrate(facts);
+      return isCombatNarrationPresentation(narration) ? narration : fallback;
+    } catch { return fallback; }
+  }
+  const lifeOptions = { bodyLimit: 1024, errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) =>
+    reply.code(400).send({ error: "invalid-command", message: "生命狀態請求格式不正確。" }) };
+  app.post<{ Body: unknown }>("/api/combat/dying-turn", lifeOptions, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.dyingTurn(request.body);
+      if (!result.ok) return reply.code(result.code === "invalid-command" ? 400 : 409)
+        .send({ error: result.code, message: result.message });
+      return { sandbox, storage, state: validatedState(result.state), event: result.event,
+        ...(result.event.lifeState === "dead" ? { narration: await narrationForLife(result.state, result.event) } : {}) };
+    } catch (error) { return safeActionFailure(app, reply, error); }
+  });
+  app.post<{ Body: unknown }>("/api/combat/rescue", lifeOptions, async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    try {
+      const result = await service.rescue(request.body);
+      if (!result.ok) return reply.code(result.code === "invalid-command" ? 400 : 409)
+        .send({ error: result.code, message: result.message });
+      return { sandbox, storage, state: validatedState(result.state), event: result.event,
+        narration: await narrationForLife(result.state, result.event) };
+    } catch (error) { return safeActionFailure(app, reply, error); }
+  });
   app.post<{ Body: unknown }>("/api/combat/companion/act", {
     bodyLimit: 1024,
     errorHandler: (_error: Error, _request: unknown, reply: FastifyReply) => reply.code(400)

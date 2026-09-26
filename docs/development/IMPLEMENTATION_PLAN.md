@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–23 已由使用者確認。Phase 24「回合順序動畫與 NPC 節奏」工程完成，等待使用者手動確認；Phase 25 尚未開始。
+Phase 1–25 已由使用者手動確認。Phase 26 尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -287,6 +287,12 @@ CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migrati
 
 ## Phase 24 交付紀錄
 
-前端新增獨立 NPC 節奏控制器：從權威 GameState 判斷目前角色，以暫定呈現停頓安排既有 TEST advance 或 companion action。玩家回合、ended combat、非 sandbox 敵人與不支援 NPC 都不自動送 mutation。成功回應先採用伺服器狀態與 Phase 23 敘事，再讓結果停留、輪轉 chip 與戰場高亮；前端不改 `turnOrder`、Round、骰值或 `lastAction`。每個 `revision:actorId` 只送一次、同時只允許一個自動 mutation；StrictMode cleanup、舊 timer／舊回應、stale revision、refresh 與網路故障有獨立處理。動畫、計時與節奏 phase 不保存，無 migration。完整流程及手動指令見 [Phase 24 文件](PHASE_24_TURN_PACING.md)。Phase 24 工程完成，等待使用者手動確認；Phase 25 尚未開始。
+前端新增獨立 NPC 節奏控制器：從權威 GameState 判斷目前角色，以暫定呈現停頓安排既有 TEST advance 或 companion action。玩家回合、ended combat、非 sandbox 敵人與不支援 NPC 都不自動送 mutation。成功回應先採用伺服器狀態與 Phase 23 敘事，再讓結果停留、輪轉 chip 與戰場高亮；前端不改 `turnOrder`、Round、骰值或 `lastAction`。每個 `revision:actorId` 只送一次、同時只允許一個自動 mutation；StrictMode cleanup、舊 timer／舊回應、stale revision、refresh 與網路故障有獨立處理。動畫、計時與節奏 phase 不保存，無 migration。完整流程及手動指令見 [Phase 24 文件](PHASE_24_TURN_PACING.md)。Phase 24 已由使用者手動確認並 commit。
 
-工程檢查：`npm test` 在隔離 `ai_trpg_phase24_test` PostgreSQL 資料庫執行，254 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，migration 後 dry run 無待執行項目。另於隔離 `ai_trpg_phase24_restart` 以實際 API process 停止／重啟驗證 revision 6、Round 2、玩家 actor、turnOrder、lastAction 與戰術偏好讀回一致。瀏覽器動畫、手機、減少動態效果與鍵盤仍待使用者手動驗收。
+工程檢查：`npm test` 在隔離 `ai_trpg_phase24_test` PostgreSQL 資料庫執行，254 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過，migration 後 dry run 無待執行項目。另於隔離 `ai_trpg_phase24_restart` 以實際 API process 停止／重啟驗證 revision 6、Round 2、玩家 actor、turnOrder、lastAction 與戰術偏好讀回一致。Phase 24 其後已由使用者手動驗收。
+
+## Phase 25 交付紀錄
+
+所有戰鬥參與者新增權威 HP／生命狀態。僅已知 TEST 角色可使用明確標示的工程 HP fixture；未知舊參與者若缺 health 會安全拒絕。generic damage transition 負責扣 HP、進入瀕死／死亡、中斷詠唱、勝敗與回合行動者正規化；正式武器、技能、法術與龍息傷害公式仍未定案。瀕死者只在自己的回合倒數並自動跳過；死者保留在名冊與回合順序但不可行動或一般受擊。玩家可手動選擇瀕死隊友救助，隊友在自己的回合按剩餘回合、玩家身分與 turnOrder 固定排序優先救助。每次成功 transition 只增加一個 revision；冷卻與排位保留。勝敗優先序、TEST 傷害入口、Phase 23 已確認事實敘事、Phase 24 自動節奏、React HP／救助畫面與 JSONB 保存均已接通。沒有關聯式 schema 變更或新 migration。完整操作與預期結果見 [Phase 25 手動驗收文件](PHASE_25_DYING_RESCUE_DEATH.md)。Phase 25 已由使用者完成並確認手動驗收；Phase 26 尚未開始。
+
+工程檢查：`npm test` 使用隔離 `ai_trpg_phase25_test` PostgreSQL 資料庫，272 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過。Dry-run 顯示沒有待執行 migration。Phase 25 手動驗收其後已由使用者完成並確認全部通過。

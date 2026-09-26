@@ -3,7 +3,8 @@ import type { DiceRoller } from "./combat.js";
 
 /** v1 只以敵方排為範圍；未來生命狀態加入後，合法目標過濾也在此集中處理。 */
 export function getEnemyRowTargets(combat: ActiveCombatState, actor: CombatParticipant, row: CombatRow): readonly CombatParticipant[] {
-  return combat.participants.filter((target) => target.side !== actor.side && target.row === row);
+  return combat.participants.filter((target) => target.side !== actor.side && target.row === row
+    && target.health.lifeState === "active");
 }
 
 function d20(roller: DiceRoller): number {

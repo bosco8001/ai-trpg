@@ -285,7 +285,8 @@ test("API 只接受 revision 與 targetRow；GET、取消選排不改權威狀�
     assert.match(markup, /龍息・火/);
     assert.match(markup, /攻擊：10 \+ 1 PER = 11/);
     assert.match(markup, /第 4 回合可再次使用/);
-    assert.doesNotMatch(markup, /造成 0 傷害|HP/);
+    assert.match(markup, /HP 6 \/ 6/);
+    assert.doesNotMatch(markup, /造成 0 傷害/);
   } finally { await app.close(); }
 });
 

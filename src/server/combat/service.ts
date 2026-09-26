@@ -17,6 +17,7 @@ import type {
   DragonBreathOptionsResult,
   DragonBreathResult,
   CompanionActResult,
+  LifeTransitionResult,
 } from "../../domain/combat.js";
 import type { GameStateSession } from "../domain-session.js";
 import type { CombatPartyOptions, SetTacticPreferenceResult } from "../../domain/party.js";
@@ -26,6 +27,9 @@ export interface CombatService {
   partyOptions(): Promise<CombatPartyOptions>;
   setCompanionTacticPreference(input: unknown): Promise<SetTacticPreferenceResult>;
   actCompanion(input: unknown): Promise<CompanionActResult>;
+  applyDamage(input: unknown): Promise<LifeTransitionResult>;
+  dyingTurn(input: unknown): Promise<LifeTransitionResult>;
+  rescue(input: unknown): Promise<LifeTransitionResult>;
   start(input: unknown): Promise<CombatTransitionResult>;
   advance(input: unknown): Promise<CombatTransitionResult>;
   normalAttackOptions(): Promise<NormalAttackOptionsResult>;
@@ -57,6 +61,9 @@ export function createCombatService(
     async getState() {
       return createGameState(await session.getState());
     },
+    async applyDamage(input: unknown) { return session.applyCombatDamage(input); },
+    async dyingTurn(input: unknown) { return session.processDyingTurn(input); },
+    async rescue(input: unknown) { return session.rescueCombatant(input); },
     async partyOptions() {
       return session.partyOptions();
     },

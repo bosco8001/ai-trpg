@@ -32,6 +32,7 @@ import {
   isCombatPartyOptionsResponse,
   isCompanionTacticPreferenceResponse,
   isCompanionActResponse,
+  isCombatLifeResponse,
   type AuthoritativeGameStateResponse,
   type CombatNormalAttackResponse,
   type CombatRowMoveResponse,
@@ -50,8 +51,30 @@ import {
   type CombatPartyOptionsResponse,
   type CompanionTacticPreferenceResponse,
   type CompanionActResponse,
+  type CombatLifeResponse,
   type CombatRow,
 } from "../shared/game-state.js";
+
+async function lifeCommand(path: string, expectedRevision: number, targetId?: string,
+  fetcher: typeof fetch = fetch): Promise<CombatLifeResponse> {
+  let response: Response;
+  try {
+    response = await fetcher(path, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(targetId === undefined ? { expectedRevision } : { expectedRevision, targetId }),
+      cache: "no-store" });
+  } catch { throw new Error("生命狀態操作暫時無法完成，請重新讀取戰鬥狀態。"); }
+  if (!response.ok) throw await saveApiError(response, "生命狀態操作暫時無法完成。");
+  let body: unknown;
+  try { body = await response.json(); } catch { throw new Error("生命狀態回應格式不正確。"); }
+  if (!isCombatLifeResponse(body) || body.state.revision !== expectedRevision + 1)
+    throw new Error("生命狀態回應格式不正確。");
+  return body;
+}
+
+export const executeDyingTurn = (revision: number, fetcher?: typeof fetch) =>
+  lifeCommand("/api/combat/dying-turn", revision, undefined, fetcher);
+export const executeRescue = (revision: number, targetId: string, fetcher?: typeof fetch) =>
+  lifeCommand("/api/combat/rescue", revision, targetId, fetcher);
 
 export async function checkApiHealth(
   signal: AbortSignal,

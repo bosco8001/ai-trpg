@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–23 已由使用者確認。Phase 24「回合順序動畫與 NPC 節奏」工程完成，等待使用者手動確認；Phase 25 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–25 已由使用者手動確認。Phase 26 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -405,4 +405,8 @@ Phase 21 已由使用者手動確認。「隊伍」可讀取伺服器提供的�
 
 ## Phase 24：回合順序動畫與 NPC 節奏
 
-TEST 戰鬥會從權威 current actor 自動接續：TEST 敵方只呼叫既有 sandbox advance；隊友只呼叫既有 companion action。玩家回合停下等待指令。行動順序 chip 會輪轉，戰場同步標示目前角色；隊友敘事與機械結果先停留供閱讀。暫定毫秒值只屬前端呈現，不改 GameState 或資料庫。完整可複製的 Memory／PostgreSQL 指令、預期 revision、refresh、錯誤、手機、減少動態效果與鍵盤檢查見 [Phase 24 文件](docs/development/PHASE_24_TURN_PACING.md)。Phase 24 等待使用者手動確認。
+TEST 戰鬥會從權威 current actor 自動接續：TEST 敵方只呼叫既有 sandbox advance；隊友只呼叫既有 companion action。玩家回合停下等待指令。行動順序 chip 會輪轉，戰場同步標示目前角色；隊友敘事與機械結果先停留供閱讀。暫定毫秒值只屬前端呈現，不改 GameState 或資料庫。完整可複製的 Memory／PostgreSQL 指令、預期 revision、refresh、錯誤、手機、減少動態效果與鍵盤檢查見 [Phase 24 文件](docs/development/PHASE_24_TURN_PACING.md)。Phase 24 已由使用者手動確認。
+
+## Phase 25：瀕死、救助與死亡
+
+戰鬥 HP 現在只由 `CombatParticipant` 保存。TEST 傷害工程入口可驗證瀕死、死亡與勝敗；玩家可選擇瀕死隊友救助，隊友在自己的回合會依固定優先序自動救助。傷害數值仍是 TEST fixture，普通攻擊與技能的正式傷害尚未定案。詳細的 Memory／PostgreSQL 指令、預期 revision、刷新、敘事故障、手機與鍵盤檢查見 [Phase 25 手動驗收文件](docs/development/PHASE_25_DYING_RESCUE_DEATH.md)。Phase 25 已由使用者手動確認；Phase 26 尚未開始。

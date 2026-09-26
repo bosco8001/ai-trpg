@@ -32,16 +32,20 @@ export function getCombatPartyOptions(state: GameState): CombatPartyOptions {
     revision: state.revision,
     context,
     canChangeTacticPreference: context === "active-combat",
-    companions: Object.freeze(state.partyMembers.map((member) => Object.freeze({
-      id: member.id,
-      displayName: member.displayName,
-      // Phase 21 does not have authoritative companion level, row, HP or MP fields.
-      level: null,
-      row: null,
-      hp: null,
-      mp: null,
-      tacticPreferenceId: member.tacticPreferenceId,
-    }))),
+    companions: Object.freeze(state.partyMembers.map((member) => {
+      const combatant = state.combat?.participants.find((entry) => entry.id === member.id
+        && entry.controlledBy === "companion");
+      return Object.freeze({
+        id: member.id,
+        displayName: member.displayName,
+        // Combat HP is projected from CombatParticipant; PartyMemberState never stores a copy.
+        level: null,
+        row: combatant?.row ?? null,
+        hp: combatant ? { current: combatant.health.currentHp, maximum: combatant.health.maxHp } : null,
+        mp: null,
+        tacticPreferenceId: member.tacticPreferenceId,
+      });
+    })),
     tacticPreferences: ENGINEERING_TEST_TACTIC_PREFERENCES,
   });
 }

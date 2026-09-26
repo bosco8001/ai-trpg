@@ -70,7 +70,8 @@ test("最後一名 participant 防禦沿用原本 Round wrap", () => {
   const participants: readonly CombatParticipantSeed[] = [
     { id: "TEST-player", displayName: "TEST 玩家", side: "party", row: "front", dexterityModifier: 0,
       normalAttack: { range: "melee", perceptionModifier: 1, weaponMainStatModifier: 2, proficiencyModifier: 1 } },
-    { id: "TEST-enemy", displayName: "TEST 敵人", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null },
+    { id: "TEST-enemy", displayName: "TEST 敵人", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null,
+      health: { maxHp: 6, currentHp: 6, lifeState: "active", dyingTurnsRemaining: null } },
   ];
   const started = startCombat(createTestGameState(), { expectedRevision: 0 }, participants, new SequenceD20Roller([10, 20]));
   requireOk(started);

@@ -1678,6 +1678,10 @@ h1 {
 
 .combat-participant[data-row="front"] { border-block-start-color: var(--action-primary); }
 .combat-participant[data-row="back"] { border-block-start-color: var(--border-interactive); }
+.combat-participant[data-life-state="dying"] { border-inline-start: 3px solid var(--state-danger); }
+.combat-participant[data-life-state="dead"] { border-inline-start: 3px solid var(--state-danger); opacity: .68; }
+.combat-participant__health { font-weight: 700; overflow-wrap: anywhere; }
+.combat-turn-order [data-actor-id] { overflow-wrap: anywhere; }
 
 .combat-last-action__pair {
   margin-block-end: var(--space-3) !important;

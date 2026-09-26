@@ -15,7 +15,9 @@ import {
   type CastingActionResolution,
   type CombatParticipant,
   type DragonBreathActionResolution,
+  type RescueActionResolution,
 } from "./combat-state.js";
+import { initialTestHealth, isCombatHealth, type CombatHealth } from "./combat-health.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
 import { getActiveSkillDefinition } from "./physical-skills.js";
 import { getCombatItemDefinition } from "./combat-items.js";
@@ -42,6 +44,7 @@ export interface CombatParticipantSeed {
   readonly normalAttack: CombatNormalAttackProfile | null;
   readonly racialEscapeModifier?: 0 | -2;
   readonly controlledBy?: "companion";
+  readonly health?: CombatHealth;
 }
 
 export type CombatTransitionCode = "invalid-command" | "stale-revision" | "revision-limit"
@@ -206,7 +209,7 @@ function castingContext(state: GameState, expectedRevision: number):
   if (state.activity !== "in-combat" || state.combat === null) return { ok: false, code: "not-in-combat" };
   if (state.combat.status === "ended") return { ok: false, code: "combat-ended" };
   const actor = state.combat.participants.find((entry) => entry.id === state.combat?.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return { ok: false, code: "not-player-turn" };
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return { ok: false, code: "not-player-turn" };
   return { ok: true, combat: state.combat, actorId: actor.id };
 }
 
@@ -459,14 +462,15 @@ function parsePhysicalSkillCommand(value: unknown): {
 }
 
 function advanceToNextTurn(combat: ActiveCombatState): ActiveCombatState {
-  const wrapsRound = combat.currentTurnIndex === combat.turnOrder.length - 1;
-  const currentTurnIndex = wrapsRound ? 0 : combat.currentTurnIndex + 1;
-  return createCombatState({
-    ...combat,
-    round: wrapsRound ? combat.round + 1 : combat.round,
-    currentTurnIndex,
-    currentActorId: combat.turnOrder[currentTurnIndex],
-  }) as ActiveCombatState;
+  for (let step = 1; step <= combat.turnOrder.length; step++) {
+    const position = combat.currentTurnIndex + step;
+    const currentTurnIndex = position % combat.turnOrder.length;
+    const id = combat.turnOrder[currentTurnIndex]!;
+    if (combat.participants.find((entry) => entry.id === id)?.health.lifeState === "dead") continue;
+    return createCombatState({ ...combat, round: combat.round + Math.floor(position / combat.turnOrder.length),
+      currentTurnIndex, currentActorId: id }) as ActiveCombatState;
+  }
+  throw new Error("戰鬥沒有可行動角色。");
 }
 
 function rollD20(roller: DiceRoller): number {
@@ -488,6 +492,7 @@ function validateSeeds(seeds: readonly CombatParticipantSeed[]): void {
       || (seed.row !== "front" && seed.row !== "back")
       || (seed.controlledBy !== undefined && (seed.controlledBy !== "companion" || seed.side !== "party"))
       || !Number.isSafeInteger(seed.dexterityModifier)
+      || !(seed.health ? isCombatHealth(seed.health) : initialTestHealth(seed.id))
       || (seed.racialEscapeModifier !== undefined && seed.racialEscapeModifier !== 0 && seed.racialEscapeModifier !== -2)
       || (seed.normalAttack !== null && (typeof seed.normalAttack !== "object"
         || (seed.normalAttack.range !== "melee" && seed.normalAttack.range !== "ranged")
@@ -566,6 +571,7 @@ export function rollInitiative(
         tieBreakRolls: participant.tieBreakRolls,
       },
       normalAttack: participant.normalAttack,
+      health: participant.health ?? initialTestHealth(participant.id),
       racialEscapeModifier: participant.racialEscapeModifier ?? 0,
       ...(participant.controlledBy === "companion" ? { controlledBy: "companion" as const } : {}),
     })),
@@ -607,7 +613,7 @@ export function getCurrentPhysicalSkillOptions(state: GameState): PhysicalSkillO
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor) return { ok: false, code: "not-in-combat", message: physicalSkillMessages["not-in-combat"] };
-  const canPlayerAct = isPlayerActionParticipant(actor);
+  const canPlayerAct = isPlayerActionParticipant(actor) && actor.health.lifeState === "active";
   const skills: PhysicalSkillOption[] = state.character.equippedSkillIds.flatMap((skillId) => {
     const definition = getActiveSkillDefinition(skillId);
     if (!definition || definition.category !== "physical-active"
@@ -649,7 +655,7 @@ export function usePhysicalSkill(state: GameState, input: unknown, roller: DiceR
   if (state.combat.status === "ended") return rejectPhysicalSkill("combat-ended");
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return rejectPhysicalSkill("not-player-turn");
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return rejectPhysicalSkill("not-player-turn");
   if (actorCasting(combat, actor.id)) return rejectPhysicalSkill("casting-active");
   const definition = getActiveSkillDefinition(command.skillId);
   if (!definition) return rejectPhysicalSkill("unknown-skill");
@@ -718,6 +724,7 @@ export function advanceCombatTurn(state: GameState, input: unknown): CombatTrans
   if (state.revision === Number.MAX_SAFE_INTEGER) return reject("revision-limit");
   if (state.activity !== "in-combat" || state.combat === null) return reject("not-in-combat");
   if (state.combat.status === "ended") return reject("combat-ended");
+  if (state.combat.participants.find((entry) => entry.id === state.combat?.currentActorId)?.health.lifeState === "dying") return reject("invalid-command");
   if (state.combat.participants.find((participant) => participant.id === state.combat?.currentActorId)?.controlledBy === "companion") {
     return reject("companion-turn");
   }
@@ -749,7 +756,7 @@ export function getCurrentRowMoveOptions(state: GameState): RowMoveOptionsResult
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
   if (!actor) return { ok: false, code: "not-in-combat", message: rowMoveMessages["not-in-combat"] };
-  const canPlayerAct = isPlayerActionParticipant(actor) && !actorCasting(combat, actor.id);
+  const canPlayerAct = isPlayerActionParticipant(actor) && actor.health.lifeState === "active" && !actorCasting(combat, actor.id);
   const legalTargetRows: readonly CombatRow[] = canPlayerAct
     ? [actor.row === "front" ? "back" : "front"]
     : [];
@@ -776,7 +783,7 @@ export function getCurrentCombatItemOptions(state: GameState): CombatItemOptions
   const items = state.inventory.flatMap((stack): CombatItemOption[] => {
     const definition = getCombatItemDefinition(stack.itemId);
     if (!definition || !definition.consumable || definition.usage !== "self") return [];
-    const unavailableReason: CombatItemUnavailableReason | undefined = !isPlayerActionParticipant(actor)
+    const unavailableReason: CombatItemUnavailableReason | undefined = !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active"
       ? "not-player-turn"
       : actorCasting(combat, actor.id) ? "casting-active"
       : stack.quantity === 0 ? "quantity-depleted" : undefined;
@@ -806,7 +813,7 @@ export function useCombatItem(state: GameState, input: unknown): CombatItemUseRe
 
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return rejectItemUse("not-player-turn");
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return rejectItemUse("not-player-turn");
   if (actorCasting(combat, actor.id)) return rejectItemUse("casting-active");
   const definition = getCombatItemDefinition(command.itemId);
   if (!definition || !definition.consumable || definition.usage !== "self") {
@@ -846,7 +853,7 @@ export function defendCombatTurn(state: GameState, input: unknown): DefendResult
 
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return rejectDefend("not-player-turn");
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return rejectDefend("not-player-turn");
   if (actorCasting(combat, actor.id)) return rejectDefend("casting-active");
   const lastAction: DefendActionResolution = Object.freeze({
     type: "defend", actorId: actor.id, round: combat.round,
@@ -885,7 +892,7 @@ export function runFromCombat(state: GameState, input: unknown, roller: DiceRoll
   if (state.combat.status === "ended") return rejectRun("combat-ended");
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return rejectRun("not-player-turn");
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return rejectRun("not-player-turn");
   if (actorCasting(combat, actor.id)) return rejectRun("casting-active");
   let check: ReturnType<typeof resolveEscapeCheck>;
   try {
@@ -921,7 +928,7 @@ export function moveCombatRow(state: GameState, input: unknown): RowMoveResult {
 
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return rejectRowMove("not-player-turn");
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return rejectRowMove("not-player-turn");
   if (actorCasting(combat, actor.id)) return rejectRowMove("casting-active");
   const options = getCurrentRowMoveOptions(state);
   if (!options.ok || !options.options.legalTargetRows.includes(command.targetRow)) {
@@ -965,7 +972,7 @@ export function resolveNormalAttack(
 
   const combat = state.combat;
   const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!attacker || !isPlayerActionParticipant(attacker)) {
+  if (!attacker || !isPlayerActionParticipant(attacker) || attacker.health.lifeState !== "active") {
     return rejectAttack("not-player-turn");
   }
   if (actorCasting(combat, attacker.id)) return rejectAttack("casting-active");
@@ -1000,7 +1007,7 @@ export type CompanionActCode = "invalid-command" | "stale-revision" | "revision-
   | "combat-ended" | "not-companion-turn" | "unsupported-companion-tactic" | "invalid-roll";
 export type CompanionActResult =
   | { readonly ok: true; readonly state: GameState; readonly effect: {
-    readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend";
+    readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend" | "rescue";
   } }
   | { readonly ok: false; readonly code: CompanionActCode; readonly message: string };
 
@@ -1032,7 +1039,20 @@ export function resolveCompanionTurn(
   if (state.combat.status === "ended") return rejectCompanionAct("combat-ended");
   const combat = state.combat;
   const actor = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!actor || actor.controlledBy !== "companion") return rejectCompanionAct("not-companion-turn");
+  if (!actor || actor.controlledBy !== "companion" || actor.health.lifeState !== "active") return rejectCompanionAct("not-companion-turn");
+  const dying = combat.participants.filter((entry) => entry.side === "party" && entry.id !== actor.id
+    && entry.health.lifeState === "dying").sort((a, b) => {
+      const remaining = a.health.dyingTurnsRemaining! - b.health.dyingTurnsRemaining!;
+      if (remaining) return remaining;
+      const player = Number(b.controlledBy !== "companion") - Number(a.controlledBy !== "companion");
+      return player || combat.turnOrder.indexOf(a.id) - combat.turnOrder.indexOf(b.id);
+    });
+  if (dying[0]) {
+    const result = resolveRescue(state, combat, actor, dying[0]);
+    if (!result.ok) throw new Error("隊友救助轉換失敗。");
+    return { ok: true, state: result.state,
+      effect: { type: "companion-action-resolved", selectedAction: "rescue" } };
+  }
   const preference = state.partyMembers.find((member) => member.id === actor.id)?.tacticPreferenceId ?? null;
   const intent = policy(combat, actor, preference);
   if (!intent || preference === null) return rejectCompanionAct("unsupported-companion-tactic");
@@ -1104,7 +1124,7 @@ export function getCurrentDragonBreathOptions(state: GameState): DragonBreathOpt
   }
   const combat = state.combat;
   const actor = combat.participants.find((entry) => entry.id === combat.currentActorId)!;
-  const playerActor = isPlayerActionParticipant(actor) ? actor
+  const playerActor = isPlayerActionParticipant(actor) && actor.health.lifeState === "active" ? actor
     : combat.participants.find((entry) => isPlayerActionParticipant(entry));
   const readyRound = combat.racialAbilityCooldowns.find((entry) => entry.actorId === actor.id
     && entry.abilityId === "dragon-breath")?.readyRound ?? null;
@@ -1113,7 +1133,7 @@ export function getCurrentDragonBreathOptions(state: GameState): DragonBreathOpt
     return { row, targetCount, available: targetCount > 0,
       ...(targetCount === 0 ? { unavailableReason: "empty-target-row" as const } : {}) };
   });
-  const unavailableReason: DragonBreathOptions["unavailableReason"] = !isPlayerActionParticipant(actor)
+  const unavailableReason: DragonBreathOptions["unavailableReason"] = !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active"
     ? "not-player-turn" : state.character.raceId !== "dragonborn" ? "not-dragonborn"
       : state.character.dragonBreathElement === null ? "element-unresolved"
         : actorCasting(combat, actor.id) ? "casting-active"
@@ -1140,7 +1160,7 @@ export function useDragonBreath(state: GameState, input: unknown, roller: DiceRo
   if (state.combat.status === "ended") return rejectDragonBreath("combat-ended");
   const combat = state.combat;
   const actor = combat.participants.find((entry) => entry.id === combat.currentActorId);
-  if (!actor || !isPlayerActionParticipant(actor)) return rejectDragonBreath("not-player-turn");
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return rejectDragonBreath("not-player-turn");
   if (state.character.raceId !== "dragonborn") return rejectDragonBreath("not-dragonborn");
   const element = state.character.dragonBreathElement;
   if (element === null) return rejectDragonBreath("element-unresolved");
@@ -1167,4 +1187,123 @@ export function useDragonBreath(state: GameState, input: unknown, roller: DiceRo
   const nextCombat = createCombatState({ ...advanceToNextTurn(combat), racialAbilityCooldowns, lastAction });
   return { ok: true, state: createGameState({ ...state, revision: state.revision + 1, combat: nextCombat }),
     effect: { type: "dragon-breath-resolved" } };
+}
+
+export type LifeTransitionCode = "invalid-command" | "stale-revision" | "revision-limit" | "not-in-combat"
+  | "combat-ended" | "illegal-target" | "not-player-turn" | "not-dying-turn" | "casting-active";
+export type LifeEvent = Readonly<{ type: "damage" | "rescue" | "dying-turn"; targetId: string;
+  previousHp: number; currentHp: number; previousLifeState: CombatHealth["lifeState"];
+  lifeState: CombatHealth["lifeState"]; previousRemaining: number | null; remaining: number | null;
+  endReason: "victory" | "party-defeat" | null }>;
+export type LifeTransitionResult = { readonly ok: true; readonly state: GameState; readonly event: LifeEvent }
+  | { readonly ok: false; readonly code: LifeTransitionCode; readonly message: string };
+
+function lifeReject(code: LifeTransitionCode): LifeTransitionResult {
+  return { ok: false, code, message: {
+    "invalid-command": "請求格式不正確。", "stale-revision": "戰鬥狀態已更新，請重新讀取。",
+    "revision-limit": "狀態版本已達工程上限。", "not-in-combat": "目前沒有戰鬥。",
+    "combat-ended": "戰鬥已結束。", "illegal-target": "目前無法指定這名目標。",
+    "not-player-turn": "目前不是玩家回合。", "not-dying-turn": "目前不是瀕死角色的回合。",
+    "casting-active": "請先繼續或取消目前的詠唱。",
+  }[code] };
+}
+
+function lifeContext(state: GameState, expectedRevision: number): ActiveCombatState | LifeTransitionResult {
+  if (expectedRevision !== state.revision) return lifeReject("stale-revision");
+  if (state.revision === Number.MAX_SAFE_INTEGER) return lifeReject("revision-limit");
+  if (state.activity !== "in-combat" || !state.combat) return lifeReject("not-in-combat");
+  if (state.combat.status === "ended") return lifeReject("combat-ended");
+  return state.combat;
+}
+
+function endReasonAfter(participants: readonly CombatParticipant[]): "victory" | "party-defeat" | null {
+  if (participants.some((entry) => entry.side === "party" && entry.controlledBy !== "companion" && entry.health.lifeState === "dead")
+    || !participants.some((entry) => entry.side === "party" && entry.health.lifeState === "active")) return "party-defeat";
+  if (!participants.some((entry) => entry.side === "enemy" && entry.health.lifeState !== "dead")) return "victory";
+  return null;
+}
+
+function commitLifeTransition(state: GameState, combat: ActiveCombatState,
+  participants: readonly CombatParticipant[], event: Omit<LifeEvent, "endReason">,
+  options: { advance: boolean; lastAction?: RescueActionResolution }): LifeTransitionResult {
+  const endReason = endReasonAfter(participants);
+  let candidate: CombatState;
+  if (endReason) candidate = createCombatState({ ...combat, participants, status: "ended", endReason,
+    currentTurnIndex: null, currentActorId: null, ...(options.lastAction ? { lastAction: options.lastAction } : {}) });
+  else {
+    const currentDead = participants.find((entry) => entry.id === combat.currentActorId)?.health.lifeState === "dead";
+    const next = options.advance || currentDead ? advanceToNextTurn(combat) : combat;
+    candidate = createCombatState({ ...next, participants, ...(options.lastAction ? { lastAction: options.lastAction } : {}) });
+  }
+  return { ok: true, state: createGameState({ ...state, revision: state.revision + 1, combat: candidate }),
+    event: Object.freeze({ ...event, endReason }) };
+}
+
+/** Generic authoritative damage. The caller chooses the amount; this never computes weapon damage. */
+export function applyCombatDamage(state: GameState, input: unknown): LifeTransitionResult {
+  if (!isRecord(input) || Object.keys(input).length !== 3 || !Object.hasOwn(input, "expectedRevision")
+    || !Object.hasOwn(input, "targetId") || !Object.hasOwn(input, "amount")
+    || !Number.isSafeInteger(input.expectedRevision) || (input.expectedRevision as number) < 0
+    || typeof input.targetId !== "string" || !input.targetId.length || input.targetId.trim() !== input.targetId
+    || !Number.isSafeInteger(input.amount) || (input.amount as number) < 1) return lifeReject("invalid-command");
+  const context = lifeContext(state, input.expectedRevision as number);
+  if ("ok" in context) return context;
+  const target = context.participants.find((entry) => entry.id === input.targetId);
+  if (!target || target.health.lifeState !== "active") return lifeReject("illegal-target");
+  const currentHp = Math.max(0, target.health.currentHp - (input.amount as number));
+  const lifeState = currentHp > 0 ? "active" : target.side === "enemy" ? "dead" : "dying";
+  const health: CombatHealth = { ...target.health, currentHp, lifeState,
+    dyingTurnsRemaining: lifeState === "dying" ? 2 : null };
+  const participants = context.participants.map((entry) => entry.id === target.id ? { ...entry, health } : entry);
+  const activeCastings = lifeState === "active" ? context.activeCastings
+    : context.activeCastings.filter((entry) => entry.actorId !== target.id);
+  return commitLifeTransition(state, { ...context, activeCastings }, participants,
+    { type: "damage", targetId: target.id, previousHp: target.health.currentHp, currentHp,
+      previousLifeState: "active", lifeState, previousRemaining: null, remaining: health.dyingTurnsRemaining },
+    { advance: false });
+}
+
+/** The dying actor's entire countdown, death and skip is one revision. */
+export function processDyingTurn(state: GameState, input: unknown): LifeTransitionResult {
+  const expectedRevision = parseExpectedRevision(input);
+  if (expectedRevision === undefined) return lifeReject("invalid-command");
+  const context = lifeContext(state, expectedRevision);
+  if ("ok" in context) return context;
+  const actor = context.participants.find((entry) => entry.id === context.currentActorId);
+  if (!actor || actor.health.lifeState !== "dying" || actor.health.dyingTurnsRemaining === null)
+    return lifeReject("not-dying-turn");
+  const remaining = actor.health.dyingTurnsRemaining - 1;
+  const lifeState = remaining === 0 ? "dead" : "dying";
+  const health: CombatHealth = { ...actor.health, lifeState, dyingTurnsRemaining: remaining === 0 ? null : 1 };
+  const participants = context.participants.map((entry) => entry.id === actor.id ? { ...entry, health } : entry);
+  return commitLifeTransition(state, context, participants,
+    { type: "dying-turn", targetId: actor.id, previousHp: 0, currentHp: 0,
+      previousLifeState: "dying", lifeState, previousRemaining: actor.health.dyingTurnsRemaining, remaining: remaining === 0 ? 0 : 1 },
+    { advance: true });
+}
+
+export function rescueCombatant(state: GameState, input: unknown): LifeTransitionResult {
+  if (!isRecord(input) || Object.keys(input).length !== 2 || !Object.hasOwn(input, "expectedRevision")
+    || !Object.hasOwn(input, "targetId") || !Number.isSafeInteger(input.expectedRevision)
+    || (input.expectedRevision as number) < 0 || typeof input.targetId !== "string"
+    || !input.targetId.length || input.targetId.trim() !== input.targetId) return lifeReject("invalid-command");
+  const context = lifeContext(state, input.expectedRevision as number);
+  if ("ok" in context) return context;
+  const actor = context.participants.find((entry) => entry.id === context.currentActorId);
+  if (!actor || !isPlayerActionParticipant(actor) || actor.health.lifeState !== "active") return lifeReject("not-player-turn");
+  if (actorCasting(context, actor.id)) return lifeReject("casting-active");
+  const target = context.participants.find((entry) => entry.id === input.targetId);
+  if (!target || target.id === actor.id || target.side !== "party" || target.health.lifeState !== "dying")
+    return lifeReject("illegal-target");
+  return resolveRescue(state, context, actor, target);
+}
+
+function resolveRescue(state: GameState, combat: ActiveCombatState,
+  actor: CombatParticipant, target: CombatParticipant): LifeTransitionResult {
+  const health: CombatHealth = { ...target.health, currentHp: 1, lifeState: "active", dyingTurnsRemaining: null };
+  const participants = combat.participants.map((entry) => entry.id === target.id ? { ...entry, health } : entry);
+  return commitLifeTransition(state, combat, participants,
+    { type: "rescue", targetId: target.id, previousHp: 0, currentHp: 1,
+      previousLifeState: "dying", lifeState: "active", previousRemaining: target.health.dyingTurnsRemaining, remaining: null },
+    { advance: true, lastAction: { type: "rescue", actorId: actor.id, targetId: target.id, round: combat.round } });
 }

@@ -63,7 +63,7 @@ export async function buildApp(options: {
     registerDomainSandbox(app, session, storage);
   }
   if (combatSandboxEnabled) {
-    registerCombatSandbox(app, combatService, storage);
+    registerCombatSandbox(app, combatService, storage, options.domainSandbox === true);
   }
   if (options.interpreter) {
     registerInterpretationRoute(app, options.interpreter);

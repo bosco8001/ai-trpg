@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { advanceCombatTurn, resolveCompanionTurn, startCombat } from "../src/domain/combat.js";
+import { advanceCombatTurn, applyCombatDamage, processDyingTurn, resolveCompanionTurn, startCombat } from "../src/domain/combat.js";
 import { createPhase22CombatFixtureRoller } from "../src/server/combat/dice.js";
 import { PHASE22_TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createTestGameState } from "../src/server/test-game-state.js";
@@ -114,6 +114,49 @@ test("player action starts enemy → companion → enemy chain and stops at next
   assert.equal(h.current.state.combat?.currentActorId, "TEST-player");
   assert.equal(h.narrations.length, 1);
   assert.equal(h.controller.state.phase, "idle");
+  h.unsubscribe();
+});
+
+test("dying Player auto-counts exactly once after refresh and leaves server-confirmed state", async () => {
+  const first = start();
+  const damaged = applyCombatDamage(first.state as GameState, { expectedRevision: 1,
+    targetId: "TEST-player", amount: 10 });
+  assert.equal(damaged.ok, true); if (!damaged.ok) return;
+  const ready = advance({ ...first, state: damaged.state });
+  assert.equal(ready.state.combat?.currentActorId, "TEST-player");
+  let calls = 0;
+  const h = harness(ready, { dying: async (revision) => {
+    calls += 1;
+    const result = processDyingTurn(h.current.state as GameState, { expectedRevision: revision });
+    assert.equal(result.ok, true); if (!result.ok) throw new Error("dying transition failed");
+    return { ...h.current, state: result.state, event: result.event };
+  } });
+  assert.equal(classifyPacingActor(h.current), "dying");
+  h.unsubscribe();
+  const unsubscribe = h.controller.subscribe(() => undefined);
+  h.clock.tick(10); await settle();
+  assert.equal(calls, 1);
+  assert.equal(h.current.state.revision, ready.state.revision + 1);
+  assert.equal(h.current.state.combat?.participants.find((entry) => entry.id === "TEST-player")?.health.dyingTurnsRemaining, 1);
+  h.controller.observe(h.current); h.clock.tick(0); await settle();
+  assert.equal(calls, 1);
+  unsubscribe();
+});
+
+test("dying pacing API failure pauses without retrying the mutation", async () => {
+  const first = start();
+  const damaged = applyCombatDamage(first.state as GameState, { expectedRevision: 1,
+    targetId: "TEST-player", amount: 10 });
+  assert.equal(damaged.ok, true); if (!damaged.ok) return;
+  const ready = advance({ ...first, state: damaged.state });
+  let calls = 0;
+  const h = harness(ready, { dying: async () => { calls += 1; throw new Error("TEST unavailable"); } });
+  h.clock.tick(10); await settle();
+  assert.equal(calls, 1);
+  assert.equal(h.controller.state.phase, "error");
+  assert.equal(h.current.state.revision, ready.state.revision);
+  h.clock.tick(200); await settle();
+  assert.equal(calls, 1);
   h.unsubscribe();
 });
 
@@ -250,5 +293,5 @@ test("production enemy is unsupported and visual carousel rotates without changi
   const html = renderToStaticMarkup(createElement(CombatPage, { gameState: player, stateError: null,
     onStateUpdate: () => undefined, onRetryState: async () => player }));
   assert.match(html, /data-actor-id="TEST-player" data-current="true" aria-current="step"/);
-  assert.match(html, /data-side="party" data-row="front" data-current="true"/);
+  assert.match(html, /data-side="party" data-row="front" data-life-state="active" data-current="true"/);
 });

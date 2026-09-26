@@ -1,5 +1,7 @@
 import { TEST_COMBAT_CONSUMABLE_ID, TEST_COMBAT_CONSUMABLE_NAME } from "./combat-items.js";
 import { isCombatNarrationPresentation, type CombatNarrationPresentation } from "./combat-narration.js";
+import { isCombatHealth, type CombatHealth } from "../domain/combat-health.js";
+import type { LifeEvent } from "../domain/combat.js";
 
 /** 前端讀取的最小權威狀態快照。所有資料仍必須經 runtime validation。 */
 export type CombatSide = "party" | "enemy";
@@ -26,6 +28,7 @@ export interface CombatParticipantView {
   readonly side: CombatSide;
   readonly row: CombatRow;
   readonly initiative: CombatInitiativeView;
+  readonly health: CombatHealth;
   readonly normalAttack: CombatNormalAttackProfileView | null;
   readonly racialEscapeModifier: number;
   readonly controlledBy?: "companion";
@@ -147,7 +150,13 @@ export interface RunResolutionView {
   readonly outcome: "success" | "failure";
 }
 
-export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RunResolutionView | CastingResolutionView | DragonBreathResolutionView;
+export interface RescueResolutionView { readonly type: "rescue"; readonly actorId: string; readonly targetId: string; readonly round: number }
+function isRescueResolution(value: unknown): value is RescueResolutionView {
+  return isRecord(value) && exact(value, ["type", "actorId", "targetId", "round"])
+    && value.type === "rescue" && isId(value.actorId) && isId(value.targetId)
+    && isSafeInteger(value.round) && value.round > 0;
+}
+export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RescueResolutionView | RunResolutionView | CastingResolutionView | DragonBreathResolutionView;
 
 interface CombatStateViewBase {
   readonly round: number;
@@ -168,10 +177,9 @@ export interface ActiveCombatStateView extends CombatStateViewBase {
 
 export interface EndedCombatStateView extends CombatStateViewBase {
   readonly status: "ended";
-  readonly endReason: "escaped";
+  readonly endReason: "escaped" | "victory" | "party-defeat";
   readonly currentTurnIndex: null;
   readonly currentActorId: null;
-  readonly lastAction: RunResolutionView & { readonly outcome: "success" };
 }
 
 export type CombatStateView = ActiveCombatStateView | EndedCombatStateView;
@@ -180,7 +188,7 @@ export interface NormalAttackTargetOptionView {
   readonly targetId: string;
   readonly displayName: string;
   readonly legal: boolean;
-  readonly reason?: "front-row-blocked";
+  readonly reason?: "front-row-blocked" | "incapacitated";
 }
 
 export interface NormalAttackOptionsResponse {
@@ -358,8 +366,36 @@ export interface CombatSandboxAdvanceResponse extends AuthoritativeGameStateResp
   readonly effect: { readonly type: "combat-turn-advanced" };
 }
 
+export interface CombatLifeResponse extends AuthoritativeGameStateResponse {
+  readonly event: LifeEvent;
+  readonly narration?: CombatNarrationPresentation;
+}
+
+export function isCombatLifeResponse(value: unknown): value is CombatLifeResponse {
+  if (!isRecord(value) || !actionShape(value, ["sandbox", "storage", "state", "event"])
+    || typeof value.sandbox !== "boolean" || (value.storage !== "memory" && value.storage !== "postgres")
+    || !isAuthoritativeGameStateView(value.state) || !isRecord(value.event)
+    || !exact(value.event, ["type", "targetId", "previousHp", "currentHp", "previousLifeState", "lifeState", "previousRemaining", "remaining", "endReason"])
+    || (value.event.type !== "damage" && value.event.type !== "rescue" && value.event.type !== "dying-turn")
+    || !isId(value.event.targetId) || !isSafeInteger(value.event.previousHp)
+    || !isSafeInteger(value.event.currentHp)
+    || (value.event.previousLifeState !== "active" && value.event.previousLifeState !== "dying")
+    || (value.event.lifeState !== "active" && value.event.lifeState !== "dying" && value.event.lifeState !== "dead")
+    || (value.event.previousRemaining !== null && value.event.previousRemaining !== 1 && value.event.previousRemaining !== 2)
+    || (value.event.remaining !== null && value.event.remaining !== 0 && value.event.remaining !== 1 && value.event.remaining !== 2)
+    || (value.event.endReason !== null && value.event.endReason !== "victory" && value.event.endReason !== "party-defeat")) return false;
+  const event = value.event as unknown as LifeEvent;
+  const target = value.state.combat?.participants.find((entry) => entry.id === event.targetId);
+  return !!target && target.health.currentHp === value.event.currentHp
+    && target.health.lifeState === value.event.lifeState
+    && (value.event.remaining === 0 ? target.health.dyingTurnsRemaining === null
+      : target.health.dyingTurnsRemaining === value.event.remaining)
+    && (value.event.endReason === null ? value.state.combat?.status === "active"
+      : value.state.combat?.status === "ended" && value.state.combat.endReason === value.event.endReason);
+}
+
 export interface CompanionActResponse extends AuthoritativeGameStateResponse {
-  readonly effect: { readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend" };
+  readonly effect: { readonly type: "companion-action-resolved"; readonly selectedAction: "normal-attack" | "defend" | "rescue" };
   readonly narration?: CombatNarrationPresentation;
 }
 
@@ -374,9 +410,11 @@ export function isCompanionActResponse(value: unknown): value is CompanionActRes
     || !isAuthoritativeGameStateView(value.state) || !isRecord(value.effect)
     || !exact(value.effect, ["type", "selectedAction"])
     || value.effect.type !== "companion-action-resolved"
-    || (value.effect.selectedAction !== "normal-attack" && value.effect.selectedAction !== "defend")) return false;
+    || (value.effect.selectedAction !== "normal-attack" && value.effect.selectedAction !== "defend"
+      && value.effect.selectedAction !== "rescue")) return false;
   const action = value.state.combat?.lastAction;
-  return action?.type === value.effect.selectedAction && action.tacticPreferenceId !== undefined
+  return action?.type === value.effect.selectedAction
+    && (action.type === "rescue" || action.tacticPreferenceId !== undefined)
     && value.state.combat?.participants.some((participant) => participant.id === action.actorId
       && participant.controlledBy === "companion") === true;
 }
@@ -415,12 +453,13 @@ function isNormalAttackProfile(value: unknown): value is CombatNormalAttackProfi
 }
 
 function parseParticipant(value: unknown): CombatParticipantView | undefined {
-  if (!isRecord(value) || !(exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier"])
-    || exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "controlledBy"]))
+  if (!isRecord(value) || !(exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "health"])
+    || exact(value, ["id", "displayName", "side", "row", "initiative", "normalAttack", "racialEscapeModifier", "controlledBy", "health"]))
     || !isId(value.id) || !isId(value.displayName)
     || (value.side !== "party" && value.side !== "enemy")
     || (Object.hasOwn(value, "controlledBy") && (value.controlledBy !== "companion" || value.side !== "party"))
     || (value.row !== "front" && value.row !== "back")
+    || !isCombatHealth(value.health) || (value.side === "enemy" && value.health.lifeState === "dying")
     || !isNormalAttackProfile(value.normalAttack)
     || (value.racialEscapeModifier !== 0 && value.racialEscapeModifier !== -2)
     || !isRecord(value.initiative)
@@ -615,7 +654,8 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
   if (lastAction !== null && !isPhysicalAttackResolution(lastAction)
     && !isRowMoveResolution(lastAction) && !isItemUseResolution(lastAction)
     && !isDefendResolution(lastAction) && !isRunResolution(lastAction)
-    && !isCastingResolution(lastAction) && !isDragonBreathResolution(lastAction)) return false;
+    && !isCastingResolution(lastAction) && !isDragonBreathResolution(lastAction)
+    && !isRescueResolution(lastAction)) return false;
   const actor = lastAction === null
     ? undefined
     : validatedParticipants.find((participant) => participant.id === lastAction.actorId);
@@ -632,7 +672,7 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
       const casting = entry as CastingStateView;
       return !ids.includes(casting.actorId) || casting.startedRound > (value.round as number)
         || validatedParticipants.find((participant) => participant.id === casting.actorId)?.side !== "party";
-    }) || (value.status === "ended" && castings.length > 0)) return false;
+    })) return false;
   if (!cooldowns.every((entry) => isRecord(entry) && exact(entry, ["actorId", "skillId", "readyRound"])
     && isId(entry.actorId) && ids.includes(entry.actorId) && entry.skillId === "TEST-skill-1"
     && isSafeInteger(entry.readyRound) && entry.readyRound >= 3 && entry.readyRound <= (value.round as number) + 2)) return false;
@@ -641,13 +681,26 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
     && value.turnOrder.length === ids.length
     && new Set(value.turnOrder).size === value.turnOrder.length
     && value.turnOrder.every((id, index) => ids.includes(id) && id === expected?.[index])
+    && (value.status !== "active" || (validatedParticipants.some((entry) => entry.side === "party" && entry.health.lifeState === "active")
+      && validatedParticipants.some((entry) => entry.side === "enemy" && entry.health.lifeState === "active")
+      && !validatedParticipants.some((entry) => entry.side === "party" && entry.controlledBy !== "companion"
+        && entry.health.lifeState === "dead")))
+    && (value.status !== "ended" || value.endReason !== "victory"
+      || (validatedParticipants.every((entry) => entry.side !== "enemy" || entry.health.lifeState === "dead")
+        && validatedParticipants.some((entry) => entry.side === "party" && entry.health.lifeState === "active")))
+    && (value.status !== "ended" || value.endReason !== "party-defeat"
+      || (validatedParticipants.some((entry) => entry.side === "party" && entry.controlledBy !== "companion"
+        && entry.health.lifeState === "dead")
+        || !validatedParticipants.some((entry) => entry.side === "party" && entry.health.lifeState === "active")))
     && (value.status === "active"
       ? value.endReason === null && isSafeInteger(value.currentTurnIndex)
         && value.currentTurnIndex >= 0 && value.currentTurnIndex < value.turnOrder.length
         && isId(value.currentActorId) && value.currentActorId === value.turnOrder[value.currentTurnIndex]
+        && validatedParticipants.find((entry) => entry.id === value.currentActorId)?.health.lifeState !== "dead"
         && (lastAction?.type !== "run" || lastAction.outcome === "failure")
-      : value.endReason === "escaped" && value.currentTurnIndex === null && value.currentActorId === null
-        && lastAction?.type === "run" && lastAction.outcome === "success" && lastAction.round === value.round)
+      : (value.endReason === "escaped" || value.endReason === "victory" || value.endReason === "party-defeat")
+        && value.currentTurnIndex === null && value.currentActorId === null
+        && (value.endReason !== "escaped" || (lastAction?.type === "run" && lastAction.outcome === "success" && lastAction.round === value.round)))
     && (lastAction === null || (lastAction.round <= value.round
       && ids.includes(lastAction.actorId) && actor?.side === "party"))
     && (lastAction === null || (lastAction.type !== "normal-attack" && lastAction.type !== "defend")
@@ -663,15 +716,13 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
     && (lastAction?.type !== "dragon-breath" || (racialCooldowns.some((entry) => {
       const cooldown = entry as RacialAbilityCooldownView;
       return cooldown.actorId === lastAction.actorId && cooldown.readyRound === lastAction.readyRound;
-    }) && lastAction.results.length === validatedParticipants.filter((participant) => participant.side === "enemy"
-      && participant.row === lastAction.targetRow).length
-      && lastAction.results.every((result) => validatedParticipants.some((participant) => participant.id === result.targetId
+    }) && lastAction.results.every((result) => validatedParticipants.some((participant) => participant.id === result.targetId
       && participant.side === "enemy" && participant.row === lastAction.targetRow
       && participant.initiative.dexterityModifier === result.evasion.dexterityModifier)
       && actor?.normalAttack?.perceptionModifier === result.attack.perceptionModifier)))
     && (lastAction === null || !lastAction.type.startsWith("casting-")
       || ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
-        ? castings.some((entry) => (entry as CastingStateView).actorId === lastAction.actorId
+        ? actor?.health.lifeState !== "active" || castings.some((entry) => (entry as CastingStateView).actorId === lastAction.actorId
           && (entry as CastingStateView).mpSpent === lastAction.totalMpSpent)
         : !castings.some((entry) => (entry as CastingStateView).actorId === lastAction.actorId)))
     && (lastAction === null || lastAction.type !== "row-move" || actor?.row === lastAction.toRow)
@@ -796,8 +847,8 @@ export function isNormalAttackOptionsResponse(value: unknown): value is NormalAt
     && (exact(target, ["targetId", "displayName", "legal"])
       || exact(target, ["targetId", "displayName", "legal", "reason"]))
     && isId(target.targetId) && isId(target.displayName) && typeof target.legal === "boolean"
-    && (target.reason === undefined || target.reason === "front-row-blocked")
-    && (target.legal ? target.reason === undefined : target.reason === "front-row-blocked"))) return false;
+    && (target.reason === undefined || target.reason === "front-row-blocked" || target.reason === "incapacitated")
+    && (target.legal ? target.reason === undefined : target.reason === "front-row-blocked" || target.reason === "incapacitated"))) return false;
   const ids = targets.map((target) => (target as Record<string, unknown>).targetId);
   const legalIds = targets.filter((target) => (target as Record<string, unknown>).legal === true)
     .map((target) => (target as Record<string, unknown>).targetId);
@@ -924,7 +975,7 @@ export function isPhysicalSkillOptionsResponse(value: unknown): value is Physica
       && (exact(target, ["targetId", "displayName", "legal"])
         || exact(target, ["targetId", "displayName", "legal", "reason"]))
       && isId(target.targetId) && isId(target.displayName) && typeof target.legal === "boolean"
-      && (target.legal ? target.reason === undefined : target.reason === "front-row-blocked"))
+      && (target.legal ? target.reason === undefined : target.reason === "front-row-blocked" || target.reason === "incapacitated"))
     && new Set(skill.targets.map((target) => (target as NormalAttackTargetOptionView).targetId)).size === skill.targets.length)
     && new Set(value.skills.map((skill) => (skill as PhysicalSkillOptionView).skillId)).size === value.skills.length;
 }

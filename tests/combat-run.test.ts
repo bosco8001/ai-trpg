@@ -114,7 +114,8 @@ test("逃跑失敗沿用 Round wrap", () => {
   const participants: readonly CombatParticipantSeed[] = [
     { id: "TEST-player", displayName: "TEST 玩家", side: "party", row: "front", dexterityModifier: 2,
       normalAttack: { range: "melee", perceptionModifier: 1, weaponMainStatModifier: 2, proficiencyModifier: 1 } },
-    { id: "TEST-enemy", displayName: "TEST 敵人", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null },
+    { id: "TEST-enemy", displayName: "TEST 敵人", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null,
+      health: { maxHp: 6, currentHp: 6, lifeState: "active", dyingTurnsRemaining: null } },
   ];
   const started = startCombat(createTestGameState(), { expectedRevision: 0 }, participants, new SequenceD20Roller([5, 20]));
   ok(started);
@@ -286,7 +287,7 @@ test("前端 request 只有 revision；畫面呈現成功或失敗的機械結�
   assert.match(page(succeeded.state), /目前沒有戰鬥敘事/);
   assert.match(page(succeeded.state), /data-command="party"/);
   assert.doesNotMatch(page(succeeded.state), /data-command="party"[^>]*disabled=""/);
-  assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 6);
+  assert.equal((page(succeeded.state).match(/disabled=""/g) ?? []).length, 7);
   assert.equal(canPlayerUseNormalAttack(succeeded.state.combat!, false), false);
   const source = await readFile(new URL("../src/web/CombatPage.tsx", import.meta.url), "utf8");
   assert.match(source, /確定要嘗試逃跑嗎？/);

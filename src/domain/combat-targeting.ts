@@ -5,7 +5,7 @@ import type {
 } from "./combat-state.js";
 import { isPlayerActionParticipant } from "./combat-state.js";
 
-export type IllegalTargetReason = "target-not-found" | "self" | "ally" | "front-row-blocked";
+export type IllegalTargetReason = "target-not-found" | "self" | "ally" | "front-row-blocked" | "incapacitated";
 
 export type NormalAttackTargetCheck =
   | { readonly legal: true }
@@ -15,7 +15,7 @@ export interface NormalAttackTargetOption {
   readonly targetId: string;
   readonly displayName: string;
   readonly legal: boolean;
-  readonly reason?: "front-row-blocked";
+  readonly reason?: "front-row-blocked" | "incapacitated";
 }
 
 export interface NormalAttackTargetOptions {
@@ -34,10 +34,13 @@ export function checkNormalAttackTarget(
 ): NormalAttackTargetCheck {
   const target = combat.participants.find((participant) => participant.id === targetId);
   if (!target) return { legal: false, reason: "target-not-found" };
+  if (attacker.health.lifeState !== "active") return { legal: false, reason: "incapacitated" };
   if (target.id === attacker.id) return { legal: false, reason: "self" };
   if (target.side === attacker.side) return { legal: false, reason: "ally" };
+  if (target.health.lifeState !== "active") return { legal: false, reason: "incapacitated" };
   if (range === "melee" && target.row === "back"
-    && combat.participants.some((participant) => participant.side === target.side && participant.row === "front")) {
+    && combat.participants.some((participant) => participant.side === target.side && participant.row === "front"
+      && participant.health.lifeState === "active")) {
     return { legal: false, reason: "front-row-blocked" };
   }
   return { legal: true };
@@ -49,7 +52,7 @@ export function getLegalNormalAttackTargets(
   range: NormalAttackRange,
 ): readonly string[] {
   const attacker = combat.participants.find((participant) => participant.id === attackerId);
-  if (!attacker) return [];
+  if (!attacker || attacker.health.lifeState !== "active") return [];
   return combat.participants
     .filter((target) => checkNormalAttackTarget(combat, attacker, target.id, range).legal)
     .map((target) => target.id);
@@ -61,7 +64,7 @@ export function getNormalAttackTargetOptions(combat: CombatState): NormalAttackT
     currentActorId: "", canPlayerAct: false, legalTargetIds: Object.freeze([]), targets: Object.freeze([]),
   });
   const attacker = combat.participants.find((participant) => participant.id === combat.currentActorId);
-  if (!attacker || !isPlayerActionParticipant(attacker)
+  if (!attacker || !isPlayerActionParticipant(attacker) || attacker.health.lifeState !== "active"
     || combat.activeCastings.some((casting) => casting.actorId === attacker.id)) {
     return Object.freeze({
       currentActorId: combat.currentActorId,
@@ -80,7 +83,7 @@ export function getNormalAttackTargetOptions(combat: CombatState): NormalAttackT
           targetId: participant.id,
           displayName: participant.displayName,
           legal: false,
-          ...(check.reason === "front-row-blocked" ? { reason: check.reason } : {}),
+          ...(check.reason === "front-row-blocked" || check.reason === "incapacitated" ? { reason: check.reason } : {}),
         });
     });
   return Object.freeze({

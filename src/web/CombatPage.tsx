@@ -31,6 +31,7 @@ import {
   loadCombatPartyOptions,
   setCombatCompanionTacticPreference,
   executeCompanionTurn,
+  executeRescue,
 } from "./api.js";
 import {
   getCombatPresentationLanes,
@@ -72,15 +73,19 @@ function ParticipantCard({
   const blocked = targeting && participant.side === "enemy" && !canChoose;
   const blockedReason = targetOption?.reason === "front-row-blocked"
     ? "前排敵人阻擋"
-    : "此目標目前不可選。";
+    : targetOption?.reason === "incapacitated" ? "目標已瀕死或死亡" : "此目標目前不可選。";
   const blockedReasonId = "target-reason-" + participant.id;
   return (
-    <article className="combat-participant" data-side={participant.side} data-row={participant.row} data-current={current || undefined}>
+    <article className="combat-participant" data-side={participant.side} data-row={participant.row}
+      data-life-state={participant.health.lifeState} data-current={current || undefined}>
       <div className="combat-participant__heading">
         <p>{participant.side === "enemy" ? "敵方" : "我方"}・{participant.row === "front" ? "前排" : "後排"}</p>
         {current ? <span className="combat-current-badge">目前行動</span> : null}
       </div>
       <h4>{participant.displayName}</h4>
+      <p className="combat-participant__health">HP {participant.health.currentHp} / {participant.health.maxHp}・{participant.health.lifeState === "active"
+        ? "可行動" : participant.health.lifeState === "dying"
+          ? `瀕死・剩餘 ${participant.health.dyingTurnsRemaining} 回合` : "死亡"}</p>
       <dl>
         <div><dt>先攻</dt><dd>{participant.initiative.total}</dd></div>
         <div><dt>骰值</dt><dd>{initiativeDetail(participant)}</dd></div>
@@ -137,6 +142,8 @@ function CombatTurnOrder({ state, visualActorId }: { state: CombatStateView; vis
         <li key={participant.id} data-actor-id={participant.id} data-current={current || undefined} aria-current={current ? "step" : undefined}>
           <span className="combat-turn-order__index" aria-hidden="true">{index + 1}</span>
           <span>{participant.displayName}</span>
+          {participant.health.lifeState !== "active" ? <span>・{participant.health.lifeState === "dying"
+            ? `瀕死 ${participant.health.dyingTurnsRemaining}` : "死亡"}</span> : null}
           {current ? <span className="combat-turn-order__current">目前行動</span> : null}
         </li>
       ))}
@@ -157,6 +164,11 @@ function LastActionPanel({ combat }: { combat: CombatStateView }) {
     );
   }
   const actor = participants.get(action.actorId)?.displayName ?? action.actorId;
+  if (action.type === "rescue") return <Panel className="combat-rail__panel combat-last-action" aria-labelledby="combat-last-action-heading">
+    <p className="combat-eyebrow">最近行動・第 {action.round} 回合</p>
+    <h2 id="combat-last-action-heading">救助</h2>
+    <p>{actor}救助了{participants.get(action.targetId)?.displayName ?? action.targetId}，目標恢復至 1 HP。</p>
+  </Panel>;
   if (action.type === "row-move") {
     const rowLabel = (row: CombatRow) => `我方${row === "front" ? "前排" : "後排"}`;
     return (
@@ -283,13 +295,16 @@ export function CombatPage({
   const currentActor = combat?.participants.find((participant) => participant.id === combat.currentActorId);
   const currentActorId = combat?.currentActorId ?? "";
   const hasPlayerActionActor = currentActor?.side === "party" && currentActor.controlledBy !== "companion"
-    && currentActor.normalAttack !== null;
+    && currentActor.normalAttack !== null && currentActor.health.lifeState === "active";
   const currentCasting = combat?.activeCastings.find((entry) => entry.actorId === currentActorId);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isTargeting, setIsTargeting] = useState(false);
   const [isLoadingTargets, setIsLoadingTargets] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [isRescueOpen, setIsRescueOpen] = useState(false);
+  const [isRescuing, setIsRescuing] = useState(false);
+  const rescueInFlight = useRef(false);
   const [isRowMoveMode, setIsRowMoveMode] = useState(false);
   const [isLoadingRowMoveOptions, setIsLoadingRowMoveOptions] = useState(false);
   const [isMovingRow, setIsMovingRow] = useState(false);
@@ -378,11 +393,16 @@ export function CombatPage({
 
   const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem
     || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation || isUsingBreath
-    || partyMutationCompanionId !== null;
+    || partyMutationCompanionId !== null || isRescuing;
   const pacing = useCombatPacing(gameState, mutationInFlight, onStateUpdate, onRetryState, (response) => {
     showNarration(response);
     setFeedback(response.effect.selectedAction === "normal-attack"
-      ? "TEST 隊友自主選擇：普通攻擊。" : "TEST 隊友自主選擇：防禦。");
+      ? "TEST 隊友自主選擇：普通攻擊。" : response.effect.selectedAction === "rescue"
+        ? "TEST 隊友優先救助瀕死隊員。" : "TEST 隊友自主選擇：防禦。");
+  }, (response) => {
+    showNarration(response);
+    setFeedback(response.event.lifeState === "dead" ? "瀕死：1 → 0，角色已死亡。"
+      : "瀕死：2 → 1；本回合已跳過。");
   });
   const visualActorId = pacing.visualActorId ?? currentActorId;
   const visualActor = combat?.participants.find((participant) => participant.id === visualActorId);
@@ -393,6 +413,7 @@ export function CombatPage({
     || isLoadingBagOptions || isLoadingSkillOptions;
 
   useEffect(() => { setFeedback(stateError ?? ""); }, [stateError]);
+  useEffect(() => { setIsRescueOpen(false); }, [gameState.state.revision]);
   useEffect(() => {
     let active = true;
     setBreathOptions(null);
@@ -706,8 +727,10 @@ export function CombatPage({
           </header>
           <div className="combat-layout">
             <Panel className="combat-rail__panel" aria-labelledby="combat-ended-heading">
-              <p className="combat-eyebrow">逃跑成功</p>
-              <h2 id="combat-ended-heading">你已成功逃離戰鬥。</h2>
+              <p className="combat-eyebrow">{combat.endReason === "escaped" ? "逃跑成功" : combat.endReason === "victory" ? "戰鬥勝利" : "隊伍戰敗"}</p>
+              <h2 id="combat-ended-heading">{combat.endReason === "escaped" ? "你已成功逃離戰鬥。" : combat.endReason === "victory" ? "敵人已全部死亡。" : "隊伍失去戰鬥能力。"}</h2>
+              <ul>{combat.participants.map((participant) => <li key={participant.id}>{participant.displayName}：HP {participant.health.currentHp} / {participant.health.maxHp}・{participant.health.lifeState === "active"
+                ? "可行動" : participant.health.lifeState === "dying" ? `瀕死・剩餘 ${participant.health.dyingTurnsRemaining} 回合` : "死亡"}</li>)}</ul>
               <p>戰鬥結算與返回探索尚未接入。</p>
               <p>目前沒有可行動的角色。</p>
             </Panel>
@@ -739,6 +762,7 @@ export function CombatPage({
                 <div className="combat-commands">
                   <Button variant="secondary" data-command="attack" disabled>普通攻擊</Button>
                   <Button variant="secondary" data-command="defend" disabled>防禦</Button>
+                  <Button variant="secondary" data-command="rescue" disabled>救助</Button>
                   <Button variant="secondary" data-command="inventory" disabled>背包</Button>
                   <Button ref={partyButton} variant="secondary" data-command="party"
                     aria-expanded={isPartyOpen} aria-controls="combat-party-dialog" onClick={toggleParty}>隊伍</Button>
@@ -761,13 +785,32 @@ export function CombatPage({
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
   const selectedSkill = skillOptions?.skills.find((skill) => skill.skillId === selectedSkillId);
   const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
-  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isPartyOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen || isBreathRowSelectionOpen;
+  const selectionModeActive = isTargeting || isRowMoveMode || isBagOpen || isPartyOpen || isDefendConfirmationOpen || isRunConfirmationOpen || selectedSkillId !== null || isStartCastingConfirmationOpen || isBreathRowSelectionOpen || isRescueOpen;
   const canPlayerAttack = canPlayerUseNormalAttack(combat, requestInFlight);
   const canDefend = canPlayerDefend(combat, controlMutationBusy);
   const canRun = canPlayerUseNormalAttack(combat, controlMutationBusy);
+  const rescueTargets = combat.participants.filter((entry) => entry.side === "party"
+    && entry.id !== currentActorId && entry.health.lifeState === "dying");
   const canPlayerMoveRow = canPlayerUseRowMove(
     combat, rowMoveOptions, gameState.state.revision, requestInFlight,
   );
+
+  function submitRescue(targetId: string) {
+    if (!isRescueOpen || !hasPlayerActionActor || controlMutationBusy || rescueInFlight.current
+      || !rescueTargets.some((entry) => entry.id === targetId)) return;
+    rescueInFlight.current = true;
+    setIsRescuing(true);
+    void executeRescue(gameState.state.revision, targetId).then((response) => {
+      onStateUpdate({ sandbox: response.sandbox, storage: response.storage, state: response.state });
+      showNarration(response);
+      setIsRescueOpen(false);
+      setFeedback("救助完成；目標恢復至 1 HP，本回合已結束。");
+    }).catch(async (error: unknown) => {
+      setFeedback(error instanceof Error ? error.message : "救助暫時無法完成。");
+      try { onStateUpdate(await onRetryState()); } catch { /* 保留錯誤提示。 */ }
+      setIsRescueOpen(false);
+    }).finally(() => { rescueInFlight.current = false; setIsRescuing(false); });
+  }
 
   function beginBreathRowSelection() {
     if (!breathOptions?.available || breathOptions.revision !== gameState.state.revision
@@ -1572,6 +1615,10 @@ export function CombatPage({
                 >
                   防禦
                 </Button>
+                <Button variant="secondary" data-command="rescue" aria-expanded={isRescueOpen}
+                  aria-controls="combat-rescue-panel"
+                  disabled={!hasPlayerActionActor || rescueTargets.length === 0 || controlMutationBusy || selectionModeActive}
+                  onClick={() => setIsRescueOpen(true)}>救助</Button>
                 <Button
                   ref={bagButton}
                   variant="primary"
@@ -1617,6 +1664,19 @@ export function CombatPage({
                   逃跑
                 </Button>
               </div>
+              {isRescueOpen ? <section id="combat-rescue-panel" className="combat-row-move-mode" aria-label="選擇救助目標" aria-live="polite">
+                <h3>選擇瀕死隊員</h3>
+                <p>救助會恢復至 1 HP，並消耗目前主要行動。</p>
+                <div className="combat-row-move-mode__choices">
+                  {rescueTargets.map((target) => <Button key={target.id} variant="primary"
+                    data-rescue-target={target.id} disabled={controlMutationBusy}
+                    loading={isRescuing} loadingLabel="正在救助……"
+                    onClick={() => submitRescue(target.id)}>
+                    救助{target.displayName}・剩餘 {target.health.dyingTurnsRemaining} 回合
+                  </Button>)}
+                  <Button variant="secondary" disabled={isRescuing} onClick={() => setIsRescueOpen(false)}>取消</Button>
+                </div>
+              </section> : null}
               {hasPlayerActionActor && !rowMoveOptions && !isLoadingRowMoveOptions ? (
                 <Button
                   variant="secondary"

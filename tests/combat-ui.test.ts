@@ -83,7 +83,8 @@ test("CombatPage 呈現權威 Round、actor、四排、唯讀技能與 disabled 
   assert.doesNotMatch(page, /data-command="party"[^>]*disabled=""/);
   assert.match(page, /TEST：推進下一回合/);
   assert.match(page, /TEST 敵方回合/);
-  assert.doesNotMatch(page, /HP\s*\d|MP\s*\d|選擇目標|攻擊成功/);
+  assert.match(page, /HP 10 \/ 10/);
+  assert.doesNotMatch(page, /選擇目標|攻擊成功/);
 });
 
 test("前端排位只使用 participant.side 與 participant.row，並在玩家回合啟用普通攻擊", () => {

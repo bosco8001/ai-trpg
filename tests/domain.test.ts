@@ -77,6 +77,7 @@ test("runtime boundary 拒絕直接狀態寫入、額外欄位與隱式型別轉
 test("戰鬥標記只作命令守門，不允許更換配置", () => {
   const started = startCombat(createGameState(seed()), { expectedRevision: 0 }, [
     { id: "TEST-player", displayName: "TEST 玩家", side: "party", row: "front", dexterityModifier: 0, normalAttack: null },
+    { id: "TEST-enemy-1", displayName: "TEST 敵人 1", side: "enemy", row: "front", dexterityModifier: -1, normalAttack: null },
   ], { d20: () => 10 });
   assert.equal(started.ok, true);
   if (!started.ok) return;

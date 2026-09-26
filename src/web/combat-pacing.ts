@@ -1,5 +1,5 @@
-import type { AuthoritativeGameStateResponse, CompanionActResponse, CombatSandboxAdvanceResponse } from "../shared/game-state.js";
-import { ApiRequestError, advanceTestCombatTurn, executeCompanionTurn } from "./api.js";
+import type { AuthoritativeGameStateResponse, CompanionActResponse, CombatSandboxAdvanceResponse, CombatLifeResponse } from "../shared/game-state.js";
+import { ApiRequestError, advanceTestCombatTurn, executeCompanionTurn, executeDyingTurn } from "./api.js";
 
 // Provisional presentation values. These are not combat rules or persistent state.
 export const COMBAT_PACING = Object.freeze({
@@ -19,20 +19,23 @@ export interface CombatPacingView {
 export interface CombatPacingDependencies {
   advance: (revision: number) => Promise<CombatSandboxAdvanceResponse>;
   companion: (revision: number) => Promise<CompanionActResponse>;
+  dying?: (revision: number) => Promise<CombatLifeResponse>;
   hydrate: () => Promise<AuthoritativeGameStateResponse>;
   commit: (response: AuthoritativeGameStateResponse) => void;
   showCompanionResult: (response: CompanionActResponse) => void;
+  showDyingResult?: (response: CombatLifeResponse) => void;
   schedule: (callback: () => void, delay: number) => number;
   cancel: (timer: number) => void;
   timing: { readonly beforeNpcActionMs: number; readonly afterTestAdvanceMs: number;
     readonly afterCompanionResultMs: number; readonly turnTransitionMs: number };
 }
 
-export function classifyPacingActor(response: AuthoritativeGameStateResponse): "player" | "companion" | "test-enemy" | "unsupported" | "ended" {
+export function classifyPacingActor(response: AuthoritativeGameStateResponse): "player" | "companion" | "test-enemy" | "dying" | "unsupported" | "ended" {
   const combat = response.state.combat;
   if (!combat || combat.status === "ended") return "ended";
   const actor = combat.participants.find((entry) => entry.id === combat.currentActorId);
   if (!actor) return "unsupported";
+  if (actor.health.lifeState === "dying") return "dying";
   if (actor.controlledBy === "companion") return "companion";
   if (actor.side === "enemy") return response.sandbox && actor.id.startsWith("TEST-enemy-") ? "test-enemy" : "unsupported";
   return actor.side === "party" && actor.normalAttack !== null ? "player" : "unsupported";
@@ -153,7 +156,7 @@ export class CombatPacingController {
     this.delay(() => { void this.execute(key, kind); }, this.deps.timing.beforeNpcActionMs);
     this.scheduledKey = key;
   }
-  private async execute(key: string, kind: "companion" | "test-enemy"): Promise<void> {
+  private async execute(key: string, kind: "companion" | "test-enemy" | "dying"): Promise<void> {
     if (!this.active || !this.latest || this.blocked || this.key(this.latest) !== key || this.issued.has(key)
       || this.requestInFlight || this.latest.state.combat?.status !== "active") return;
     const revision = this.latest.state.revision;
@@ -161,7 +164,8 @@ export class CombatPacingController {
     this.requestInFlight = true;
     this.setView({ phase: "resolving" });
     try {
-      const response = kind === "companion" ? await this.deps.companion(revision) : await this.deps.advance(revision);
+      const response = kind === "companion" ? await this.deps.companion(revision)
+        : kind === "dying" ? await this.deps.dying!(revision) : await this.deps.advance(revision);
       if (!this.active || !this.latest) return;
       if (response.state.revision !== revision + 1 || response.state.combat === null) throw new Error("NPC 回合回應格式不正確。");
       // A newer response or hydration wins. The old result can never roll the UI backward.
@@ -170,6 +174,7 @@ export class CombatPacingController {
       this.latest = response;
       this.deps.commit(response);
       if (kind === "companion") this.deps.showCompanionResult(response as CompanionActResponse);
+      if (kind === "dying") this.deps.showDyingResult?.(response as CombatLifeResponse);
       if (response.state.combat.status === "ended") {
         this.holdingRevision = null;
         this.setView({ phase: "idle", visualActorId: null });
@@ -188,7 +193,8 @@ export class CombatPacingController {
             this.setView({ phase: "idle" });
             this.evaluate();
           }, this.deps.timing.turnTransitionMs);
-        }, kind === "companion" ? this.deps.timing.afterCompanionResultMs : this.deps.timing.afterTestAdvanceMs);
+        }, kind === "companion" || (kind === "dying" && (response as CombatLifeResponse).event.lifeState === "dead")
+          ? this.deps.timing.afterCompanionResultMs : this.deps.timing.afterTestAdvanceMs);
       }, 0);
     } catch (error) {
       if (!this.active || !this.latest || this.latest.state.revision > revision) return;
@@ -216,6 +222,7 @@ export class CombatPacingController {
 export const browserCombatPacingDependencies = {
   advance: advanceTestCombatTurn,
   companion: executeCompanionTurn,
+  dying: executeDyingTurn,
   schedule: (callback: () => void, ms: number) => window.setTimeout(callback, ms),
   cancel: (timer: number) => window.clearTimeout(timer),
   timing: COMBAT_PACING,

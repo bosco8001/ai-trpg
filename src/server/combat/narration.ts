@@ -4,10 +4,14 @@ import { getCombatItemDisplayName } from "../../shared/combat-items.js";
 import { getActiveSkillDefinition } from "../../domain/physical-skills.js";
 import type { CombatNarrationPresentation } from "../../shared/combat-narration.js";
 import type { LanguageModel } from "../llm/contracts.js";
+import type { LifeEvent } from "../../domain/combat.js";
 
 type Base = { readonly round: number; readonly actorName: string };
 type Target = { readonly targetName: string; readonly outcome: "hit" | "miss" };
 export type CombatNarrationFacts = Base & (
+  | { readonly kind: "life-event"; readonly eventType: "rescue" | "dying-turn" | "damage";
+      readonly targetName: string; readonly lifeState: "active" | "dying" | "dead";
+      readonly currentHp: number; readonly endReason: "victory" | "party-defeat" | null }
   | ({ readonly kind: "normal-attack" | "physical-skill"; readonly skillName?: string } & Target)
   | { readonly kind: "defend" }
   | { readonly kind: "row-move"; readonly fromRow: CombatRow; readonly toRow: CombatRow }
@@ -23,6 +27,21 @@ export interface CombatNarrationService {
   narrate(facts: CombatNarrationFacts): Promise<CombatNarrationPresentation>;
 }
 
+export function buildLifeEventNarrationFacts(state: GameState, event: LifeEvent): CombatNarrationFacts {
+  const combat = state.combat;
+  if (!combat) throw new Error("沒有已確認的生命事件。");
+  const target = combat.participants.find((entry) => entry.id === event.targetId);
+  if (!target || target.health.currentHp !== event.currentHp || target.health.lifeState !== event.lifeState)
+    throw new Error("生命事件與權威狀態不一致。");
+  const actorName = event.type === "rescue"
+    ? combat.participants.find((entry) => entry.id === combat.lastAction?.actorId)?.displayName
+    : target.displayName;
+  if (!actorName) throw new Error("生命事件缺少行動者。");
+  return Object.freeze({ kind: "life-event", round: combat.round, actorName, targetName: target.displayName,
+    eventType: event.type, lifeState: event.lifeState, currentHp: event.currentHp,
+    endReason: event.endReason });
+}
+
 /** Called only with a successful session result: this state has already passed the persistence boundary. */
 export function buildCombatNarrationFacts(state: GameState): CombatNarrationFacts {
   const combat = state.combat;
@@ -35,6 +54,8 @@ export function buildCombatNarrationFacts(state: GameState): CombatNarrationFact
   };
   const base = { round: action.round, actorName: name(action.actorId) };
   switch (action.type) {
+    case "rescue": return Object.freeze({ ...base, kind: "life-event", eventType: "rescue",
+      targetName: name(action.targetId), lifeState: "active", currentHp: 1, endReason: null });
     case "normal-attack":
       return Object.freeze({ ...base, kind: action.type, targetName: name(action.targetId), outcome: action.outcome });
     case "physical-skill":
@@ -67,6 +88,13 @@ const dragonBreathName = (element: DragonBreathElement) => ({
 export function buildCombatNarrationFallback(facts: CombatNarrationFacts): string {
   const actor = facts.actorName;
   switch (facts.kind) {
+    case "life-event": {
+      const transition = facts.eventType === "rescue" ? `${actor}救助${facts.targetName}，恢復至 1 HP。`
+        : facts.lifeState === "dead" ? `${facts.targetName}已死亡。`
+          : `${facts.targetName}進入瀕死狀態。`;
+      return transition + (facts.endReason === "victory" ? "戰鬥勝利。"
+        : facts.endReason === "party-defeat" ? "隊伍戰敗。" : "");
+    }
     case "normal-attack": return `${actor}攻擊${facts.targetName}，${outcomeText(facts.outcome)}。`;
     case "physical-skill": return `${actor}對${facts.targetName}使用${facts.skillName}，${outcomeText(facts.outcome)}。`;
     case "defend": return `${actor}採取防禦行動。`;
@@ -90,7 +118,7 @@ export function buildCombatNarrationFallback(facts: CombatNarrationFacts): strin
 const instruction = [
   "你是暗黑高奇幻戰鬥的繁體中文說書人。只描述 JSON data 中已確認的結果，輸出一至三句簡短敘事。",
   "戰鬥系統已經完成判定與保存。不得改寫行動者、目標、命中、逃跑、站位、回合或任何遊戲狀態。",
-  "目前沒有傷害、HP、受傷、死亡、治療、物品效果、防禦減傷或詠唱後法術效果；不得暗示這些結果。詠唱完成只代表詠唱結束。",
+  "只有 kind=life-event 時可描述已確認 HP、瀕死、救助、死亡與勝敗；其餘行動沒有傷害或 HP 結果。不得發明傷口位置、骨折、斷肢、流血、傷害類型、狀態效果或戰後結果。",
   "龍息元素對照：fire=火焰龍息、ice=冰霜龍息、lightning=雷電龍息；元素不代表燃燒、灼傷或其他效果。",
   "龍息 AoE 必須逐一描述每個 target，且不可把 target 寫成命中者。hit 必須使用「<targetName>被<元素龍息>命中」；miss 必須使用「<targetName>避開了<元素龍息>」或「<targetName>未被<元素龍息>命中」。",
   "critical=true 必須只在該 target 的句子中補充已確認結果「本次判定為暴擊」或「本次判定格外精準」；critical=false 不可提及暴擊或格外精準。不得寫成「<targetName>命中」。",
@@ -99,6 +127,7 @@ const instruction = [
 ].join("\n");
 
 const forbidden = /(?:HP|MP|damage|health|death|injur|傷害|扣血|血量|生命值|受傷|重傷|流血|骨折|斷肢|死亡|殺死|陣亡|瀕死|倒地|灼傷|燒傷|燃燒|凍結|麻痺|恢復|治療|減傷|護甲破裂|法術命中|法術爆發|獲得戰利品|掉落)/iu;
+const forbiddenLifeInjury = /(?:骨折|斷肢|傷口|流血|失血|內臟|灼傷|燒傷|燃燒|凍結|麻痺|中毒|復活|戰利品|掉落|護甲破裂)/iu;
 
 function validText(raw: string, facts: CombatNarrationFacts): string | null {
   if (raw.length > 4096) return null;
@@ -108,8 +137,12 @@ function validText(raw: string, facts: CombatNarrationFacts): string | null {
     || Object.keys(value).length !== 1 || !Object.hasOwn(value, "text")) return null;
   const text = (value as { text: unknown }).text;
   if (typeof text !== "string" || !text.trim() || Array.from(text).length > 240
-    || /[\r\n]/u.test(text) || forbidden.test(text)) return null;
+    || /[\r\n]/u.test(text) || (facts.kind === "life-event" ? forbiddenLifeInjury.test(text) : forbidden.test(text))) return null;
   if (!text.includes(facts.actorName)) return null;
+  if (facts.kind === "life-event") {
+    // Until richer structured injury facts exist, accept only the canonical confirmed wording.
+    return text.trim() === buildCombatNarrationFallback(facts) ? text.trim() : null;
+  }
   if ((facts.kind === "normal-attack" || facts.kind === "physical-skill")
     && (!text.includes(facts.targetName) || (facts.outcome === "hit" ? !/命中/u.test(text)
       : !/未命中|沒有命中|避開/u.test(text))

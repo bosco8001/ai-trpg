@@ -248,14 +248,17 @@ test("self、ally 與不存在的 participant 都不是合法目標", () => {
     {
       id: "TEST-attacker", displayName: "TEST 攻擊者", side: "party", row: "front",
       dexterityModifier: 0,
+      health: { maxHp: 10, currentHp: 10, lifeState: "active", dyingTurnsRemaining: null },
       normalAttack: { range: "melee", perceptionModifier: 1, weaponMainStatModifier: 2, proficiencyModifier: 1 },
     },
     {
       id: "TEST-ally", displayName: "TEST 隊友", side: "party", row: "back",
+      health: { maxHp: 8, currentHp: 8, lifeState: "active", dyingTurnsRemaining: null },
       dexterityModifier: 0, normalAttack: null,
     },
     {
       id: "TEST-enemy", displayName: "TEST 敵人", side: "enemy", row: "front",
+      health: { maxHp: 6, currentHp: 6, lifeState: "active", dyingTurnsRemaining: null },
       dexterityModifier: 0, normalAttack: null,
     },
   ];
@@ -573,7 +576,8 @@ test("普通攻擊結果 UI 只顯示檢定事實與命中結果，不顯示傷�
   assert.match(page, /結果：命中/);
   assert.match(page, /目前行動：<strong>TEST 敵人 2<\/strong>/);
   const visibleText = page.replace(/<[^>]+>/g, " ");
-  assert.doesNotMatch(visibleText, /\bHP\b|damage|傷害|揮劍|躲開|暴擊|critical/i);
+  assert.match(visibleText, /HP 10 \/ 10/);
+  assert.doesNotMatch(visibleText, /damage|造成傷害|揮劍|躲開|暴擊|critical/i);
 });
 
 test("target mode 的取消與進入流程不會直接呼叫 attack endpoint；卡片平時維持 article", async () => {
@@ -631,7 +635,7 @@ test("legacy known Phase 11 TEST snapshot 可補 row；未知缺 row participant
     currentTurnIndex: combat.currentTurnIndex,
     currentActorId: combat.currentActorId,
     turnOrder: combat.turnOrder,
-    participants: combat.participants.map(({ row: _row, normalAttack: _normalAttack, ...participant }) => participant),
+    participants: combat.participants.map(({ row: _row, normalAttack: _normalAttack, health: _health, ...participant }) => participant),
   };
   const hydrated = hydrateStateRow({
     character_id: state.character.id,

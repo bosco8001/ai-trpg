@@ -153,12 +153,8 @@ test("第二顆攻擊骰失敗不留下部分狀態；無合法目標固定防�
   assert.equal(before.combat?.currentActorId, "TEST-companion-1");
   const noEnemies = startCombat(createTestGameState(), { expectedRevision: 0 },
     PHASE22_TEST_COMBAT_PARTICIPANTS.filter((entry) => entry.side === "party"), new SequenceD20Roller([1, 20]));
-  ok(noEnemies);
-  const fallback = resolveCompanionTurn(noEnemies.state, { expectedRevision: noEnemies.state.revision }, { d20: () => {
-    throw new Error("fallback must not roll");
-  } });
-  ok(fallback);
-  assert.equal(fallback.state.combat?.lastAction?.type, "defend");
+  assert.equal(noEnemies.ok, false);
+  if (!noEnemies.ok) assert.equal(noEnemies.code, "invalid-combat-setup");
 });
 
 test("隊友 Turn 的玩家指令均受保護；舊戰鬥 hydrate 不重建名冊", () => {
