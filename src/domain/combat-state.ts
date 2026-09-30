@@ -21,6 +21,9 @@ export interface CombatInitiative {
 }
 
 export interface CombatParticipant {
+  readonly characterId?: string | null;
+  readonly capacityAdjustment?: {readonly ruleId:"TEST-temporary-capacity";readonly hpDelta:number;readonly mpDelta:number};
+  readonly mp?: { readonly currentMp: number; readonly maxMp: number };
   readonly id: string;
   readonly displayName: string;
   readonly side: CombatSide;
@@ -166,6 +169,7 @@ export interface RunActionResolution {
 export type CombatLastAction = NormalAttackActionResolution | PhysicalSkillActionResolution | RowMoveActionResolution | ItemUseActionResolution | DefendActionResolution | RescueActionResolution | RunActionResolution | CastingActionResolution | DragonBreathActionResolution;
 
 interface CombatStateBase {
+  readonly lifecycle?: import("./settlement.js").CombatLifecycle;
   readonly round: number;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipant[];
@@ -250,6 +254,19 @@ function parseNormalAttackProfile(value: unknown): CombatNormalAttackProfile | n
 
 function parseParticipant(value: unknown, allowKnownLegacyTest: boolean): CombatParticipant {
   if (!isRecord(value)) throw new Error("戰鬥參與者格式不正確。");
+  if (Object.hasOwn(value, "capacityAdjustment")) {
+    const {capacityAdjustment,...base}=value;
+    if(!isRecord(capacityAdjustment) || !exact(capacityAdjustment,['ruleId','hpDelta','mpDelta']) || capacityAdjustment.ruleId !== 'TEST-temporary-capacity' || !isSafeInteger(capacityAdjustment.hpDelta) || !isSafeInteger(capacityAdjustment.mpDelta)) throw new Error('上限調整格式不合法。');
+    return Object.freeze({...parseParticipant(base,allowKnownLegacyTest),capacityAdjustment:Object.freeze(capacityAdjustment) as {ruleId:'TEST-temporary-capacity';hpDelta:number;mpDelta:number}});
+  }
+  if (Object.hasOwn(value, "characterId") || Object.hasOwn(value, "mp")) {
+    const { characterId, mp, ...base } = value;
+    if (!(characterId === null || isId(characterId)) || (mp !== undefined && (!isRecord(mp)
+      || !exact(mp, ["currentMp", "maxMp"]) || !isSafeInteger(mp.currentMp) || !isSafeInteger(mp.maxMp)
+      || mp.currentMp < 0 || mp.maxMp < 0 || mp.currentMp > mp.maxMp))) throw new Error("戰鬥角色資源不合法。");
+    return Object.freeze({...parseParticipant(base, allowKnownLegacyTest), characterId,
+      ...(mp !== undefined ? {mp: Object.freeze(mp) as {currentMp:number;maxMp:number}} : {})});
+  }
   let normalized: Record<string, unknown> = value;
   if (allowKnownLegacyTest && (exact(value, ["id", "displayName", "side", "initiative"])
     || exact(value, ["id", "displayName", "side", "initiative", "racialEscapeModifier"]))) {
@@ -523,6 +540,11 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
 
 /** PostgreSQL 與 domain 建立狀態時共用的完整 runtime validation。 */
 export function createCombatState(value: unknown): CombatState {
+  if (isRecord(value) && Object.hasOwn(value, "lifecycle")) {
+    const { lifecycle, ...base } = value;
+    if (!isRecord(lifecycle) || !exact(lifecycle,["combatId","runId","worldId","fixtureId","sourceEncounterId","returnExplorationContext","rewardEligibleOnVictory"])) throw new Error("戰鬥身分格式不正確。");
+    return Object.freeze({...createCombatState(base), lifecycle: Object.freeze(structuredClone(lifecycle)) as unknown as import("./settlement.js").CombatLifecycle});
+  }
   if (!isRecord(value)) throw new Error("CombatState 格式不正確。");
   const legacyShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants"]);
   const previousShape = exact(value, ["round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction"]);
@@ -599,6 +621,8 @@ export function createCombatState(value: unknown): CombatState {
       || value.currentActorId !== value.turnOrder[value.currentTurnIndex as number]))
     || (status === "ended" && endReason === "escaped" && (lastAction?.type !== "run" || lastAction.outcome !== "success"
       || lastAction.round !== value.round))
+    || (status === "ended" && activeCastings.length > 0)
+    || (status === "ended" && (endReason === "victory" || endReason === "escaped") && participants.some(p => p.side === "party" && p.controlledBy !== "companion" && p.health.lifeState === "dead"))
     || (status === "ended" && endReason === "victory" && (participants.some((participant) => participant.side === "enemy" && participant.health.lifeState !== "dead")
       || !participants.some((participant) => participant.side === "party" && participant.health.lifeState === "active")))
     || (status === "ended" && endReason === "party-defeat" && !(
@@ -630,7 +654,7 @@ export function createCombatState(value: unknown): CombatState {
         || result.attack.perceptionModifier !== participants.find((participant) => participant.id === lastAction.actorId)?.normalAttack?.perceptionModifier)))
     || (lastAction !== null && lastAction.type.startsWith("casting-")
       && ((lastAction.type === "casting-start" || lastAction.type === "casting-continue")
-        ? (participants.find((entry) => entry.id === lastAction.actorId)?.health.lifeState === "active"
+        ? (status !== "ended" && participants.find((entry) => entry.id === lastAction.actorId)?.health.lifeState === "active"
           && !activeCastings.some((entry) => entry.actorId === lastAction.actorId
             && entry.skillId === lastAction.skillId && entry.mpSpent === lastAction.totalMpSpent))
         : activeCastings.some((entry) => entry.actorId === lastAction.actorId)))

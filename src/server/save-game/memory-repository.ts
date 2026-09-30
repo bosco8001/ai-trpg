@@ -1,10 +1,10 @@
-import { createGameState } from "../../domain/game.js";
+import { createGameState, gameStateContents } from "../../domain/game.js";
 import type { SaveSlotId } from "../../shared/save-game.js";
 import type {
   CurrentStateReader,
   SaveGameRepository,
   SaveRevisionGuard,
-  SaveSnapshotV1,
+  SaveSnapshotV2,
   StoredSaveSlot,
 } from "./contracts.js";
 
@@ -31,7 +31,7 @@ export class InMemorySaveGameRepository implements SaveGameRepository {
 
   async writeIfLiveRevision(
     slotId: SaveSlotId,
-    snapshot: SaveSnapshotV1,
+    snapshot: SaveSnapshotV2,
     guard: SaveRevisionGuard,
   ): Promise<StoredSaveSlot | undefined> {
     const current = createGameState(await this.readCurrentState());
@@ -40,7 +40,7 @@ export class InMemorySaveGameRepository implements SaveGameRepository {
       slotId,
       formatVersion: snapshot.formatVersion,
       sourceRevision: snapshot.sourceRevision,
-      snapshot: structuredClone(snapshot.state),
+      snapshot: structuredClone(gameStateContents(current)),
       savedAt: this.now().toISOString(),
     };
     this.records.set(slotId, record);

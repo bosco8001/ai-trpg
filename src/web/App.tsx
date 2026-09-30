@@ -1,3 +1,5 @@
+import { acceptState, acceptHistory } from "./state-sync.js";
+import { RuntimeSystemPanel } from "./RuntimeSystemPanel.js";
 import { useEffect, useState } from "react";
 import { checkApiHealth, loadAuthoritativeGameState } from "./api.js";
 import { CombatPage } from "./CombatPage.js";
@@ -9,12 +11,14 @@ import { Panel } from "./ui/Panel.js";
 const CONNECTION_TIMEOUT_MS = 5000;
 
 export function App() {
+  const [presentation,setPresentation]=useState<{text:string|null;warning:string;generation:string;revision:number}|null>(null);
+  const [menu,setMenu]=useState(false);
   const [state, setState] = useState<ConnectionState>("checking");
   const [attempt, setAttempt] = useState(0);
   const [authoritativeState, setAuthoritativeState] = useState<AuthoritativeGameStateResponse | null>(null);
   const [stateError, setStateError] = useState<string | null>(null);
   const acceptAuthoritativeState = (next: AuthoritativeGameStateResponse) => {
-    setAuthoritativeState((current) => current && current.state.revision > next.state.revision ? current : next);
+    setAuthoritativeState(current=>acceptState(current,next));
   };
 
   useEffect(() => {
@@ -63,15 +67,19 @@ export function App() {
   return (
     <>
       <a className="skip-link" href="#main-content">{inCombat ? "跳至戰鬥畫面" : "跳至故事紀錄"}</a>
-      {authoritativeState && inCombat ? (
+      {menu && authoritativeState ? <main id="main-content" className="site-shell" tabIndex={-1}><h1>主選單</h1><Button onClick={()=>{void retryAuthoritativeState().then(()=>setMenu(false)).catch(()=>setStateError("目前無法讀取遊戲狀態。"));}}>返回目前遊戲</Button><RuntimeSystemPanel state={authoritativeState} onStateUpdate={next=>{acceptAuthoritativeState(next);setMenu(false);}} onRetryState={retryAuthoritativeState}/></main> : authoritativeState && inCombat ? (
         <CombatPage
+          key={`${authoritativeState.state.phase26?.runtimeGeneration}:${authoritativeState.state.combat?.lifecycle?.combatId}`}
           gameState={authoritativeState}
+          onMainMenu={()=>setMenu(true)}
+          onPresentation={(text,warning,generation,revision)=>setPresentation({text,warning,generation,revision})}
+          onHistoryEntry={(entry,generation)=>setAuthoritativeState(current=>acceptHistory(current,generation,entry))}
           stateError={stateError}
           onStateUpdate={acceptAuthoritativeState}
           onRetryState={retryAuthoritativeState}
         />
       ) : authoritativeState ? (
-        <ExplorationPage connectionState={state} onRetryConnection={retryAll} />
+        <ExplorationPage onHistoryEntry={(entry,generation)=>setAuthoritativeState(current=>acceptHistory(current,generation,entry))} key={authoritativeState.state.phase26?.runtimeGeneration} authoritativeState={authoritativeState} presentation={presentation?.generation === authoritativeState.state.phase26?.runtimeGeneration && presentation?.revision === authoritativeState.state.revision ? presentation : null} onStateUpdate={acceptAuthoritativeState} onRetryState={retryAuthoritativeState} connectionState={state} onRetryConnection={retryAll} />
       ) : (
         <main id="main-content" className="site-shell" tabIndex={-1}>
           <div className="site-shell__inner">

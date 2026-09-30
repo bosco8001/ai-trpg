@@ -1,10 +1,11 @@
+import {createTestGameState as fullTestState} from "../src/server/test-game-state.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { applyCommand, createGameState, type GameState } from "../src/domain/game.js";
+import { applyCommand, createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { advanceCombatTurn, cancelCasting, continueCasting, defendCombatTurn, moveCombatRow,
   resolveCompanionTurn, resolveNormalAttack, runFromCombat, startCasting, startCombat, useCombatItem,
@@ -12,7 +13,7 @@ import { advanceCombatTurn, cancelCasting, continueCasting, defendCombatTurn, mo
 import { setCompanionTacticPreference } from "../src/domain/party.js";
 import { createLegacyPartyMembers } from "../src/domain/party-tactics.js";
 import { TEST_COMBAT_CONSUMABLE_ID } from "../src/domain/combat-items.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createCombatFixtureRoller, createPhase22CombatFixtureRoller, SequenceD20Roller } from "../src/server/combat/dice.js";
 import { PHASE22_TEST_COMBAT_PARTICIPANTS, TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { buildCombatNarrationFacts, buildCombatNarrationFallback, createCombatNarrationService,
@@ -22,7 +23,7 @@ import { createDomainSession, createPersistedDomainSession } from "../src/server
 import { createLanguageModel } from "../src/server/llm/language-model.js";
 import type { GenerateRequest, LanguageModel } from "../src/server/llm/contracts.js";
 import { PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { isCombatNormalAttackResponse } from "../src/shared/game-state.js";
 import { CombatPage } from "../src/web/CombatPage.js";
 
@@ -31,7 +32,7 @@ function ok<T extends { readonly ok: boolean }>(result: T): asserts result is Ex
 }
 function player(initial = createTestGameState(), participants = TEST_COMBAT_PARTICIPANTS): GameState {
   const started = startCombat(initial, { expectedRevision: initial.revision }, participants,
-    createCombatFixtureRoller("normal")); ok(started);
+    (participants.some(p=>p.controlledBy === "companion") ? createPhase22CombatFixtureRoller("normal") : createCombatFixtureRoller("normal"))); ok(started);
   const advanced = advanceCombatTurn(started.state, { expectedRevision: started.state.revision }); ok(advanced);
   return advanced.state;
 }
@@ -222,7 +223,7 @@ test("詠唱 start、continue、complete、cancel 的進度與法術效果分離
 });
 
 test("同伴 A 攻擊與 B 防禦只收到 policy 已選的結果", () => {
-  const started = startCombat(createTestGameState(), { expectedRevision: 0 },
+  const started = startCombat(fullTestState(), { expectedRevision: 0 },
     PHASE22_TEST_COMBAT_PARTICIPANTS, createPhase22CombatFixtureRoller("normal")); ok(started);
   let state = started.state;
   while (state.combat?.status === "active" && state.combat.currentActorId !== "TEST-companion-1") {
@@ -296,9 +297,9 @@ test("每個正式 action route 成功後都只送一次已確認事實，並保
 test("拒絕、GET、TEST advance 與 tactic 設定不呼叫模型", async () => {
   let calls = 0;
   const model: LanguageModel = { async generateText() { calls += 1; return { text: "{}" }; } };
-  const ready = player();
+  const ready = player(fullTestState(),PHASE22_TEST_COMBAT_PARTICIPANTS);
   const session = createDomainSession(ready);
-  const app = await buildApp({ domainSession: session, combatSandbox: true,
+  const app = await buildApp({ domainSession: session, domainSandbox: true, combatSandbox: true,
     combatNarrator: createCombatNarrationService(model), combatActionRoller: new SequenceD20Roller([10, 8]) });
   try {
     const requests = [
@@ -410,7 +411,7 @@ test("PostgreSQL 已提交的戰鬥在模型故障後可由新 session 讀回，
   const id = `TEST-phase23-${randomUUID()}`;
   const base = createTestGameState();
   const seed = player(createGameState({ ...base, character: { ...base.character, id },
-    partyMembers: createLegacyPartyMembers("TEST-character") }));
+    partyMembers: createLegacyPartyMembers("TEST-character") }), PHASE22_TEST_COMBAT_PARTICIPANTS);
   const poolA = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 2 });
   let poolB: pg.Pool | undefined;
   try {

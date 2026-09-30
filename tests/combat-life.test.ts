@@ -7,7 +7,7 @@ import { applyCombatDamage, advanceCombatTurn, processDyingTurn, rescueCombatant
   resolveCompanionTurn, startCasting, startCombat } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
 import { isCombatHealth } from "../src/domain/combat-health.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { checkNormalAttackTarget } from "../src/domain/combat-targeting.js";
 import { PHASE22_TEST_COMBAT_PARTICIPANTS, TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createPhase22CombatFixtureRoller } from "../src/server/combat/dice.js";
@@ -22,7 +22,8 @@ function ok<T extends { ok: boolean }>(result: T): asserts result is Extract<T, 
   assert.equal(result.ok, true, JSON.stringify(result));
 }
 function battle(withCompanion = true): GameState {
-  const result = startCombat(createTestGameState(), { expectedRevision: 0 },
+  const initial=createTestGameState();
+  const result = startCombat(withCompanion ? initial : createGameState({...initial,partyMembers:[]}), { expectedRevision: 0 },
     withCompanion ? PHASE22_TEST_COMBAT_PARTICIPANTS : TEST_COMBAT_PARTICIPANTS,
     createPhase22CombatFixtureRoller("normal"));
   ok(result);
@@ -130,7 +131,7 @@ test("companion chooses lower countdown before Player and turnOrder breaks compa
     normalAttack: { range: "melee" as const, perceptionModifier: 1, weaponMainStatModifier: 1, proficiencyModifier: 0 },
     health: { maxHp: 8, currentHp: 8, lifeState: "active" as const, dyingTurnsRemaining: null },
   }));
-  const seed = createGameState({ ...initial, partyMembers: [...initial.partyMembers,
+  const seed = createGameState({ ...initial, phase26:{...initial.phase26!,characters:[...initial.phase26!.characters,...extra.map(e=>({...initial.phase26!.characters[1]!,characterId:e.id,displayName:e.displayName}))]}, partyMembers: [...initial.partyMembers,
     ...extra.map((entry) => ({ id: entry.id, displayName: entry.displayName, tacticPreferenceId: "TEST-tactic-b" }))] });
   const started = startCombat(seed, { expectedRevision: 0 }, [...PHASE22_TEST_COMBAT_PARTICIPANTS, ...extra],
     new SequenceD20Roller([12, 17, 8, 4, 3, 2]));
@@ -159,17 +160,17 @@ test("lethal damage interrupts casting without MP refund; Rescue leaves cooldown
     equippedSkillIds: ["TEST-skill-2"] } });
   const casting = startCasting(actor(equipped, "TEST-player"), { expectedRevision: 1, skillId: "TEST-skill-2" });
   ok(casting);
-  assert.equal(casting.state.character.currentMp, 18);
+  assert.equal(casting.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 18);
   const fallen = damage(casting.state, "TEST-player", 10);
   assert.equal(fallen.state.combat?.activeCastings.length, 0);
-  assert.equal(fallen.state.character.currentMp, 18);
+  assert.equal(fallen.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 18);
   assert.equal(fallen.state.combat?.lastAction?.type, "casting-start");
   assert.equal(isCombatStateView(fallen.state.combat), true);
   const rescued = resolveCompanionTurn(actor(fallen.state, "TEST-companion-1"),
     { expectedRevision: fallen.state.revision }, { d20: () => { throw new Error("no roll"); } });
   ok(rescued);
   assert.equal(rescued.state.combat?.activeCastings.length, 0);
-  assert.equal(rescued.state.character.currentMp, 18);
+  assert.equal(rescued.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 18);
 });
 
 test("enemy death skips current actor, front-row blocking clears, final enemy yields victory", () => {

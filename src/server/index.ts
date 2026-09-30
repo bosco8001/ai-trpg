@@ -1,3 +1,4 @@
+import { createSettlementNarrator, settlementFallback } from "./combat/settlement-service.js";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { buildApp } from "./app.js";
@@ -66,8 +67,10 @@ const app = await buildApp({
   logger: true,
   domainSandbox,
   combatSandbox,
-  combatRoller: combatSandbox
-    ? createPhase22CombatFixtureRoller(combatRollMode as CombatRollFixtureMode)
+  combatStartContext: domainSandbox && combatSandbox && process.env.COMBAT_ENCOUNTER_FIXTURE === "1"
+    ? {sourceEncounterId:"TEST-encounter-1",rewardEligibleOnVictory:false} : undefined,
+  combatRollerFactory: combatSandbox
+    ? () => createPhase22CombatFixtureRoller(combatRollMode as CombatRollFixtureMode)
     : undefined,
   combatActionRoller: combatSandbox && combatActionRollMode
     ? createCombatActionFixtureRoller(combatActionRollMode as CombatActionRollFixtureMode)
@@ -87,6 +90,14 @@ const app = await buildApp({
   combatNarrator: createCombatNarrationService(createLanguageModel(
     new FixtureCombatNarrationAdapter(narrationMode as NarrationFixtureMode), { timeoutMs: 250 },
   )),
+  settlementNarrator: createSettlementNarrator(createLanguageModel({
+    async generateText(request, signal) {
+      if(narrationMode === 'unavailable') throw new Error('fixture');
+      if(narrationMode === 'timeout') {await new Promise<void>((resolve,reject)=>{signal.addEventListener('abort',()=>reject(new Error('fixture')), {once:true});});}
+      const input=JSON.parse(request.input);
+      return {text:narrationMode === 'malformed' ? '{' : JSON.stringify({text:input.allowed[0]})};
+    },
+  },{timeoutMs:250})),
   webRoot: process.env.NODE_ENV === "production"
     ? fileURLToPath(new URL("../web/", import.meta.url))
     : undefined,

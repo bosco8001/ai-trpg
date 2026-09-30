@@ -23,16 +23,7 @@ interface StateRow {
   snapshot: unknown;
 }
 
-function snapshotOf(state: GameState) {
-  return {
-    activity: state.activity,
-    character: state.character,
-    inventory: state.inventory,
-    partyMembers: state.partyMembers,
-    exploration: state.exploration,
-    combat: state.combat,
-  };
-}
+export function snapshotOf(state:GameState) { const {revision,...snapshot}=state;return snapshot; }
 
 /** 僅接受經 domain 驗證的快照，資料庫列也必須重新驗證。 */
 export function hydrateStateRow(row: StateRow): GameState {
@@ -43,6 +34,11 @@ export function hydrateStateRow(row: StateRow): GameState {
       throw new Error("資料列格式錯誤。");
     }
     const snapshot = row.snapshot as Record<string, unknown>;
+    if (Object.hasOwn(snapshot,"phase26")) {
+      const state = createGameState({...snapshot,revision:Number(row.revision)});
+      if (state.character.id !== row.character_id) throw new Error("角色識別碼不一致。");
+      return state;
+    }
     const snapshotKeys = Object.keys(snapshot);
     const legacy = snapshotKeys.length === 2 && snapshotKeys.includes("activity")
       && snapshotKeys.includes("character");
@@ -72,7 +68,7 @@ export function hydrateStateRow(row: StateRow): GameState {
       exploration: legacy ? createInitialTestExplorationState() : snapshot.exploration,
       inventory: missingInventory ? createTestCombatInventory() : snapshot.inventory,
       combat: current || currentWithParty || currentWithoutInventory ? snapshot.combat : null,
-      partyMembers: currentWithParty ? snapshot.partyMembers : createLegacyPartyMembers(row.character_id),
+      ...(currentWithParty ? {partyMembers:snapshot.partyMembers} : {}),
       revision,
     });
     if (state.character.id !== row.character_id) throw new Error("角色識別碼不一致。");
@@ -118,6 +114,10 @@ export class PostgresGameStateRepository implements GameStateRepository {
     );
     const loaded = await this.load(state.character.id);
     if (!loaded) throw new InvalidPersistedStateError(new Error("建立後找不到狀態。"));
+    if (loaded.phase26) {
+      await this.query("UPDATE game_states SET snapshot = $3::jsonb WHERE character_id = $1 AND revision = $2 AND NOT (snapshot ? 'phase26')",[loaded.character.id,loaded.revision,JSON.stringify(snapshotOf(loaded))]);
+      return (await this.load(state.character.id))!;
+    }
     return loaded;
   }
 
@@ -161,8 +161,12 @@ export class PostgresGameStateRepository implements GameStateRepository {
       const { result, nextState } = transition(current);
       if (nextState) {
         const next = createGameState(nextState);
-        if (next.character.id !== current.character.id || next.revision !== current.revision + 1) {
+        if (next.character.id !== current.character.id || (next.revision !== current.revision + 1 && next.revision !== current.revision)) {
           throw new Error("鎖定交易中的狀態版本不符合單次 transition 契約。");
+        }
+        if (next.revision === current.revision) {
+          const gameplay = (s:GameState) => {const {revision,phase26:p,...base}=s;return JSON.stringify([base,p?.characters,p?.encounters,p?.runId,p?.worldId,p?.fixtureId,p?.runtimeGeneration]);};
+          if (gameplay(next) !== gameplay(current)) throw new Error("敘事寫入不能改變玩法。");
         }
         const updated = await this.queryClient(client,
           "UPDATE game_states SET revision = $3, snapshot = $4::jsonb WHERE character_id = $1 AND revision = $2",

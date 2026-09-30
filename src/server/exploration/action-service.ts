@@ -100,11 +100,33 @@ export function createExplorationActionService(
       if (transition.effect.type !== "location-changed" && transition.effect.type !== "target-inspected") {
         throw new Error("探索命令產生非探索結果。");
       }
+      let narration: NarrationPresentation = transition.reservation
+        ? await narrateTransition(narrator,before,transition)
+        : {status:'unavailable',text:'行動已完成；敘事目前無法保存。'};
+      let narrativeDelivery: ExplorationActionResponse['narrativeDelivery'];
+      if (transition.reservation) {
+        try {
+          const outcome=await session.appendNarrative(transition.reservation,narration.text!,narration.status === 'ready' ? 'model' : 'fallback');
+          if (outcome.status === 'discarded') {
+            narration={status:'not-requested',text:null};
+            narrativeDelivery={status:'discarded',generation:transition.reservation.generation};
+          } else {
+            if(narration.status !== 'not-requested') narration={...narration,text:outcome.entry.text};
+            narrativeDelivery={status:'saved',generation:transition.reservation.generation,entry:outcome.entry};
+          }
+        } catch {
+          const current=await Promise.resolve(session.getState()).catch(()=>undefined);
+          const discarded=!!current && current.phase26?.runtimeGeneration !== transition.reservation.generation;
+          if(discarded) narration={status:'not-requested',text:null};
+          narrativeDelivery={status:discarded?'discarded':'unsaved',generation:transition.reservation.generation};
+        }
+      }
       return {
         mode: "test-fixture", candidate,
         ruling: { accepted: true, code: "accepted", effect: transition.effect },
         state: summary(transition.state, storage),
-        narration: await narrateTransition(narrator, before, transition),
+        narration,
+        ...(narrativeDelivery ? {narrativeDelivery} : {}),
       };
     },
   };

@@ -639,3 +639,19 @@ export function saveGame(slotId: SaveSlotId, expectedRevision: number, fetcher: 
 export function loadGame(slotId: SaveSlotId, expectedRevision: number, fetcher: typeof fetch = fetch) {
   return changeSaveSlot("POST", slotId, expectedRevision, fetcher);
 }
+
+export class SettlementApiError extends Error {constructor(readonly code:string,message:string) {super(message);}}
+
+/** A failed response is uncertain; callers may read state but never automatically repeat this intent. */
+export async function executeSettlement(expectedRevision:number,fetcher:typeof fetch=fetch):Promise<import('../shared/settlement.js').SettlementResponse> {
+  const {isSettlementResponse}=await import('../shared/settlement.js');
+  const response=await fetcher('/api/combat/settle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision}),signal:AbortSignal.timeout(5000)});
+  const body:unknown=await response.json();
+  if(!response.ok) {
+    const message=body && typeof body === 'object' && 'message' in body && typeof body.message === 'string' ? body.message : '目前無法確認結算狀態。';
+    const code=body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "state-unavailable";
+    throw new SettlementApiError(code,message);
+  }
+  if(!isSettlementResponse(body)) throw new Error('目前無法確認結算回應，請重新讀取。');
+  return body;
+}

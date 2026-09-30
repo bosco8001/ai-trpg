@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–25 已由使用者手動確認。Phase 26 尚未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–25 已由使用者手動確認。Phase 26 工程完成，等待使用者手動驗收；Phase 27 未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -409,4 +409,14 @@ TEST 戰鬥會從權威 current actor 自動接續：TEST 敵方只呼叫既有 
 
 ## Phase 25：瀕死、救助與死亡
 
-戰鬥 HP 現在只由 `CombatParticipant` 保存。TEST 傷害工程入口可驗證瀕死、死亡與勝敗；玩家可選擇瀕死隊友救助，隊友在自己的回合會依固定優先序自動救助。傷害數值仍是 TEST fixture，普通攻擊與技能的正式傷害尚未定案。詳細的 Memory／PostgreSQL 指令、預期 revision、刷新、敘事故障、手機與鍵盤檢查見 [Phase 25 手動驗收文件](docs/development/PHASE_25_DYING_RESCUE_DEATH.md)。Phase 25 已由使用者手動確認；Phase 26 尚未開始。
+戰鬥 HP 現在只由 `CombatParticipant` 保存。TEST 傷害工程入口可驗證瀕死、死亡與勝敗；玩家可選擇瀕死隊友救助，隊友在自己的回合會依固定優先序自動救助。傷害數值仍是 TEST fixture，普通攻擊與技能的正式傷害尚未定案。詳細的 Memory／PostgreSQL 指令、預期 revision、刷新、敘事故障、手機與鍵盤檢查見 [Phase 25 手動驗收文件](docs/development/PHASE_25_DYING_RESCUE_DEATH.md)。Phase 25 已由使用者手動確認。Phase 26 的資源交接與返回探索請見下節。
+
+## Phase 26：戰鬥結算與返回探索
+
+Phase 26 工程完成，等待使用者手動驗收。勝利／逃跑停在結果頁，按「繼續」才原子寫回長期 HP／MP、處理瀕死／死亡與來源 Encounter，返回原探索位置。Game Over 保留 ended Combat；active／ended／Game Over 均可完整 Save／Load。戰後與探索敘事保存於同一權威狀態，Load／Reset 更換 generation，舊 callback 不污染新世界。
+
+[第一個手動驗收步驟與完整清單](docs/development/PHASE_26_SETTLEMENT_ACCEPTANCE.md)、[實際工程驗證](docs/development/PHASE_26_VERIFICATION.md)、[規格與實作對照](docs/development/PHASE_26_IMPLEMENTATION_MAPPING.md)、[已接受完整規格](docs/development/PHASE_26_FINAL_SPEC.md)、[Canon 索引](docs/development/PHASE_26_CANON_INDEX.md)。
+
+本次隔離 PostgreSQL 回歸 303 項通過、0 失敗、0 略過；typecheck、build、migration dry-run 與 diff 檢查通過。三次實際 API 程序重啟保留 CombatId／資源／History，Load 的 revision／generation 與 allocator 均符合契約。v1 已知 TEST Save 讀取遷移不改原列；缺可驗證世界資料則 migration-blocked。新增 migration 只在隔離 DB 驗證，正式 DB 尚未套用。
+
+FUTURE REQUIRED Save / State Repair System、Reward／Resurrection／Combat History 與其他 [未定事項](docs/development/OPEN_QUESTIONS.md) 保留。未自行 commit／push，Phase 27 未開始。

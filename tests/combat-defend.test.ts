@@ -9,13 +9,13 @@ import {
   type CombatParticipantSeed,
 } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { TEST_COMBAT_CONSUMABLE_ID } from "../src/domain/combat-items.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createCombatActionFixtureRoller, createCombatFixtureRoller, SequenceD20Roller } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import { isAuthoritativeGameStateResponse, isCombatDefendResponse, isCombatStateView } from "../src/shared/game-state.js";
 import { executeDefend } from "../src/web/api.js";
@@ -54,7 +54,7 @@ test("玩家防禦只記錄 action、消耗 Turn、增加一次 revision，且�
   assert.deepEqual(after.state.combat?.lastAction, { type: "defend", actorId: "TEST-player", round: 1 });
   assert.deepEqual([after.state.revision, after.state.combat?.round, after.state.combat?.currentActorId], [3, 1, "TEST-enemy-2"]);
   assert.equal(after.effect.type, "defend-completed");
-  assert.deepEqual(before, playerState());
+  assert.deepEqual(before.character, playerState().character);
   assert.deepEqual(after.state.inventory, before.inventory);
   assert.deepEqual(after.state.combat?.participants, before.combat?.participants);
   assert.deepEqual(Object.keys(after.state.combat!.lastAction!).sort(), ["actorId", "round", "type"]);

@@ -7,12 +7,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { advanceCombatTurn, getCurrentCombatItemOptions, startCombat, useCombatItem } from "../src/domain/combat.js";
 import { createTestCombatInventory, TEST_COMBAT_CONSUMABLE_ID } from "../src/domain/combat-items.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
-import { buildApp } from "../src/server/app.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createCombatFixtureRoller } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { CombatPage } from "../src/web/CombatPage.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import {

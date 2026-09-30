@@ -58,3 +58,10 @@ Agent 遇到 unresolved 項目時：
 1. 不得自行宣布定案。
 2. 可以用獨立、可設定的 placeholder 讓 UI／工程繼續。
 3. placeholder 必須清楚標記，不能反寫成 source-of-truth。
+
+## Phase 26 已接受規格
+
+- [完整規格](PHASE_26_FINAL_SPEC.md)：Phase 26 行為的權威來源；明列修訂優先於早期草圖。
+- [Canon #1–#116 追溯索引](PHASE_26_CANON_INDEX.md)：只供編號追溯，不能取代完整規格。
+
+- [規格與實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)、[工程驗證紀錄](PHASE_26_VERIFICATION.md)、[手動驗收清單](PHASE_26_SETTLEMENT_ACCEPTANCE.md)：工程交付文件；不代替已接受設計或使用者驗收。

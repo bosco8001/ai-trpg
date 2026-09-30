@@ -56,6 +56,8 @@ export function createCombatService(
   initiativeRoller: DiceRoller,
   actionRoller: DiceRoller = initiativeRoller,
   escapeRoller: DiceRoller = initiativeRoller,
+  context?: import("../../domain/combat.js").CombatStartContext,
+  initiativeFixtureFactory?: () => DiceRoller,
 ): CombatService {
   return {
     async getState() {
@@ -74,7 +76,7 @@ export function createCombatService(
       return session.actCompanion(input, actionRoller);
     },
     async start(input: unknown) {
-      return session.startCombat(input, participants, initiativeRoller);
+      return session.startCombat(input, participants, initiativeFixtureFactory?.() ?? initiativeRoller,context);
     },
     async advance(input: unknown) {
       return session.advanceCombat(input);

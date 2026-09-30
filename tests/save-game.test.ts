@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import pg from "pg";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, gameStateContents, type GameState } from "./helpers/phase26-fixture.js";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { buildApp } from "../src/server/app.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
@@ -76,12 +76,7 @@ test("初始三槽皆空；Save 保存 v1 authoritative snapshot 且不增加 li
   const raw = await repository.read(1);
   assert.ok(raw);
   assert.equal("revision" in (raw.snapshot as object), false);
-  assert.deepEqual(decodeSaveSnapshot(raw).state, {
-    activity: "outside-combat",
-    character: seed().character,
-    inventory: createTestCombatInventory(),
-    exploration: seed().exploration,
-  });
+  assert.deepEqual(decodeSaveSnapshot(raw).state, gameStateContents(seed()));
 });
 
 test("Load 恢復內容但 live revision 從目前版本只增加一次", async () => {

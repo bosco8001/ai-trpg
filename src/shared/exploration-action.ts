@@ -31,6 +31,8 @@ export interface ExplorationActionResponse {
   readonly ruling: ExplorationRuling;
   readonly state: ExplorationStateSummary;
   readonly narration: NarrationPresentation;
+  readonly narrativeDelivery?: {readonly status:'saved';readonly generation:string;readonly entry:import('./narrative.js').NarrativeEntry}
+    | {readonly status:'unsaved'|'discarded';readonly generation:string};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,10 +86,21 @@ function isNarration(value: unknown): value is NarrationPresentation {
 }
 
 export function isExplorationActionResponse(value: unknown): value is ExplorationActionResponse {
-  return isRecord(value) && exact(value, ["mode", "candidate", "ruling", "state", "narration"])
+  return isRecord(value) && (exact(value, ["mode", "candidate", "ruling", "state", "narration"]) || exact(value,["mode", "candidate", "ruling", "state", "narration","narrativeDelivery"]))
+    && (value.narrativeDelivery === undefined || isNarrativeDelivery(value.narrativeDelivery))
     && value.mode === "test-fixture" && isCandidateAction(value.candidate)
     && isRuling(value.ruling) && isExplorationStateSummary(value.state)
     && isNarration(value.narration)
-    && (value.ruling.accepted ? value.narration.status !== "not-requested"
+    && (value.ruling.accepted ? value.narration.status !== "not-requested" || isRecord(value.narrativeDelivery) && value.narrativeDelivery.status === "discarded"
       : value.narration.status === "not-requested");
+}
+
+function isNarrativeDelivery(value:unknown):boolean {
+  if(!isRecord(value) || typeof value.generation !== 'string' || !value.generation) return false;
+  if(value.status === 'unsaved' || value.status === 'discarded') return exact(value,['status','generation']);
+  if(value.status !== 'saved' || !exact(value,['status','generation','entry']) || !isRecord(value.entry)) return false;
+  const e=value.entry;
+  return e.type === 'exploration' && e.category === 'placed' && typeof e.id === 'string' && !!e.id
+    && typeof e.text === 'string' && !!e.text.trim() && ['model','fallback'].includes(String(e.source))
+    && isRevision(e.sourceStateRevision) && isRevision(e.sequence) && e.sequence > 0 && e.sourceCombatId === null;
 }

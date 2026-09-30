@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import type { SaveSlotId } from "../../shared/save-game.js";
-import type { SaveGameRepository, SaveRevisionGuard, SaveSnapshotV1, StoredSaveSlot } from "./contracts.js";
+import type { SaveGameRepository, SaveRevisionGuard, SaveSnapshotV2, StoredSaveSlot } from "./contracts.js";
 
 export class SavePersistenceUnavailableError extends Error {
   constructor(cause: unknown) {
@@ -77,20 +77,21 @@ export class PostgresSaveGameRepository implements SaveGameRepository {
 
   async writeIfLiveRevision(
     slotId: SaveSlotId,
-    snapshot: SaveSnapshotV1,
+    snapshot: SaveSnapshotV2,
     guard: SaveRevisionGuard,
   ): Promise<StoredSaveSlot | undefined> {
     const result = await this.query<SaveSlotRow>(
       `INSERT INTO save_slots (slot_id, format_version, source_revision, snapshot, saved_at)
-       SELECT $1, $2, $3, $4::jsonb, CURRENT_TIMESTAMP
-       FROM game_states WHERE character_id = $5 AND revision = $6
+       SELECT $1, $2, $3,
+         jsonb_set(snapshot - 'revision', '{phase26}', (snapshot->'phase26') - 'runtimeGeneration' - 'sequenceHighWater' - 'narrativeLedger'), CURRENT_TIMESTAMP
+       FROM game_states WHERE character_id = $4 AND revision = $5
        ON CONFLICT (slot_id) DO UPDATE SET
          format_version = EXCLUDED.format_version,
          source_revision = EXCLUDED.source_revision,
          snapshot = EXCLUDED.snapshot,
          saved_at = EXCLUDED.saved_at
        RETURNING slot_id, format_version, source_revision, snapshot, saved_at`,
-      [slotId, snapshot.formatVersion, snapshot.sourceRevision, JSON.stringify(snapshot.state),
+      [slotId, snapshot.formatVersion, snapshot.sourceRevision,
         guard.characterId, guard.expectedRevision],
     );
     const row = result.rows[0];

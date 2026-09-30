@@ -27,7 +27,7 @@
 ## Combat
 - 個別物理主動技能的傷害、額外命中修正、狀態效果與 AoE 規則，以及正式技能內容製作流程與 HP／傷害整合仍未定案。Phase 18 的 `TEST-skill-1` 只判定命中／未命中，不能視為正式技能效果。
 - 正式物品效果與目標規則仍未定；Phase 15 的 TEST self-use fixture 只消耗數量，不代表世界物品或正式效果。
-- 戰鬥中是否允許 Save / Load 尚未決定。Phase 11 暫時安全拒絕戰鬥中的保存與載入，避免 Save Format v1 遺失 CombatState；這不是正式 gameplay rule。
+- Phase 26 已接受 active／ended／Game Over 的完整 Save／Load，以 Save Format v2 保存 Combat 與資源；Phase 11 暫定拒絕已由此規格取代。見 [Phase 26 完整規格](PHASE_26_FINAL_SPEC.md)。
 - 每排容量／擁擠、換排攔截、區域控制與 opportunity attack 尚未定義。Phase 14 只允許確定前後排換位，不加入容量限制或反擊。
 - 防禦的正式減傷量／百分比尚未定案；Prototype 的 `-30%` 不是正式規則。Phase 16 只完成 Defend action plumbing，沒有減傷效果。
 - 防禦減傷何時開始生效尚未定案。
@@ -37,7 +37,7 @@
 - 正式普通攻擊傷害、武器基礎傷害、STR／DEX 加成、護甲、物理技能傷害、法術傷害、龍息傷害及治療數值仍未定；Phase 25 的 generic damage transition 不賦予這些行動傷害值。
 - 正式角色與隊友的戰鬥 HP 來源、成長及平衡接入方式仍未定；Phase 25 固定 HP 僅供已知 TEST 角色驗證，不能作正式角色預設值。
 - 對瀕死者的處決、特殊攻擊與 AoE 波及規則仍未定；Phase 25 一般目標與 generic damage 均排除瀕死／死亡者。
-- 勝敗後瀕死角色的處置、復活、獎勵與返回探索屬 Phase 26 後續規則，尚未定案。Phase 25 結束戰鬥後不再倒數或救助。
+- Phase 26 已接受勝利／逃跑按繼續才結算；瀕死穩定為 1 HP、死亡隊友保留 Character 並移出 Party、返回原探索位置；Game Over 不結算。復活與獎勵仍為 future，沒有新增規則。
 - 龍息基礎傷害與等級成長公式。
 - 龍息傷害套用須等權威 HP／傷害流程與具體龍息平衡值確立後才接入。Phase 20 僅記錄逐目標命中、未命中、暴擊；不設定 0 傷害，也不計護甲、死亡或取整。
 - 龍息火／冰／雷的生成機率。
@@ -54,7 +54,7 @@
 
 ## AI / LLM
 - 正式使用的 LLM 供應商與模型尚未決定。Phase 5 只建立中立介面與固定回應測試模型；不以測試模型代表正式選擇。
-- 戰鬥敘事是否永久保存、是否進入存檔歷史，以及每場戰鬥保留多少段敘事尚未決定。Phase 23 只在當次成功 action response 回傳文字；刷新或 PostgreSQL hydrate 不自動補敘事。
+- Phase 26 的 post-combat 與探索正式 Entry 保存並進入完整 Save；Phase 23 個別戰鬥 action 敘事仍是當次 response 文字。完整 Combat History、每場保留政策與敘事補送仍屬 future。
 - 正式戰鬥敘事模型、token budget、production retry policy 與 streaming 是否需要尚未決定。Phase 23 沿用本機 fake adapter、一次生成與現有逾時邊界。
 - 最終戰鬥敘事停頓、動畫毫秒數、是否提供玩家節奏速度設定及是否提供 NPC 動畫快轉仍未定。Phase 24 的前端常數只是可調工程預設，**不是 gameplay rule**。
 - 正式 enemy AI、敵方 action／target policy 與 production 不支援 NPC 的長期處理方式仍未定。Phase 24 只在 sandbox 對 `TEST-enemy-*` 使用既有開發推進，不作敵方行動。
@@ -64,3 +64,12 @@
 ## Rule
 - 遇到上述未定義內容：標記 unresolved / TODO，向使用者回報。
 - 不要為了「讓程式完整」而自行創造正式世界規則。
+
+## Phase 26 Future / open commitments
+
+- **FUTURE REQUIRED：Save / State Repair System。** deterministic rules、verified evidence、backup、candidate validation、atomic apply、repair report；LLM 不猜 authoritative identity／resources。History 修復須證明目前 lineage 且沒有後續相關 mutation，單獨最新 Settlement HP 不足以重建目前 HP。
+- Persistent Settlement、Combat History／Statistics／Replay、Reward、Narration delivery／recovery／versioning、Resurrection、Persistent Enemy／Encounter composition、Persistent statuses／Formation 留待後續。
+- 未保存的 confirmed facts 或原文不能承諾追溯補回；未來 Reward identity 與 Save replay 需區分不同 completion。
+- Combat 推進 world time 的正式模型仍未定。Escape 的本場 enemy facts 不代表永久敵人死亡／傷勢／療傷規則。
+- 正式永久 capacity／modifier mechanic 尚未接入；Phase 26 只支援必要同步／clamp 契約與明確 TEST fixture，沒有新增正式玩家行動。
+- [已接受完整規格](PHASE_26_FINAL_SPEC.md) 與 [實作／相容限制](PHASE_26_IMPLEMENTATION_MAPPING.md)。Phase 27 未開始。

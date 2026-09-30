@@ -4,7 +4,7 @@ import pg from "pg";
 import { randomUUID } from "node:crypto";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { createLegacyPartyMembers } from "../src/domain/party-tactics.js";
-import type { GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "../src/domain/game.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
 import { buildApp } from "../src/server/app.js";
 import { createPersistedDomainSession } from "../src/server/domain-session.js";
@@ -44,11 +44,11 @@ test("資料庫快照必須重新通過完整 domain 驗證", () => {
     revision: "0",
     snapshot: { activity: "outside-combat", character: seed().character },
   };
-  assert.deepEqual(hydrateStateRow(valid), seed());
+  assert.deepEqual(hydrateStateRow(valid), createGameState(seed()));
   assert.deepEqual(hydrateStateRow({
     ...valid,
     snapshot: { ...valid.snapshot, exploration: seed().exploration },
-  }), seed());
+  }), createGameState(seed()));
   for (const row of [
     { ...valid, revision: "9007199254740992" },
     { ...valid, snapshot: { ...valid.snapshot, revision: 999 } },

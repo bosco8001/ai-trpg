@@ -20,7 +20,7 @@ import {
 import {
   SaveGameFailure,
   type SaveGameRepository,
-  type SaveSnapshotV1,
+  type SaveSnapshotV2,
   type StoredSaveSlot,
 } from "./contracts.js";
 
@@ -41,11 +41,9 @@ function summary(state: GameState, storage: "memory" | "postgres"): ExplorationS
   };
 }
 
-export function createSaveSnapshot(state: GameState): SaveSnapshotV1 {
+export function createSaveSnapshot(state: GameState): SaveSnapshotV2 {
   const validated = createGameState(state);
-  if (validated.activity === "in-combat" || validated.combat !== null) {
-    throw new SaveGameFailure("combat-not-supported");
-  }
+  if(!validated.phase26) throw new SaveGameFailure("migration-blocked");
   return {
     formatVersion: SAVE_FORMAT_VERSION,
     sourceRevision: validated.revision,
@@ -53,22 +51,30 @@ export function createSaveSnapshot(state: GameState): SaveSnapshotV1 {
   };
 }
 
-export function decodeSaveSnapshot(record: StoredSaveSlot): SaveSnapshotV1 {
+export function decodeSaveSnapshot(record: StoredSaveSlot): SaveSnapshotV2 {
   if (!Number.isSafeInteger(record.formatVersion) || record.formatVersion < 1) {
     throw new SaveGameFailure("invalid-save");
   }
-  if (record.formatVersion !== SAVE_FORMAT_VERSION) throw new SaveGameFailure("unsupported-format");
+  if (record.formatVersion !== 1 && record.formatVersion !== SAVE_FORMAT_VERSION) throw new SaveGameFailure("unsupported-format");
   if (!Number.isSafeInteger(record.sourceRevision) || record.sourceRevision < 0
     || !isRecord(record.snapshot)) {
     throw new SaveGameFailure("invalid-save");
+  }
+  if (record.formatVersion === 2) {
+    try {
+      const p=record.snapshot.phase26;
+      if (!isRecord(p) || Object.keys(p).some(k => ['runtimeGeneration','sequenceHighWater','narrativeLedger'].includes(k)) || !Array.isArray(p.history)) throw new Error('invalid');
+      const state=createGameState({...record.snapshot,revision:record.sourceRevision,phase26:{...p,runtimeGeneration:'save-validation',
+        sequenceHighWater:Math.max(0,...p.history.map(e => (e as {sequence?:number}).sequence ?? 0)),narrativeLedger:p.history}});
+      return {formatVersion:2,sourceRevision:record.sourceRevision,state:gameStateContents(state)};
+    } catch(error) {throw new SaveGameFailure('invalid-save',{cause:error});}
   }
   const legacy = exact(record.snapshot, ["activity", "character", "exploration"]);
   const current = exact(record.snapshot, ["activity", "character", "inventory", "exploration"]);
   if (!legacy && !current) throw new SaveGameFailure("invalid-save");
   const character = record.snapshot.character;
-  if (legacy && (!isRecord(character) || character.id !== "TEST-character")) {
-    throw new SaveGameFailure("invalid-save");
-  }
+  if (!isRecord(character)) throw new SaveGameFailure("invalid-save");
+  if (character.id !== "TEST-character") throw new SaveGameFailure("migration-blocked");
   try {
     const validated = createGameState({
       ...record.snapshot,
@@ -86,7 +92,7 @@ export function decodeSaveSnapshot(record: StoredSaveSlot): SaveSnapshotV1 {
   }
 }
 
-function occupied(record: StoredSaveSlot, snapshot: SaveSnapshotV1): Extract<SaveSlotSummary, { empty: false }> {
+function occupied(record: StoredSaveSlot, snapshot: SaveSnapshotV2): Extract<SaveSlotSummary, { empty: false }> {
   return {
     slotId: record.slotId,
     empty: false,
@@ -146,9 +152,6 @@ export function createSaveGameService(
       validateRequest(slotId, expectedRevision);
       try {
         const current = createGameState(await session.getState());
-        if (current.activity === "in-combat" || current.combat !== null) {
-          throw new SaveGameFailure("combat-not-supported");
-        }
         if (current.revision !== expectedRevision) throw new SaveGameFailure("stale-revision");
         const snapshot = createSaveSnapshot(current);
         const record = await repository.writeIfLiveRevision(slotId, snapshot, {
@@ -156,7 +159,7 @@ export function createSaveGameService(
           expectedRevision,
         });
         if (!record) throw new SaveGameFailure("stale-revision");
-        return { slot: occupied(record, decodeSaveSnapshot(record)), state: summary(current, storage) };
+        return { slot: occupied(record, decodeSaveSnapshot(record)), state: summary(current, storage), authoritative:{sandbox:false,storage,state:current} };
       } catch (error) {
         return safeFailure(error);
       }
@@ -165,9 +168,6 @@ export function createSaveGameService(
       validateRequest(slotId, expectedRevision);
       try {
         const current = createGameState(await session.getState());
-        if (current.activity === "in-combat" || current.combat !== null) {
-          throw new SaveGameFailure("combat-not-supported");
-        }
         if (current.revision !== expectedRevision) throw new SaveGameFailure("stale-revision");
         const record = await repository.read(slotId);
         if (!record) throw new SaveGameFailure("slot-empty");
@@ -178,7 +178,7 @@ export function createSaveGameService(
           if (result.code === "revision-limit") throw new SaveGameFailure("revision-limit");
           throw new SaveGameFailure("invalid-save");
         }
-        return { slot: occupied(record, snapshot), state: summary(result.state, storage) };
+        return { slot: occupied(record, snapshot), state: summary(result.state, storage), authoritative:{sandbox:false,storage,state:result.state} };
       } catch (error) {
         return safeFailure(error);
       }

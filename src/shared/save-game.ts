@@ -1,6 +1,7 @@
+import { isAuthoritativeGameStateResponse, type AuthoritativeGameStateResponse } from "./game-state.js";
 import { isExplorationStateSummary, type ExplorationLocationId, type ExplorationStateSummary } from "./exploration-action.js";
 
-export const SAVE_FORMAT_VERSION = 1 as const;
+export const SAVE_FORMAT_VERSION = 2 as const;
 export const SAVE_SLOT_IDS = [1, 2, 3] as const;
 export type SaveSlotId = typeof SAVE_SLOT_IDS[number];
 
@@ -9,7 +10,7 @@ export type SaveSlotSummary =
   | {
       readonly slotId: SaveSlotId;
       readonly empty: false;
-      readonly formatVersion: typeof SAVE_FORMAT_VERSION;
+      readonly formatVersion: 1 | typeof SAVE_FORMAT_VERSION;
       readonly sourceRevision: number;
       readonly savedAt: string;
       readonly locationId: ExplorationLocationId;
@@ -20,6 +21,7 @@ export interface SaveSlotsResponse {
 }
 
 export interface SaveOperationResponse {
+  readonly authoritative?: AuthoritativeGameStateResponse;
   readonly slot: Extract<SaveSlotSummary, { empty: false }>;
   readonly state: ExplorationStateSummary;
 }
@@ -44,7 +46,7 @@ export function isSaveSlotSummary(value: unknown): value is SaveSlotSummary {
   if (!isRecord(value) || !isSaveSlotId(value.slotId) || typeof value.empty !== "boolean") return false;
   if (value.empty) return exact(value, ["slotId", "empty"]);
   return exact(value, ["slotId", "empty", "formatVersion", "sourceRevision", "savedAt", "locationId"])
-    && value.formatVersion === SAVE_FORMAT_VERSION && isRevision(value.sourceRevision)
+    && (value.formatVersion === 1 || value.formatVersion === SAVE_FORMAT_VERSION) && isRevision(value.sourceRevision)
     && typeof value.savedAt === "string" && !Number.isNaN(Date.parse(value.savedAt))
     && (value.locationId === "TEST-forest-edge" || value.locationId === "TEST-ruin-entrance");
 }
@@ -56,6 +58,6 @@ export function isSaveSlotsResponse(value: unknown): value is SaveSlotsResponse 
 }
 
 export function isSaveOperationResponse(value: unknown): value is SaveOperationResponse {
-  return isRecord(value) && exact(value, ["slot", "state"])
+  return isRecord(value) && (exact(value, ["slot", "state"]) || exact(value,["slot","state","authoritative"]) && isAuthoritativeGameStateResponse(value.authoritative))
     && isSaveSlotSummary(value.slot) && !value.slot.empty && isExplorationStateSummary(value.state);
 }

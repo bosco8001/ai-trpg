@@ -1,5 +1,7 @@
 # Phase 10：Manual Save / Load
 
+> 以下保留 Phase 10 當時的 v1 格式紀錄。現行 Phase 26 已支援完整 v2 active／ended／Game Over Save／Load；最新契約及相容情況見 [Phase 26 驗證紀錄](PHASE_26_VERIFICATION.md)。
+
 > Phase 1–15 已由使用者確認。Phase 16 工程實作完成，等待使用者手動驗收；Phase 17 尚未開始。
 
 這一階段像拍下正式記分板的照片，再於需要時把照片內容重新寫到現在的記分板。拍照不改變比賽，所以 Save 不增加 revision；Load 是新的正式變更，所以只從目前 live revision 往前增加一次。

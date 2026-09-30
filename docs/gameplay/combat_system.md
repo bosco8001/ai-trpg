@@ -464,6 +464,8 @@ Prototype 中曾使用：
 
 ## 21. 戰鬥結算
 
+Phase 26 的 lifecycle、資源交接、Game Over、Save／Load 與返回探索以 [已接受完整規格](../development/PHASE_26_FINAL_SPEC.md) 為準。下列 XP／金錢／掉落物屬未來 Reward 範圍，Phase 26 不生成或發放，也不建立永久 Settlement／Combat History。
+
 戰鬥結束後：
 
 - 先顯示戰鬥結算。

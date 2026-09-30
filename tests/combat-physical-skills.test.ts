@@ -10,12 +10,12 @@ import {
 } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
 import { getActiveSkillDefinition } from "../src/domain/physical-skills.js";
-import { applyCommand, createGameState, type GameState } from "../src/domain/game.js";
+import { applyCommand, createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createCombatActionFixtureRoller, createCombatFixtureRoller, SequenceD20Roller } from "../src/server/combat/dice.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import { isAuthoritativeGameStateResponse, isPhysicalSkillOptionsResponse, isPhysicalSkillUseResponse } from "../src/shared/game-state.js";
 import { executePhysicalSkill, loadPhysicalSkillOptions } from "../src/web/api.js";

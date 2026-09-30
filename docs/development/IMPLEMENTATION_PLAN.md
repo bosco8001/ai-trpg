@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–25 已由使用者手動確認。Phase 26 尚未開始。
+Phase 1–25 已由使用者手動確認。Phase 26 工程完成，等待使用者手動驗收；Phase 27 未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -293,6 +293,16 @@ CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migrati
 
 ## Phase 25 交付紀錄
 
-所有戰鬥參與者新增權威 HP／生命狀態。僅已知 TEST 角色可使用明確標示的工程 HP fixture；未知舊參與者若缺 health 會安全拒絕。generic damage transition 負責扣 HP、進入瀕死／死亡、中斷詠唱、勝敗與回合行動者正規化；正式武器、技能、法術與龍息傷害公式仍未定案。瀕死者只在自己的回合倒數並自動跳過；死者保留在名冊與回合順序但不可行動或一般受擊。玩家可手動選擇瀕死隊友救助，隊友在自己的回合按剩餘回合、玩家身分與 turnOrder 固定排序優先救助。每次成功 transition 只增加一個 revision；冷卻與排位保留。勝敗優先序、TEST 傷害入口、Phase 23 已確認事實敘事、Phase 24 自動節奏、React HP／救助畫面與 JSONB 保存均已接通。沒有關聯式 schema 變更或新 migration。完整操作與預期結果見 [Phase 25 手動驗收文件](PHASE_25_DYING_RESCUE_DEATH.md)。Phase 25 已由使用者完成並確認手動驗收；Phase 26 尚未開始。
+所有戰鬥參與者新增權威 HP／生命狀態。僅已知 TEST 角色可使用明確標示的工程 HP fixture；未知舊參與者若缺 health 會安全拒絕。generic damage transition 負責扣 HP、進入瀕死／死亡、中斷詠唱、勝敗與回合行動者正規化；正式武器、技能、法術與龍息傷害公式仍未定案。瀕死者只在自己的回合倒數並自動跳過；死者保留在名冊與回合順序但不可行動或一般受擊。玩家可手動選擇瀕死隊友救助，隊友在自己的回合按剩餘回合、玩家身分與 turnOrder 固定排序優先救助。每次成功 transition 只增加一個 revision；冷卻與排位保留。勝敗優先序、TEST 傷害入口、Phase 23 已確認事實敘事、Phase 24 自動節奏、React HP／救助畫面與 JSONB 保存均已接通。沒有關聯式 schema 變更或新 migration。完整操作與預期結果見 [Phase 25 手動驗收文件](PHASE_25_DYING_RESCUE_DEATH.md)。Phase 25 已由使用者完成並確認手動驗收；Phase 26 工程交付見下節。
 
 工程檢查：`npm test` 使用隔離 `ai_trpg_phase25_test` PostgreSQL 資料庫，272 項通過、0 失敗、0 略過；`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過。Dry-run 顯示沒有待執行 migration。Phase 25 手動驗收其後已由使用者完成並確認全部通過。
+
+## Phase 26 交付紀錄
+
+依 [完整已接受規格](PHASE_26_FINAL_SPEC.md) 與 [Canon 追溯索引](PHASE_26_CANON_INDEX.md)，完成 Persistent Party → Combat → ended → Settlement → Exploration。Participant 明確映射長期 Character；Start 繼承資源，結算集中處理 active／dying／dead、Party order／物品保留、來源 Encounter 與 return context，revision 只加一次。Game Over 不結算；結果頁需明確繼續。永久 capacity 僅保留必要 domain 契約，不新增玩家玩法。
+
+PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久化 generation、allocator 與 first-write-wins Entry 身分帳；migration 提供 run identity 與敘事去重保障。Save Format v2 保存完整 mutable Gameplay 與已保存 History；Load 同 run、revision 前進、新 generation、CombatId 與 Entry provenance 保留。舊 v1 已知 TEST 映射保留原列，缺必要 world references 則 migration-blocked。前端接通 Continue／blocking recovery／Game Over／系統存檔／探索 History；timeout／conflict 不自動重送 mutation。
+
+工程檢查：隔離 `ai_trpg_phase26_final_test` PostgreSQL 的 `npm test` 303 項通過、0 失敗、0 略過；typecheck、build、全新與已套用 migration dry-run、diff 檢查通過；實際 API 程序三次重啟與四種 Memory TEST 情境產生器通過。完整證據及限制見 [驗證紀錄](PHASE_26_VERIFICATION.md)，逐節對照見 [實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)。
+
+**Phase 26 工程完成，等待使用者手動驗收。** [手動驗收清單與第一步](PHASE_26_SETTLEMENT_ACCEPTANCE.md)。沒有自行 commit／push，Phase 27 未開始。FUTURE REQUIRED Repair、Persistent Settlement／Combat History／Statistics／Replay、Reward、Narration delivery／recovery／versioning、Resurrection、Persistent Enemy／Encounter composition、Persistent statuses／Formation 與 world time open commitment 均保留。

@@ -33,16 +33,17 @@ export function getCombatPartyOptions(state: GameState): CombatPartyOptions {
     context,
     canChangeTacticPreference: context === "active-combat",
     companions: Object.freeze(state.partyMembers.map((member) => {
-      const combatant = state.combat?.participants.find((entry) => entry.id === member.id
+      const combatant = state.combat?.participants.find((entry) => entry.characterId === member.id
         && entry.controlledBy === "companion");
+      const persistent=state.phase26?.characters.find(c=>c.characterId === member.id);
       return Object.freeze({
         id: member.id,
         displayName: member.displayName,
         // Combat HP is projected from CombatParticipant; PartyMemberState never stores a copy.
         level: null,
         row: combatant?.row ?? null,
-        hp: combatant ? { current: combatant.health.currentHp, maximum: combatant.health.maxHp } : null,
-        mp: null,
+        hp: combatant ? { current: combatant.health.currentHp, maximum: combatant.health.maxHp } : persistent ? {current:persistent.currentHp,maximum:persistent.maxHp} : null,
+        mp: combatant?.mp ? {current:combatant.mp.currentMp,maximum:combatant.mp.maxMp} : persistent ? {current:persistent.currentMp,maximum:persistent.maxMp} : null,
         tacticPreferenceId: member.tacticPreferenceId,
       });
     })),

@@ -37,7 +37,7 @@ export function SaveSlotsPanel({
     <section className="save-slots" aria-labelledby="save-slots-heading" aria-busy={loading || busySlotId !== null || undefined}>
       <div className="save-slots__intro">
         <h3 id="save-slots-heading">手動存檔</h3>
-        <p>只保存 authoritative GameState。探索紀錄、敘事與輸入文字不在存檔內。</p>
+        <p>保存完整玩法、戰鬥與已保存的敘事紀錄；尚未保存的文字不會等待。</p>
       </div>
       {loading ? <p role="status">正在讀取存檔槽……</p> : null}
       {!loading && slots ? (

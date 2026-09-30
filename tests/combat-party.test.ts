@@ -1,3 +1,4 @@
+import {createGameState as hydrateLegacy} from "../src/domain/game.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -6,18 +7,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import test from "node:test";
 import pg from "pg";
 import {
-  advanceCombatTurn,
+  advanceCombatTurn, resolveCompanionTurn,
   runFromCombat,
   startCasting,
   startCombat,
 } from "../src/domain/combat.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import { getCombatPartyOptions, setCompanionTacticPreference } from "../src/domain/party.js";
 import { createLegacyPartyMembers } from "../src/domain/party-tactics.js";
 import { buildApp } from "../src/server/app.js";
-import { createCombatEscapeFixtureRoller, createCombatFixtureRoller } from "../src/server/combat/dice.js";
-import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
+import { createCombatEscapeFixtureRoller, createPhase22CombatFixtureRoller } from "../src/server/combat/dice.js";
+import { PHASE22_TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import { isCombatPartyOptionsResponse, isCompanionTacticPreferenceResponse } from "../src/shared/game-state.js";
@@ -49,8 +50,8 @@ function requireOk<T extends { readonly ok: boolean }>(result: T): asserts resul
 }
 
 function activeCombat(initial = seed()): GameState {
-  const result = startCombat(initial, { expectedRevision: initial.revision }, TEST_COMBAT_PARTICIPANTS,
-    createCombatFixtureRoller("normal"));
+  const result = startCombat(initial, { expectedRevision: initial.revision }, PHASE22_TEST_COMBAT_PARTICIPANTS,
+    createPhase22CombatFixtureRoller("normal"));
   requireOk(result);
   return result.state;
 }
@@ -81,12 +82,12 @@ test("Party options 是伺服器推導唯讀資料，顯示明確的權威資料
   assert.equal(options.canChangeTacticPreference, true);
   assert.equal(options.companions[0]?.id, "TEST-companion-1");
   assert.equal(options.companions[0]?.level, null);
-  assert.equal(options.companions[0]?.row, null);
-  assert.equal(options.companions[0]?.hp, null);
-  assert.equal(options.companions[0]?.mp, null);
+  assert.equal(options.companions[0]?.row, "back");
+  assert.deepEqual(options.companions[0]?.hp, {current:8,maximum:8});
+  assert.deepEqual(options.companions[0]?.mp, {current:0,maximum:0});
   assert.deepEqual(session.getState(), before);
-  assert.deepEqual(initial.combat?.turnOrder, ["TEST-enemy-1", "TEST-player", "TEST-enemy-2"]);
-  assert.ok(!initial.combat?.turnOrder.includes("TEST-companion-1"));
+  assert.deepEqual(initial.combat?.turnOrder, ["TEST-enemy-1", "TEST-player", "TEST-enemy-2", "TEST-companion-1"]);
+  assert.ok(initial.combat?.turnOrder.includes("TEST-companion-1"));
 });
 
 test("偏好變更只更新偏好與 revision，回合及所有 combat facts 原樣保留", () => {
@@ -132,21 +133,22 @@ test("active casting 期間可更改偏好，詠唱、MP 與目前 actor 不變"
   const started = startCasting(state, { expectedRevision: state.revision, skillId: "TEST-skill-2" });
   requireOk(started);
   state = started.state;
-  for (let i = 0; i < 2; i += 1) {
-    const next = advanceCombatTurn(state, { expectedRevision: state.revision });
+  for (let i = 0; i < 3; i += 1) {
+    const actor=state.combat!.participants.find(p=>p.id===state.combat!.currentActorId);
+    const next = actor?.controlledBy === "companion" ? resolveCompanionTurn(state,{expectedRevision:state.revision},{d20:()=>10}) : advanceCombatTurn(state, { expectedRevision: state.revision });
     requireOk(next);
     state = next.state;
   }
   assert.equal(state.combat?.currentActorId, "TEST-player");
   assert.equal(state.combat?.activeCastings[0]?.completedCastingTurns, 1);
-  const beforeMp = state.character.currentMp;
+  const beforeMp = state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp;
   const beforeCombat = state.combat;
   const result = setCompanionTacticPreference(state, {
     expectedRevision: state.revision, companionId: "TEST-companion-1", tacticPreferenceId: "TEST-tactic-b",
   });
   requireOk(result);
   assert.equal(result.state.revision, state.revision + 1);
-  assert.equal(result.state.character.currentMp, beforeMp);
+  assert.equal(result.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, beforeMp);
   assert.deepEqual(result.state.combat, beforeCombat);
   assert.equal(result.state.combat?.currentActorId, "TEST-player");
 });
@@ -164,7 +166,7 @@ test("同一偏好選擇是無 revision 的 idempotent no-op", () => {
 
 test("嚴格驗證 stale revision、不明隊友、不明偏好與注入欄位，全部拒絕且不改 state", async (t) => {
   const session = createDomainSession(seed());
-  const app = await buildApp({ domainSession: session, combatSandbox: true, combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
+  const app = await buildApp({ domainSession: session, domainSandbox: true, combatSandbox: true, combatParticipants: PHASE22_TEST_COMBAT_PARTICIPANTS, combatRoller: createPhase22CombatFixtureRoller("normal") });
   t.after(() => app.close());
   const started = await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } });
   assert.equal(started.statusCode, 200);
@@ -186,8 +188,8 @@ test("嚴格驗證 stale revision、不明隊友、不明偏好與注入欄位�
 
 test("GET Party options 不改狀態； ended combat 保持可讀且偏好唯讀", async (t) => {
   const session = createDomainSession(seed());
-  const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"), combatEscapeRoller: createCombatEscapeFixtureRoller("success") });
+  const app = await buildApp({ domainSession: session, domainSandbox: true, combatSandbox: true,
+    combatParticipants: PHASE22_TEST_COMBAT_PARTICIPANTS, combatRoller: createPhase22CombatFixtureRoller("normal"), combatEscapeRoller: createCombatEscapeFixtureRoller("success") });
   t.after(() => app.close());
   await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } });
   const readBefore = session.getState();
@@ -217,8 +219,8 @@ test("GET Party options 不改狀態； ended combat 保持可讀且偏好唯讀
 
 test("Memory API 設定偏好後再次 GET，偏好保存且 combat snapshot 不變", async (t) => {
   const session = createDomainSession(seed());
-  const app = await buildApp({ domainSession: session, combatSandbox: true,
-    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
+  const app = await buildApp({ domainSession: session, domainSandbox: true, combatSandbox: true,
+    combatParticipants: PHASE22_TEST_COMBAT_PARTICIPANTS, combatRoller: createPhase22CombatFixtureRoller("normal") });
   t.after(() => app.close());
   const started = await app.inject({ method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 } });
   assert.equal(started.statusCode, 200);
@@ -244,7 +246,7 @@ test("Memory API 設定偏好後再次 GET，偏好保存且 combat snapshot 不
 
 test("舊 Phase 1–20 snapshot 只替 TEST 隊友補工程偏好；正式角色不補選項", () => {
   const legacyTest = seed();
-  const hydratedTest = createGameState({
+  const hydratedTest = hydrateLegacy({
     revision: legacyTest.revision, activity: legacyTest.activity, character: legacyTest.character,
     inventory: legacyTest.inventory, exploration: legacyTest.exploration, combat: legacyTest.combat,
   });
@@ -252,12 +254,12 @@ test("舊 Phase 1–20 snapshot 只替 TEST 隊友補工程偏好；正式角色
     id: "TEST-companion-1", displayName: "TEST 隊友", tacticPreferenceId: "TEST-tactic-a",
   }]);
 
-  const { partyMembers: _legacyParty, ...legacyBase } = legacyTest;
+  const { partyMembers: _legacyParty, phase26:_phase26, ...legacyBase } = legacyTest;
   const formal = createGameState({ ...legacyBase, character: {
     ...legacyTest.character, id: "PLAYER-1", raceId: null, dragonBreathElement: null,
   } });
   assert.deepEqual(formal.partyMembers, []);
-  const unknownPreference = createGameState({ ...legacyTest, partyMembers: [
+  const unknownPreference = createGameState({ ...legacyTest, phase26:{...legacyTest.phase26!,characters:[...legacyTest.phase26!.characters,{...legacyTest.phase26!.characters[1]!,characterId:"COMPANION-1",displayName:"同行者"}]}, partyMembers: [
     { id: "COMPANION-1", displayName: "同行者", tacticPreferenceId: "legacy-static-id" },
   ] });
   assert.equal(unknownPreference.partyMembers[0]?.tacticPreferenceId, "legacy-static-id");
@@ -278,7 +280,8 @@ test("PostgreSQL 舊 snapshot hydrate 時補 TEST fixture，不替正式角色�
   assert.equal(hydratedTest.partyMembers[0]?.id, "TEST-companion-1");
   assert.equal(hydratedTest.partyMembers[0]?.tacticPreferenceId, "TEST-tactic-a");
 
-  const formal = createGameState({ ...legacyTest, character: {
+  const {phase26:_discard,...formalBase}=legacyTest;
+  const formal = createGameState({ ...formalBase, character: {
     ...legacyTest.character, id: "PLAYER-1", raceId: null, dragonBreathElement: null,
   } });
   const hydratedFormal = hydrateStateRow({
@@ -352,8 +355,8 @@ test("PostgreSQL Party preference survives a new API session and pool", {
   const poolA = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 2 });
   const repositoryA = new PostgresGameStateRepository(poolA);
   const sessionA = createPersistedDomainSession(repositoryA, initial);
-  const appA = await buildApp({ domainSession: sessionA, storage: "postgres", combatSandbox: true,
-    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
+  const appA = await buildApp({ domainSession: sessionA, storage: "postgres", domainSandbox: true, combatSandbox: true,
+    combatParticipants: PHASE22_TEST_COMBAT_PARTICIPANTS, combatRoller: createPhase22CombatFixtureRoller("normal") });
   let poolB: pg.Pool | undefined;
   let appB: Awaited<ReturnType<typeof buildApp>> | undefined;
   let appAClosed = false;
@@ -377,8 +380,8 @@ test("PostgreSQL Party preference survives a new API session and pool", {
     poolB = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 2 });
     const repositoryB = new PostgresGameStateRepository(poolB);
     const sessionB = createPersistedDomainSession(repositoryB, initial);
-    appB = await buildApp({ domainSession: sessionB, storage: "postgres", combatSandbox: true,
-      combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal") });
+    appB = await buildApp({ domainSession: sessionB, storage: "postgres", domainSandbox: true, combatSandbox: true,
+      combatParticipants: PHASE22_TEST_COMBAT_PARTICIPANTS, combatRoller: createPhase22CombatFixtureRoller("normal") });
     const stateResponse = await appB.inject("/api/game-state");
     assert.equal(stateResponse.statusCode, 200);
     const reloaded = stateResponse.json().state;

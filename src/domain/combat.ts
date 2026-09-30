@@ -1,3 +1,4 @@
+import { phase26, newIdentity, validateCombatReferences } from "./settlement.js";
 import {
   createCombatState,
   type CombatNormalAttackProfile,
@@ -45,6 +46,7 @@ export interface CombatParticipantSeed {
   readonly racialEscapeModifier?: 0 | -2;
   readonly controlledBy?: "companion";
   readonly health?: CombatHealth;
+  readonly characterId?: string;
 }
 
 export type CombatTransitionCode = "invalid-command" | "stale-revision" | "revision-limit"
@@ -226,7 +228,7 @@ export function startCasting(state: GameState, input: unknown): CastingResult {
   if (definition.category !== "magic-active") return rejectCasting("not-magic-skill");
   if (!state.character.learnedActiveSkillIds.includes(command.skillId)) return rejectCasting("skill-not-learned");
   if (!state.character.equippedSkillIds.includes(command.skillId)) return rejectCasting("skill-not-equipped");
-  if (state.character.currentMp < definition.totalMpCost) return rejectCasting("insufficient-mp");
+  if (combat.participants.find(p => p.id === actorId)!.mp!.currentMp < definition.totalMpCost) return rejectCasting("insufficient-mp");
   const casting: CastingState = {
     actorId, skillId: command.skillId, startedRound: combat.round, completedCastingTurns: 1,
     totalCastingTurns: definition.castingTurns, totalMpCost: definition.totalMpCost,
@@ -240,7 +242,7 @@ export function startCasting(state: GameState, input: unknown): CastingResult {
   const nextCombat = createCombatState({ ...advanceToNextTurn(combat),
     activeCastings: [...combat.activeCastings, casting], lastAction });
   return { ok: true, state: createGameState({ ...state, revision: state.revision + 1,
-    character: { ...state.character, currentMp: state.character.currentMp - definition.perTurnMpCost }, combat: nextCombat }),
+    combat: createCombatState({...nextCombat,participants:nextCombat.participants.map(p => p.id === actorId ? {...p,mp:{...p.mp!,currentMp:p.mp!.currentMp-definition.perTurnMpCost}} : p)}) }),
   effect: { type: "casting-started" } };
 }
 
@@ -254,7 +256,7 @@ export function continueCasting(state: GameState, input: unknown): CastingResult
   if (!casting) return rejectCasting("not-casting");
   const definition = getActiveSkillDefinition(casting.skillId);
   if (!definition || definition.category !== "magic-active") return rejectCasting("unknown-skill");
-  if (state.character.currentMp < definition.perTurnMpCost) return rejectCasting("insufficient-mp");
+  if (combat.participants.find(p => p.id === actorId)!.mp!.currentMp < definition.perTurnMpCost) return rejectCasting("insufficient-mp");
   const completedCastingTurns = casting.completedCastingTurns + 1;
   const totalMpSpent = casting.mpSpent + definition.perTurnMpCost;
   const completed = completedCastingTurns === casting.totalCastingTurns;
@@ -267,7 +269,7 @@ export function continueCasting(state: GameState, input: unknown): CastingResult
   if (!completed) activeCastings.push({ ...casting, completedCastingTurns, mpSpent: totalMpSpent });
   const nextCombat = createCombatState({ ...advanceToNextTurn(combat), activeCastings, lastAction });
   return { ok: true, state: createGameState({ ...state, revision: state.revision + 1,
-    character: { ...state.character, currentMp: state.character.currentMp - definition.perTurnMpCost }, combat: nextCombat }),
+    combat: createCombatState({...nextCombat,participants:nextCombat.participants.map(p => p.id === actorId ? {...p,mp:{...p.mp!,currentMp:p.mp!.currentMp-definition.perTurnMpCost}} : p)}) }),
   effect: { type: completed ? "casting-completed" : "casting-continued" } };
 }
 
@@ -687,11 +689,14 @@ export function usePhysicalSkill(state: GameState, input: unknown, roller: DiceR
     effect: { type: "physical-skill-resolved", outcome: check.outcome } };
 }
 
+export interface CombatStartContext {readonly sourceEncounterId:string|null;readonly rewardEligibleOnVictory:boolean}
+
 export function startCombat(
   state: GameState,
   input: unknown,
   participants: readonly CombatParticipantSeed[],
   roller: DiceRoller,
+  context: CombatStartContext = {sourceEncounterId:null,rewardEligibleOnVictory:false},
 ): CombatTransitionResult {
   const expectedRevision = parseExpectedRevision(input);
   if (expectedRevision === undefined) return reject("invalid-command");
@@ -700,8 +705,26 @@ export function startCombat(
   if (state.activity === "in-combat" || state.combat !== null) return reject("already-in-combat");
   try {
     const roster = participants.filter((participant) => participant.controlledBy !== "companion"
-      || state.partyMembers.some((member) => member.id === participant.id));
-    const combat = rollInitiative(roster, roller);
+      || state.partyMembers.some((member) => member.id === (participant.characterId ?? participant.id)));
+    createGameState(state);
+    const p = phase26(state);
+    const seeded = roster.map(c => {
+      if (c.side === 'enemy') return c;
+      const characterId = c.characterId ?? (p.fixtureId === 'phase26-test-v1' ? c.id === 'TEST-player' ? state.character.id : c.id : undefined);
+      const character = p.characters.find(r => r.characterId === characterId);
+      if (!character || character.lifeState !== 'active') throw new Error('缺少有效長期角色。');
+      return {...c,characterId,health:{maxHp:character.maxHp,currentHp:character.currentHp,lifeState:'active' as const,dyingTurnsRemaining:null}};
+    });
+    const rolled = rollInitiative(seeded, roller);
+    const combat = createCombatState({...rolled,lifecycle:{combatId:newIdentity(),runId:p.runId,worldId:p.worldId,fixtureId:p.fixtureId,
+      sourceEncounterId:context.sourceEncounterId,returnExplorationContext:state.exploration,rewardEligibleOnVictory:p.fixtureId === null && context.rewardEligibleOnVictory},
+      participants:rolled.participants.map(c => {
+        const seed = seeded.find(s => s.id === c.id)!;
+        const characterId = seed.side === 'party' ? seed.characterId! : null;
+        const character = p.characters.find(r => r.characterId === characterId);
+        return {...c,characterId,...(character ? {mp:{currentMp:character.currentMp,maxMp:character.maxMp}} : {})};
+      })});
+    validateCombatReferences({...state,combat});
     return {
       ok: true,
       state: createGameState({

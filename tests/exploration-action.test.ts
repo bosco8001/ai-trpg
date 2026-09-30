@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyCommand, createGameState, validateCandidateAction, type GameState } from "../src/domain/game.js";
+import { applyCommand, createGameState, validateCandidateAction, type GameState } from "./helpers/phase26-fixture.js";
 import { buildApp } from "../src/server/app.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { createExplorationActionService } from "../src/server/exploration/action-service.js";

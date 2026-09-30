@@ -1,3 +1,6 @@
+import { orderedHistory } from "../shared/narrative.js";
+import type { AuthoritativeGameStateResponse } from "../shared/game-state.js";
+import { loadAuthoritativeGameState } from "./api.js";
 import { useEffect, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Button } from "./ui/Button.js";
 import { Icon, type IconName } from "./ui/Icon.js";
@@ -75,12 +78,17 @@ function trapDrawerFocus(event: ReactKeyboardEvent<HTMLElement>) {
 
 export function ExplorationPage({
   connectionState,
-  onRetryConnection,
+  onRetryConnection, authoritativeState, onStateUpdate, onRetryState, presentation, onHistoryEntry,
 }: {
   connectionState: ConnectionState;
   onRetryConnection?: () => void;
+  authoritativeState?:AuthoritativeGameStateResponse;
+  onStateUpdate?:(state:AuthoritativeGameStateResponse)=>void;
+  onHistoryEntry?:(entry:import("../shared/narrative.js").NarrativeEntry,generation:string)=>void;
+  onRetryState?:()=>Promise<AuthoritativeGameStateResponse>;
+  presentation?:{text:string|null;warning:string}|null;
 }) {
-  const [entries, setEntries] = useState<readonly NarrativeEntry[]>(initialNarrativeEntries);
+  const [entries, setEntries] = useState<readonly NarrativeEntry[]>(authoritativeState ? [] : initialNarrativeEntries);
   const [composer, dispatchComposer] = useReducer(actionComposerReducer, initialActionComposerState);
   const [activeUtility, dispatchUtility] = useReducer(utilityPanelReducer, null);
   const [feedback, setFeedback] = useState("介面測試模式：輸入只會暫存在這個頁面。 ");
@@ -92,6 +100,11 @@ export function ExplorationPage({
   const [saveConfirmation, setSaveConfirmation] = useState<SaveConfirmation | null>(null);
   const [busySlotId, setBusySlotId] = useState<SaveSlotId | null>(null);
   const entryId = useRef(0);
+  const live=useRef(true);
+  useEffect(()=>{live.current=true;document.getElementById('main-content')?.focus();return()=>{live.current=false;};},[]);
+  useEffect(()=>{if(authoritativeState) setGameState({revision:authoritativeState.state.revision,...authoritativeState.state.exploration,storage:authoritativeState.storage});},[authoritativeState]);
+  const formalEntries:readonly NarrativeEntry[] = orderedHistory(authoritativeState?.state.phase26?.history ?? []).map(e=>({id:e.id,source:'narration',label:e.type === 'post-combat' ? '戰後敘事' : '探索敘事',text:e.text}));
+  const legacyEntries:readonly NarrativeEntry[] = (authoritativeState?.state.phase26?.history ?? []).filter(e=>e.category === 'legacy-unplaced').map(e=>({id:e.id,source:'narration',label:'舊版紀錄',text:e.text}));
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const historyEndRef = useRef<HTMLDivElement>(null);
   const drawerCloseRef = useRef<HTMLButtonElement>(null);
@@ -102,6 +115,7 @@ export function ExplorationPage({
   const suggestedActions = getSuggestedActions(gameState?.locationId ?? "TEST-forest-edge");
 
   useEffect(() => {
+    if(authoritativeState) return;
     let disposed = false;
     void loadExplorationState()
       .then((state) => { if (!disposed) setGameState(state); })
@@ -173,13 +187,15 @@ export function ExplorationPage({
       ? saveGame(slotId, gameState.revision)
       : loadGame(slotId, gameState.revision);
     void operation.then((response) => {
+      if(!live.current) return;
       updateSlot(response.slot);
       setGameState(response.state);
       setSaveConfirmation(null);
       if (kind === "load") {
-        setEntries(narrativeEntriesAfterLoad(slotId));
+        if(response.authoritative && onStateUpdate) onStateUpdate({...response.authoritative,sandbox:authoritativeState?.sandbox ?? false});
+        setEntries(authoritativeState ? [] : narrativeEntriesAfterLoad(slotId));
         dispatchComposer({ type: "submitted" });
-        setFeedback(`已載入存檔 ${slotId}；本頁舊探索紀錄已清除。`);
+        setFeedback(`已載入存檔 ${slotId}；已恢復存檔中的探索紀錄。`);
         setSaveFeedback(`已載入存檔 ${slotId}。權威狀態版本現在是 ${response.state.revision}。`);
       } else {
         setSaveFeedback(`存檔 ${slotId} 已儲存；live revision 維持 ${response.state.revision}。`);
@@ -202,34 +218,40 @@ export function ExplorationPage({
     setFeedback(next.feedback ?? "正在解析、裁定並整理敘事……");
     processingRef.current = true;
     setIsProcessing(true);
-    void executeExplorationAction(text, gameState.revision).then((response) => {
+    void executeExplorationAction(text, gameState.revision).then(async (response) => {
+      if(response.narrativeDelivery?.status === "saved") onHistoryEntry?.(response.narrativeDelivery.entry,response.narrativeDelivery.generation);
+      if(!live.current) return;
       entryId.current += 1;
       const id = entryId.current;
       const additions: NarrativeEntry[] = [
         { id: `interpretation-${id}`, source: "interpretation", label: "候選解析（固定測試）", text: describeCandidate(response.candidate) },
         { id: `ruling-${id}`, source: "ruling", label: "系統裁定（權威）", text: describeRuling(response.ruling) },
       ];
-      if (response.narration.status === "ready") {
+      if (!authoritativeState && response.narration.status === "ready") {
         additions.push({ id: `narration-${id}`, source: "narration", label: "探索敘事（固定測試）", text: response.narration.text });
-      } else if (response.narration.status !== "not-requested") {
+      } else if (!authoritativeState && response.narration.status !== "not-requested") {
         additions.push({ id: `narration-${id}`, source: "system", label: "探索敘事暫時不可用", text: response.narration.text });
       }
+      if(authoritativeState && response.narrativeDelivery?.status === "unsaved" && response.narration.text) additions.push({id:`unsaved-${id}`,source:"narration",label:"探索文字（未保存）",text:response.narration.text});
       setEntries((current) => [...current, ...additions]);
-      setGameState(response.state);
-      setFeedback(response.ruling.accepted && response.narration.status === "ready"
+      setGameState(current=>current && current.revision > response.state.revision ? current : response.state);
+      if(onStateUpdate) {try {const state=await loadAuthoritativeGameState();if(live.current) onStateUpdate(state);} catch {setFeedback("行動回應已收到；完整狀態目前無法重新讀取。");return;}}
+      setFeedback(response.narrativeDelivery?.status === "unsaved" ? "行動已完成；本次探索文字未保存。" : response.ruling.accepted && response.narration.status === "ready"
         ? "權威狀態已更新，探索敘事已整理完成。"
         : response.ruling.accepted
           ? "權威狀態已更新；探索敘事暫時不可用。"
           : "行動未執行；權威狀態未被這次請求修改。");
     }).catch(() => {
+      if(!live.current) return;
       entryId.current += 1;
       setEntries((current) => [...current, {
         id: `interpretation-${entryId.current}`,
         source: "system",
         label: "解析暫時不可用",
-        text: "探索解析或裁定暫時不可用；你的文字仍只在本頁紀錄，沒有更新遊戲狀態。",
+        text: "探索回應尚未確認；正在重新讀取目前狀態。",
       }]);
-      setFeedback("探索解析或裁定暫時不可用；請稍後再試。");
+      setFeedback("探索回應尚未確認，請重新讀取目前狀態；不會自動重送行動。");
+      if(onRetryState) void onRetryState().catch(()=>undefined);
     }).finally(() => {
       processingRef.current = false;
       setIsProcessing(false);
@@ -278,7 +300,10 @@ export function ExplorationPage({
             ) : <p role="status">正在讀取權威探索狀態……</p>}
           </section>
 
-          <NarrativeHistory entries={entries} />
+          <NarrativeHistory entries={formalEntries} />
+              {legacyEntries.length ? <section aria-label="舊版紀錄"><h3>舊版紀錄</h3><NarrativeHistory entries={legacyEntries}/></section> : null}
+              {presentation ? <div role="status">{presentation.text ? <p>{presentation.text}</p> : null}<p>{presentation.warning}</p></div> : null}
+              <NarrativeHistory entries={entries} />
           <div ref={historyEndRef} aria-hidden="true" />
 
           <section className="suggested-actions" aria-labelledby="suggested-actions-heading" aria-busy={isProcessing || undefined}>

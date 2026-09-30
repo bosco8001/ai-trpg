@@ -5,9 +5,9 @@ import test from "node:test";
 import pg from "pg";
 import { advanceCombatTurn, startCombat } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createCombatFixtureRoller, RandomD20Roller, SequenceD20Roller } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
@@ -102,7 +102,7 @@ test("tie fixture 只重擲同分者，再次同點時只讓仍平手者繼續�
 
 test("平手順序由重擲決定，不以 ID、字母或輸入順序代替", () => {
   const started = requireStarted(startCombat(seed(), { expectedRevision: 0 }, [
-    { id: "TEST-a", displayName: "TEST A", side: "party", row: "front", dexterityModifier: 0, normalAttack: null,
+    { id: "TEST-a", characterId:"TEST-character", displayName: "TEST A", side: "party", row: "front", dexterityModifier: 0, normalAttack: null,
       health: { maxHp: 10, currentHp: 10, lifeState: "active", dyingTurnsRemaining: null } },
     { id: "TEST-z", displayName: "TEST Z", side: "enemy", row: "front", dexterityModifier: 0, normalAttack: null,
       health: { maxHp: 6, currentHp: 6, lifeState: "active", dyingTurnsRemaining: null } },
@@ -220,23 +220,12 @@ test("active combat 阻擋探索且不呼叫 narrator，也不改 exploration �
   assert.equal((await session.getState()).combat?.currentActorId, "TEST-enemy-1");
 });
 
-test("戰鬥中的 Save 與 Load 暫時安全拒絕，Save Format v1 不含 combat 且 revision 不變", async () => {
-  const session = createDomainSession(seed());
-  const repository = new InMemorySaveGameRepository(() => session.getState());
-  const saves = createSaveGameService(repository, session, "memory");
-  await saves.save(1, 0);
-  const started = await session.startCombat(
-    { expectedRevision: 0 }, TEST_COMBAT_PARTICIPANTS, createCombatFixtureRoller("normal"),
-  );
-  assert.equal(started.ok, true);
-  await expectSaveFailure(saves.save(2, 1), "combat-not-supported");
-  await expectSaveFailure(saves.load(1, 1), "combat-not-supported");
-  const state = await session.getState();
-  assert.equal(state.revision, 1);
-  assert.equal(state.activity, "in-combat");
-  const stored = await repository.read(1);
-  assert.ok(stored);
-  assert.equal("combat" in (stored.snapshot as object), false);
+test("Format v2 saves and loads active Combat without changing identity", async () => {
+  const session=createDomainSession(seed()),repository=new InMemorySaveGameRepository(()=>session.getState()),saves=createSaveGameService(repository,session,'memory');
+  const started=session.startCombat({expectedRevision:0},TEST_COMBAT_PARTICIPANTS,createCombatFixtureRoller('normal'));assert.equal(started.ok,true);
+  const id=session.getState().combat!.lifecycle!.combatId;
+  await saves.save(1,1);assert.equal(session.getState().revision,1);
+  await saves.load(1,1);assert.equal(session.getState().revision,2);assert.equal(session.getState().combat!.lifecycle!.combatId,id);
 });
 
 test("dev combat sandbox 驗證 request、structured state、stale 與 production 關閉", async (t) => {
@@ -276,33 +265,14 @@ test("dev combat sandbox 驗證 request、structured state、stale 與 productio
   assert.equal((await production.inject("/api/dev/combat")).statusCode, 404);
 });
 
-test("Save / Load API 在 active combat 回安全 engineering safeguard，不修改 revision", async (t) => {
-  const session = createDomainSession(seed());
-  const saveRepository = new InMemorySaveGameRepository(() => session.getState());
-  const app = await buildApp({
-    domainSession: session,
-    saveGameRepository: saveRepository,
-    combatSandbox: true,
-    combatParticipants: TEST_COMBAT_PARTICIPANTS, combatRoller: createCombatFixtureRoller("normal"),
-  });
-  t.after(() => app.close());
-  assert.equal((await app.inject({
-    method: "PUT", url: "/api/save-slots/1", payload: { expectedRevision: 0 },
-  })).statusCode, 200);
-  assert.equal((await app.inject({
-    method: "POST", url: "/api/dev/combat/start", payload: { expectedRevision: 0 },
-  })).statusCode, 200);
-  for (const request of [
-    { method: "PUT" as const, url: "/api/save-slots/2", payload: { expectedRevision: 1 } },
-    { method: "POST" as const, url: "/api/save-slots/1/load", payload: { expectedRevision: 1 } },
-  ]) {
-    const response = await app.inject(request);
-    assert.equal(response.statusCode, 409);
-    assert.equal(response.json().error, "combat-not-supported");
-    assert.equal(response.json().message, "目前工程階段尚未支援戰鬥中的存檔與載入。");
-  }
-  assert.equal((await session.getState()).revision, 1);
-  assert.equal((await session.getState()).combat?.currentActorId, "TEST-enemy-1");
+test("Save / Load API supports active Combat with revision advance only on Load", async () => {
+  const app=await buildApp({combatSandbox:true,combatParticipants:TEST_COMBAT_PARTICIPANTS,combatRoller:createCombatFixtureRoller('normal')});
+  try {
+    await app.inject({method:'POST',url:'/api/dev/combat/start',payload:{expectedRevision:0}});
+    const saved=await app.inject({method:'PUT',url:'/api/save-slots/1',payload:{expectedRevision:1}});
+    assert.equal(saved.statusCode,200);
+    const loaded=await app.inject({method:'POST',url:'/api/save-slots/1/load',payload:{expectedRevision:1}});assert.equal(loaded.statusCode,200);assert.equal(loaded.json().state.revision,2);
+  } finally {await app.close();}
 });
 
 test("舊 snapshot 安全 hydrate 為無 active combat；新 snapshot 可完整 round-trip", () => {

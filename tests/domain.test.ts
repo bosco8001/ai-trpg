@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyCommand, createGameState } from "../src/domain/game.js";
-import type { GameState } from "../src/domain/game.js";
+import { applyCommand, createGameState } from "./helpers/phase26-fixture.js";
+import type { GameState } from "./helpers/phase26-fixture.js";
 import { startCombat } from "../src/domain/combat.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { buildApp } from "../src/server/app.js";
@@ -33,7 +33,7 @@ test("六格配置更新版本、保留七個已學技能；輸入與舊快照�
   assert.equal(session.getState().character.equippedSkillIds.length, 6);
   assert.equal(session.getState().character.learnedActiveSkillIds.length, 7);
   assert.equal(session.getState().revision, 1);
-  assert.deepEqual(old, initial);
+  assert.deepEqual(old, createGameState(initial));
   assert.equal(old.character.equippedSkillIds.length, 0);
   assert.throws(() => Object.assign(session.getState().character.equippedSkillIds, { 0: "tampered" }));
   assert.equal(session.execute(command([], 1)).ok, true);
@@ -75,7 +75,7 @@ test("runtime boundary 拒絕直接狀態寫入、額外欄位與隱式型別轉
 });
 
 test("戰鬥標記只作命令守門，不允許更換配置", () => {
-  const started = startCombat(createGameState(seed()), { expectedRevision: 0 }, [
+  const started = startCombat(createGameState({...seed(),partyMembers:[]}), { expectedRevision: 0 }, [
     { id: "TEST-player", displayName: "TEST 玩家", side: "party", row: "front", dexterityModifier: 0, normalAttack: null },
     { id: "TEST-enemy-1", displayName: "TEST 敵人 1", side: "enemy", row: "front", dexterityModifier: -1, normalAttack: null },
   ], { d20: () => 10 });

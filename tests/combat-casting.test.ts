@@ -4,16 +4,16 @@ import test from "node:test";
 import pg from "pg";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { applyCommand, createGameState, gameStateContents, type GameState } from "../src/domain/game.js";
+import { applyCommand, createGameState, gameStateContents, type GameState } from "./helpers/phase26-fixture.js";
 import { advanceCombatTurn, cancelCasting, continueCasting, defendCombatTurn, getCurrentCombatItemOptions,
   getCurrentNormalAttackOptions, getCurrentPhysicalSkillOptions, getCurrentRowMoveOptions, moveCombatRow,
   resolveNormalAttack, runFromCombat, startCasting, startCombat, useCombatItem, usePhysicalSkill } from "../src/domain/combat.js";
 import { TEST_COMBAT_CONSUMABLE_ID } from "../src/domain/combat-items.js";
 import { createCombatFixtureRoller, SequenceD20Roller } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import { isAuthoritativeGameStateResponse, isCastingResponse } from "../src/shared/game-state.js";
 import { executeCasting } from "../src/web/api.js";
@@ -47,11 +47,11 @@ function page(state: GameState) {
 
 test("TEST 法術已學且裝備；完整 18 MP 門檻先於每回合 6 MP", () => {
   const ready = player();
-  assert.equal(ready.character.currentMp, 24);
-  const low = createGameState({ ...ready, character: { ...ready.character, currentMp: 10 } });
+  assert.equal(ready.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 24);
+  const low = createGameState({ ...ready, combat:{...ready.combat,participants:ready.combat!.participants.map(p=>p.id === "TEST-player" ? {...p,mp:{...p.mp!,currentMp:10}} : p)} });
   const rejected = startCasting(low, { expectedRevision: low.revision, skillId: "TEST-skill-2" });
   assert.deepEqual([rejected.ok, rejected.ok ? null : rejected.code], [false, "insufficient-mp"]);
-  assert.equal(low.character.currentMp, 10);
+  assert.equal(low.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 10);
   assert.deepEqual(low.combat?.activeCastings, []);
   for (const [state, skillId, code] of [
     [player(createTestGameState()), "TEST-skill-2", "skill-not-equipped"],
@@ -71,23 +71,23 @@ test("TEST 法術已學且裝備；完整 18 MP 門檻先於每回合 6 MP", () 
 test("三回合詠唱跨敵方回合保存 MP 與進度；完成沒有命中、傷害或反噬", () => {
   const initial = player(equipped(["TEST-skill-1", "TEST-skill-2"]));
   const r1 = startCasting(initial, { expectedRevision: initial.revision, skillId: "TEST-skill-2" }); ok(r1);
-  assert.deepEqual([r1.state.character.currentMp, r1.state.combat?.activeCastings[0]?.completedCastingTurns,
+  assert.deepEqual([r1.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, r1.state.combat?.activeCastings[0]?.completedCastingTurns,
     r1.state.combat?.activeCastings[0]?.mpSpent, r1.state.combat?.currentActorId, r1.state.revision],
   [18, 1, 6, "TEST-enemy-2", initial.revision + 1]);
   assert.equal(r1.state.combat?.lastAction?.type, "casting-start");
-  assert.throws(() => gameStateContents(r1.state), /不支援 active combat/);
+  assert.equal(gameStateContents(r1.state).combat?.status,"active");
   const r2 = nextPlayer(r1.state);
   assert.deepEqual(r2.combat?.activeCastings, r1.state.combat?.activeCastings);
-  assert.equal(r2.character.currentMp, 18);
+  assert.equal(r2.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 18);
   assert.equal(r2.combat?.round, 2);
   const continued = continueCasting(r2, { expectedRevision: r2.revision }); ok(continued);
-  assert.deepEqual([continued.state.character.currentMp, continued.state.combat?.activeCastings[0]?.completedCastingTurns,
+  assert.deepEqual([continued.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, continued.state.combat?.activeCastings[0]?.completedCastingTurns,
     continued.state.combat?.activeCastings[0]?.mpSpent, continued.state.combat?.currentActorId,
     continued.state.revision], [12, 2, 12, "TEST-enemy-2", r2.revision + 1]);
   const r3 = nextPlayer(continued.state);
-  assert.equal(r3.character.currentMp, 12);
+  assert.equal(r3.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 12);
   const completed = continueCasting(r3, { expectedRevision: r3.revision }); ok(completed);
-  assert.deepEqual([completed.state.character.currentMp, completed.state.combat?.activeCastings,
+  assert.deepEqual([completed.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, completed.state.combat?.activeCastings,
     completed.state.combat?.lastAction?.type, completed.state.combat?.currentActorId,
     completed.state.revision], [6, [], "casting-complete", "TEST-enemy-2", r3.revision + 1]);
   assert.deepEqual(completed.state.combat?.lastAction, { type: "casting-complete", actorId: "TEST-player",
@@ -124,7 +124,7 @@ test("詠唱時其他權威行動與 TEST 跳回合受阻；取消不退 MP 且�
   for (const attempt of attempts) assert.deepEqual([attempt.ok, attempt.ok ? null : attempt.code], [false, "casting-active"]);
   assert.deepEqual(ownTurn, before);
   const cancelled = cancelCasting(ownTurn, { expectedRevision: ownTurn.revision }); ok(cancelled);
-  assert.deepEqual([cancelled.state.character.currentMp, cancelled.state.combat?.activeCastings,
+  assert.deepEqual([cancelled.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, cancelled.state.combat?.activeCastings,
     cancelled.state.combat?.currentActorId, cancelled.state.combat?.round, cancelled.state.revision],
   [18, [], "TEST-player", 2, ownTurn.revision + 1]);
   assert.equal(cancelled.state.combat?.lastAction?.type, "casting-cancel");
@@ -174,12 +174,12 @@ test("舊 TEST 快照只補工程 MP／空詠唱；UI 顯示權威進度與完�
   const hydrated = hydrateStateRow({ character_id: "TEST-character", revision: String(started.state.revision),
     snapshot: { activity: old.activity, character: old.character, inventory: old.inventory,
       exploration: old.exploration, combat: { ...(old.combat as object), lastAction: null } } });
-  assert.equal(hydrated.character.currentMp, 24);
+  assert.equal(hydrated.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 18);
   assert.deepEqual(hydrated.combat?.activeCastings, []);
   assert.match(page(started.state), /正在詠唱：TEST 多回合法術/);
   assert.match(page(started.state), /已投入：6 \/ 18 MP/);
   assert.match(page(player()), /18 MP・3 回合詠唱/);
-  const low = createGameState({ ...player(), character: { ...player().character, currentMp: 10 } });
+  const before=player();const low = createGameState({ ...before, combat:{...before.combat,participants:before.combat!.participants.map(p=>p.id === "TEST-player" ? {...p,mp:{...p.mp!,currentMp:10}} : p)} });
   assert.match(page(low), /MP 不足/);
 });
 
@@ -198,7 +198,7 @@ test("詠唱 API 精確 body、Memory persistence、frontend runtime validation"
     assert.equal(started.statusCode, 200);
     assert.equal(isCastingResponse(started.json()), true);
     const refresh = await app.inject({ method: "GET", url: "/api/game-state" });
-    assert.deepEqual([refresh.json().state.character.currentMp,
+    assert.deepEqual([refresh.json().state.combat!.participants.find((p:{side:string;controlledBy?:string})=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp,
       refresh.json().state.combat.activeCastings[0].completedCastingTurns], [18, 1]);
     const stale = await app.inject({ method: "POST", url: "/api/combat/casting/cancel", payload: { expectedRevision: 3 } });
     assert.equal(stale.statusCode, 409);
@@ -207,7 +207,7 @@ test("詠唱 API 精確 body、Memory persistence、frontend runtime validation"
       assert.deepEqual(JSON.parse(String(init?.body)), { expectedRevision: 3, skillId: "TEST-skill-2" });
       return new Response(JSON.stringify(started.json()), { status: 200 });
     };
-    assert.equal((await executeCasting("start", 3, "TEST-skill-2", fetcher as typeof fetch)).state.character.currentMp, 18);
+    assert.equal((await executeCasting("start", 3, "TEST-skill-2", fetcher as typeof fetch)).state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 18);
     await assert.rejects(executeCasting("start", 3, "TEST-skill-2",
       async () => new Response(JSON.stringify({ error: "internal", message: "SQL secret" }), { status: 500 })),
     /目前無法完成詠唱操作/);
@@ -227,7 +227,7 @@ test("隔離 PostgreSQL 可從新 repository 讀回 MP、詠唱與 revision", {
     const advanced = await session.advanceCombat({ expectedRevision: 2 }); ok(advanced);
     const cast = await session.startCasting({ expectedRevision: 3, skillId: "TEST-skill-2" }); ok(cast);
     const loaded = await new PostgresGameStateRepository(pool).load(id);
-    assert.deepEqual([loaded?.revision, loaded?.character.currentMp,
+    assert.deepEqual([loaded?.revision, loaded?.combat?.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")?.mp?.currentMp,
       loaded?.combat?.activeCastings[0]?.completedCastingTurns, loaded?.combat?.activeCastings[0]?.mpSpent,
       loaded?.combat?.currentActorId], [4, 18, 1, 6, "TEST-enemy-2"]);
   } finally {

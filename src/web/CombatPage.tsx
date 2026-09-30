@@ -1,3 +1,6 @@
+import { RuntimeSystemPanel } from "./RuntimeSystemPanel.js";
+import { executeSettlement, SettlementApiError } from "./api.js";
+import type { NarrativeEntry } from "../shared/narrative.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   AuthoritativeGameStateResponse,
@@ -285,12 +288,39 @@ export function CombatPage({
   stateError,
   onStateUpdate,
   onRetryState,
+  onHistoryEntry, onMainMenu, onPresentation,
 }: {
   gameState: AuthoritativeGameStateResponse;
   stateError: string | null;
   onStateUpdate: (next: AuthoritativeGameStateResponse) => void;
   onRetryState: () => Promise<AuthoritativeGameStateResponse>;
+  onHistoryEntry?: (entry:NarrativeEntry,generation:string)=>void;
+  onMainMenu?:()=>void;
+  onPresentation?:(text:string|null,warning:string,generation:string,revision:number)=>void;
 }) {
+  const [settling,setSettling]=useState(false),[recovery,setRecovery]=useState<string|null>(null),[settlementBlocked,setSettlementBlocked]=useState(false);
+  const integrityBlocked=useRef(false);
+  const settlementInFlight=useRef(false),settlementLive=useRef(true),continueButton=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{settlementLive.current=true;return()=>{settlementLive.current=false;};},[]);
+  useEffect(()=>{if(gameState.state.combat?.status === 'ended') continueButton.current?.focus();},[gameState.state.combat?.status]);
+  async function continueToExploration() {
+    if(settlementInFlight.current || settlementBlocked) return;
+    settlementInFlight.current=true;setSettling(true);setRecovery(null);
+    try {
+      const response=await executeSettlement(gameState.state.revision);
+      if(settlementLive.current) onStateUpdate(response);
+      if(response.narration.status === "saved" && response.state.phase26) onHistoryEntry?.(response.narration.entry,response.state.phase26.runtimeGeneration);
+      if(!settlementLive.current) return;
+      if(response.narration.status !== "saved" && response.state.phase26) onPresentation?.(response.narration.text,response.narration.status === 'unsaved' ? '結算已完成；本次文字未保存。' : response.narration.status === 'unavailable' ? '結算已完成；敘事目前無法保存。' : '',response.state.phase26.runtimeGeneration,response.state.revision);
+    } catch(error) {
+      if(!settlementLive.current) return;
+      integrityBlocked.current=error instanceof SettlementApiError && error.code === "integrity-conflict";
+      setSettlementBlocked(true);
+      setRecovery(error instanceof Error ? error.message : '結算結果尚未確認。');
+      try {const current=await onRetryState();if(settlementLive.current) {onStateUpdate(current);setRecovery('已重新讀取目前狀態。請依目前畫面繼續操作。');setSettlementBlocked(integrityBlocked.current);}}
+      catch {if(settlementLive.current) setRecovery('目前無法確認狀態。請重新讀取、載入健康存檔或返回主選單。');}
+    } finally {settlementInFlight.current=false;if(settlementLive.current) setSettling(false);}
+  }
   const combat = gameState.state.combat;
   const currentActor = combat?.participants.find((participant) => participant.id === combat.currentActorId);
   const currentActorId = combat?.currentActorId ?? "";
@@ -393,7 +423,7 @@ export function CombatPage({
 
   const mutationInFlight = isAdvancing || isRetrying || isResolving || isMovingRow || isUsingItem
     || isSubmittingDefend || isSubmittingRun || isUsingSkill || isCastingMutation || isUsingBreath
-    || partyMutationCompanionId !== null || isRescuing;
+    || partyMutationCompanionId !== null || isRescuing || settling || settlementBlocked;
   const pacing = useCombatPacing(gameState, mutationInFlight, onStateUpdate, onRetryState, (response) => {
     showNarration(response);
     setFeedback(response.effect.selectedAction === "normal-attack"
@@ -721,7 +751,7 @@ export function CombatPage({
           <header className="combat-header">
             <div className="combat-header__identity">
               <p className="combat-eyebrow">權威戰鬥狀態</p>
-              <h1>戰鬥已結束</h1>
+              <h1>{combat.endReason === "party-defeat" ? "Game Over" : "戰鬥已結束"}</h1>
               <p>第 {combat.round} 回合・工程版本 {gameState.state.revision}</p>
             </div>
           </header>
@@ -730,11 +760,16 @@ export function CombatPage({
               <p className="combat-eyebrow">{combat.endReason === "escaped" ? "逃跑成功" : combat.endReason === "victory" ? "戰鬥勝利" : "隊伍戰敗"}</p>
               <h2 id="combat-ended-heading">{combat.endReason === "escaped" ? "你已成功逃離戰鬥。" : combat.endReason === "victory" ? "敵人已全部死亡。" : "隊伍失去戰鬥能力。"}</h2>
               <ul>{combat.participants.map((participant) => <li key={participant.id}>{participant.displayName}：HP {participant.health.currentHp} / {participant.health.maxHp}・{participant.health.lifeState === "active"
-                ? "可行動" : participant.health.lifeState === "dying" ? `瀕死・剩餘 ${participant.health.dyingTurnsRemaining} 回合` : "死亡"}</li>)}</ul>
-              <p>戰鬥結算與返回探索尚未接入。</p>
+                ? "可行動" : participant.health.lifeState === "dying" ? `瀕死・剩餘 ${participant.health.dyingTurnsRemaining} 回合` : "死亡"}{participant.mp ? `・MP ${participant.mp.currentMp} / ${participant.mp.maxMp}` : ""}</li>)}</ul>
+              {combat.endReason !== 'party-defeat' ? <Button ref={continueButton} loading={settling} loadingLabel="正在結算並整理敘事……" disabled={settlementBlocked} onClick={()=>void continueToExploration()}>繼續</Button> : <p>請載入健康存檔或返回主選單。</p>}
+              {recovery ? <p role="alert">{recovery}</p> : null}
+              <Button variant="secondary" disabled={settling} onClick={()=>{void onRetryState().then(next=>{onStateUpdate(next);setSettlementBlocked(integrityBlocked.current);setRecovery(integrityBlocked.current ? '資料完整性衝突仍需載入健康存檔。' : '已重新讀取目前狀態。');}).catch(()=>{setSettlementBlocked(true);setRecovery('狀態仍無法讀取。');});}}>重新讀取</Button>
+
+
               <p>目前沒有可行動的角色。</p>
             </Panel>
             <aside className="combat-rail" aria-label="戰鬥結束資訊">
+              <RuntimeSystemPanel state={gameState} onStateUpdate={onStateUpdate} onRetryState={onRetryState} onMainMenu={onMainMenu} disabled={settling}/>
               <LastActionPanel combat={combat} />
               <Panel className="combat-rail__panel" aria-labelledby="combat-ended-narration-heading">
                 <p className="combat-eyebrow">AI 戰鬥敘事</p>
@@ -848,7 +883,7 @@ export function CombatPage({
   }
 
   function beginCastingConfirmation() {
-    if (!hasPlayerActionActor || currentCasting || gameState.state.character.currentMp < 18 || controlMutationBusy) return;
+    if (!hasPlayerActionActor || currentCasting || (gameState.state.combat?.participants.find(p => p.side === "party" && p.controlledBy !== "companion")?.mp?.currentMp ?? gameState.state.character.currentMp) < 18 || controlMutationBusy) return;
     setIsTargeting(false); setTargetOptions(null); setSelectedSkillId(null); setIsRowMoveMode(false);
     setIsBagOpen(false); setPendingItemId(null); setIsDefendConfirmationOpen(false);
     setIsRunConfirmationOpen(false); setCastingError(null); setIsStartCastingConfirmationOpen(true);
@@ -1467,7 +1502,7 @@ export function CombatPage({
                 <div><dt>目前行動</dt><dd>{visualActor?.displayName ?? combat.currentActorId}</dd></div>
                 <div><dt>參戰者</dt><dd>{combat.participants.length} 名</dd></div>
                 <div><dt>活動</dt><dd>戰鬥中</dd></div>
-                <div><dt>MP</dt><dd>{gameState.state.character.currentMp} <small>（TEST 數值）</small></dd></div>
+                <div><dt>MP</dt><dd>{(gameState.state.combat?.participants.find(p => p.side === "party" && p.controlledBy !== "companion")?.mp?.currentMp ?? gameState.state.character.currentMp)} <small>（TEST 數值）</small></dd></div>
                 <div><dt>工程版本</dt><dd>{gameState.state.revision}</dd></div>
               </dl>
             </Panel>
@@ -1552,10 +1587,10 @@ export function CombatPage({
                         : skillOptionsError ? skillOptionsError : isLoadingSkillOptions || (skillId === "TEST-skill-1" && !option)
                           ? "正在確認技能狀態" : !option ? "此技能尚未支援戰鬥使用" : "可使用";
                   if (skillId === "TEST-skill-2") {
-                    const available = hasPlayerActionActor && !currentCasting && gameState.state.character.currentMp >= 18;
+                    const available = hasPlayerActionActor && !currentCasting && (gameState.state.combat?.participants.find(p => p.side === "party" && p.controlledBy !== "companion")?.mp?.currentMp ?? gameState.state.character.currentMp) >= 18;
                     const reason = currentCasting ? "請先繼續或取消詠唱"
                       : !hasPlayerActionActor ? "目前不是可操作角色的回合"
-                        : gameState.state.character.currentMp < 18 ? "MP 不足" : "可開始詠唱";
+                        : (gameState.state.combat?.participants.find(p => p.side === "party" && p.controlledBy !== "companion")?.mp?.currentMp ?? gameState.state.character.currentMp) < 18 ? "MP 不足" : "可開始詠唱";
                     return <li key={skillId} className="combat-skill-item">
                       <Button ref={castingButton} variant="secondary" data-skill={skillId}
                         disabled={!available || requestInFlight || selectionModeActive}
@@ -1693,6 +1728,8 @@ export function CombatPage({
                   {currentActor?.side === "enemy" ? <p className="combat-rail__notice">{gameState.sandbox ? "TEST 敵方回合；只推進權威順序，不產生敵方攻擊或敘事。" : "目前是敵方回合，玩家不能執行攻擊、移動或防禦。"}</p> : null}
               {currentActor?.controlledBy === "companion" ? <p className="combat-rail__notice">目前是 TEST 隊友回合；伺服器會自行選擇行動與目標。</p> : null}
             </Panel>
+
+            <RuntimeSystemPanel state={gameState} onStateUpdate={onStateUpdate} onRetryState={onRetryState} onMainMenu={onMainMenu} disabled={mutationInFlight}/>
 
             {gameState.sandbox ? (
               <Panel className="combat-rail__panel combat-test-controls" aria-labelledby="combat-test-heading">

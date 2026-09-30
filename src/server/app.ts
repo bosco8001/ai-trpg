@@ -1,3 +1,5 @@
+import { registerSettlementRoutes } from "./combat/settlement-routes.js";
+import type { SettlementNarrator } from "./combat/settlement-service.js";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import type { HealthResponse } from "../shared/health.js";
@@ -34,11 +36,15 @@ export async function buildApp(options: {
   saveGameRepository?: SaveGameRepository;
   combatSandbox?: boolean;
   combatRoller?: DiceRoller;
+  combatRollerFactory?: () => DiceRoller;
   combatActionRoller?: DiceRoller;
   combatEscapeRoller?: DiceRoller;
   combatNarrator?: CombatNarrationService;
+  settlementNarrator?: SettlementNarrator;
   /** Allows focused legacy three-participant tests to keep their original roster. */
   combatParticipants?: readonly CombatParticipantSeed[];
+  /** Trusted server context; never accepted from a Start request. */
+  combatStartContext?: import("../domain/combat.js").CombatStartContext;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
@@ -47,16 +53,19 @@ export async function buildApp(options: {
     : createDomainSession(createTestGameState()));
   const saveGameRepository = options.saveGameRepository
     ?? new InMemorySaveGameRepository(() => session.getState());
-  const combatSandboxEnabled = options.combatSandbox === true && process.env.NODE_ENV !== "production";
+  const combatSandboxEnabled = options.combatSandbox === true && options.domainSandbox === true && process.env.NODE_ENV !== "production";
   const combatService = createCombatService(
     session,
     options.combatParticipants ?? PHASE22_TEST_COMBAT_PARTICIPANTS,
     options.combatRoller ?? new RandomD20Roller(),
     options.combatActionRoller ?? new RandomD20Roller(),
     options.combatEscapeRoller ?? new RandomD20Roller(),
+    options.combatStartContext,
+    combatSandboxEnabled ? options.combatRollerFactory : undefined,
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
+  registerSettlementRoutes(app,session,storage,combatSandboxEnabled,options.settlementNarrator);
   registerCombatActionRoutes(app, combatService, storage, combatSandboxEnabled, options.combatNarrator);
 
   if (options.domainSandbox && process.env.NODE_ENV !== "production") {

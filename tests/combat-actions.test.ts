@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import pg from "pg";
 import {
-  advanceCombatTurn,
+  advanceCombatTurn, rollInitiative,
   getCurrentNormalAttackOptions,
   resolveNormalAttack,
   startCombat,
@@ -13,10 +13,10 @@ import {
 } from "../src/domain/combat.js";
 import { checkNormalAttackTarget, getLegalNormalAttackTargets } from "../src/domain/combat-targeting.js";
 import { createCombatState } from "../src/domain/combat-state.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { createTestCombatInventory } from "../src/domain/combat-items.js";
 import type { GameStateRepository } from "../src/domain/game-state-repository.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import {
   createCombatActionFixtureRoller,
   createCombatFixtureRoller,
@@ -102,7 +102,7 @@ function normalAttackAction(state: GameState) {
 }
 
 function customTargetingCombat(seeds: readonly CombatParticipantSeed[], rolls: readonly number[]) {
-  return startCombat(seed(), { expectedRevision: 0 }, seeds, new SequenceD20Roller(rolls));
+  return {ok:true as const,state:{...seed(),activity:"in-combat" as const,combat:rollInitiative(seeds,new SequenceD20Roller(rolls))}};
 }
 
 test("TEST initial row 與最小普通攻擊 profile 進入 CombatState", () => {

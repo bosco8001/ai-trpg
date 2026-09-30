@@ -10,15 +10,15 @@ import {
   runFromCombat, startCombat, useCombatItem, type CombatParticipantSeed,
 } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
-import { createGameState, type GameState } from "../src/domain/game.js";
+import { createGameState, type GameState } from "./helpers/phase26-fixture.js";
 import { TEST_COMBAT_CONSUMABLE_ID } from "../src/domain/combat-items.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import {
   createCombatEscapeFixtureRoller, createCombatFixtureRoller, SequenceD20Roller,
 } from "../src/server/combat/dice.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import { createSaveSnapshot } from "../src/server/save-game/service.js";
 import { SaveGameFailure } from "../src/server/save-game/contracts.js";
@@ -211,11 +211,7 @@ test("Phase 13–16 的四種 lastAction 舊快照都 hydrate active；未結算
   }
   const success = runFromCombat(player, { expectedRevision: 2 }, createCombatEscapeFixtureRoller("success"));
   ok(success);
-  assert.throws(() => createSaveSnapshot(success.state), (error: unknown) => {
-    assert.ok(error instanceof SaveGameFailure);
-    assert.equal(error.code, "combat-not-supported");
-    return true;
-  });
+  assert.equal(createSaveSnapshot(success.state).state.combat?.status,"ended");
 });
 
 test("Run route 精確 request、stale、成功 terminal 及結束後 action guard", async (t) => {
@@ -282,7 +278,7 @@ test("前端 request 只有 revision；畫面呈現成功或失敗的機械結�
   assert.match(page(succeeded.state), /戰鬥已結束/);
   assert.match(page(succeeded.state), /逃跑判定：8 \+ 2 = 10/);
   assert.match(page(succeeded.state), /結果：逃跑成功/);
-  assert.match(page(succeeded.state), /戰鬥結算與返回探索尚未接入/);
+  assert.match(page(succeeded.state), />繼續<\/button>/);
   assert.doesNotMatch(page(succeeded.state), /目前行動：TEST 敵人 2|成功率|進入探索/);
   assert.match(page(succeeded.state), /目前沒有戰鬥敘事/);
   assert.match(page(succeeded.state), /data-command="party"/);

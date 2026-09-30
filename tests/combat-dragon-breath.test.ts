@@ -8,12 +8,12 @@ import { advanceCombatTurn, cancelCasting, defendCombatTurn, getCurrentDragonBre
   getCurrentPhysicalSkillOptions, runFromCombat, startCasting, startCombat, useDragonBreath,
   type CombatParticipantSeed, type DiceRoller } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
-import { applyCommand, createGameState, gameStateContents, type GameState } from "../src/domain/game.js";
+import { applyCommand, createGameState, gameStateContents, type GameState } from "./helpers/phase26-fixture.js";
 import { TEST_COMBAT_PARTICIPANTS } from "../src/server/combat/fixtures.js";
 import { createCombatActionFixtureRoller, createCombatFixtureRoller, SequenceD20Roller } from "../src/server/combat/dice.js";
-import { buildApp } from "../src/server/app.js";
+import { buildApp } from "./helpers/phase26-fixture.js";
 import { createDomainSession, createPersistedDomainSession } from "../src/server/domain-session.js";
-import { createTestGameState } from "../src/server/test-game-state.js";
+import { createTestGameState } from "./helpers/phase26-fixture.js";
 import { hydrateStateRow, PostgresGameStateRepository } from "../src/server/postgres-game-state-repository.js";
 import { isAuthoritativeGameStateResponse, isDragonBreathOptionsResponse, isDragonBreathResponse } from "../src/shared/game-state.js";
 import { executeDragonBreath, loadDragonBreathOptions } from "../src/web/api.js";
@@ -53,7 +53,7 @@ test("龍裔天生能力不佔六格、不需已學或裝備、不扣 MP；非�
   assert.equal(ready.character.equippedSkillIds.includes("dragon-breath"), false);
   const used = use(ready); ok(used);
   assert.deepEqual(used.state.character.equippedSkillIds, ready.character.equippedSkillIds);
-  assert.equal(used.state.character.currentMp, 24);
+  assert.equal(used.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, 24);
   assert.deepEqual(used.state.combat?.skillCooldowns, []);
   assert.deepEqual(used.state.combat?.activeCastings, []);
   assert.equal(used.state.combat?.racialAbilityCooldowns[0]?.readyRound, 4);
@@ -193,7 +193,7 @@ test("stale、注入、非法排、敵方回合、ended 與途中骰子故障都
   const escaped = runFromCombat(state, { expectedRevision: state.revision }, new SequenceD20Roller([8])); ok(escaped);
   assert.equal(getCurrentDragonBreathOptions(escaped.state).ok, false);
   assert.equal(use(escaped.state).ok, false);
-  assert.throws(() => gameStateContents(state), /不支援 active combat/);
+  assert.equal(gameStateContents(state).combat?.status,"active");
 });
 
 test("詠唱阻止龍息；取消後同一 Turn 可使用且 MP 不再扣除", () => {
@@ -212,7 +212,7 @@ test("詠唱阻止龍息；取消後同一 Turn 可使用且 MP 不再扣除", (
   const option = getCurrentDragonBreathOptions(cancelled.state); ok(option);
   assert.equal(option.options.available, true);
   const used = use(cancelled.state); ok(used);
-  assert.deepEqual([used.state.character.currentMp, used.state.combat?.currentActorId,
+  assert.deepEqual([used.state.combat!.participants.find(p=>p.side === "party" && p.controlledBy !== "companion")!.mp!.currentMp, used.state.combat?.currentActorId,
     getCurrentPhysicalSkillOptions(used.state).ok], [18, "TEST-enemy-2", true]);
 });
 
@@ -232,7 +232,7 @@ test("舊快照補空天生能力冷卻；已知 TEST 元素補固定值，未�
   } });
   assert.deepEqual([unknown.character.raceId, unknown.character.dragonBreathElement], [null, null]);
   const unresolved = createGameState({ ...fresh, character: { ...fresh.character,
-    id: "other-character", raceId: "dragonborn", dragonBreathElement: null } });
+    id: "other-character", raceId: "dragonborn", dragonBreathElement: null },combat:{...fresh.combat,lifecycle:{...fresh.combat!.lifecycle!,runId:"fixture-run-other-character"},participants:fresh.combat!.participants.map(p=>p.characterId === "TEST-character" ? {...p,characterId:"other-character"} : p)} });
   assert.equal(use(unresolved).ok, false);
   const action = use(fresh); ok(action);
   assert.equal(isAuthoritativeGameStateResponse({ sandbox: true, storage: "memory", state: action.state }), true);

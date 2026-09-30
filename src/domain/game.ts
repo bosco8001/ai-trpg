@@ -1,3 +1,4 @@
+import { migrateKnownTest, validatePhase26, phase26, newIdentity, canonicalEntry, type Phase26State } from "./settlement.js";
 import { createCombatState, type CombatState } from "./combat-state.js";
 import { isInventory, normalizeInventory, type InventoryStack } from "./combat-items.js";
 import { createLegacyPartyMembers, isPartyMemberStates, type PartyMemberState } from "./party-tactics.js";
@@ -16,6 +17,7 @@ export function createInitialTestExplorationState(): ExplorationState {
 
 /** 最小權威狀態切片；TEST 探索識別碼全是工程資料，不是正式世界設定。 */
 export interface GameState {
+  readonly phase26?: Phase26State;
   readonly revision: number;
   readonly activity: "outside-combat" | "in-combat";
   readonly character: {
@@ -37,25 +39,14 @@ export interface GameState {
   readonly combat: CombatState | null;
 }
 
-/** Save Format v1 的既有內容；刻意不加入 Phase 11 CombatState。 */
-export interface GameStateContents {
-  readonly activity: "outside-combat";
-  readonly character: GameState["character"];
-  readonly inventory: GameState["inventory"];
-  readonly exploration: ExplorationState;
-}
-
+/** Format v2 captures complete mutable gameplay and active persisted History. */
+export type GameStateContents = Omit<GameState, "revision" | "phase26"> & { readonly phase26?: Omit<Phase26State,"runtimeGeneration" | "sequenceHighWater" | "narrativeLedger"> };
 export function gameStateContents(state: GameState): GameStateContents {
   const validated = createGameState(state);
-  if (validated.activity !== "outside-combat" || validated.combat !== null) {
-    throw new Error("Save Format v1 不支援 active combat。");
-  }
-  return Object.freeze({
-    activity: "outside-combat",
-    character: validated.character,
-    inventory: validated.inventory,
-    exploration: validated.exploration,
-  });
+  const {revision, phase26: p, ...gameplay} = validated;
+  if (!p) throw new Error("缺少版本化世界引用。");
+  const {runtimeGeneration, sequenceHighWater, narrativeLedger, ...saved} = p;
+  return {...gameplay, phase26:saved};
 }
 
 export type StateReplacementResult =
@@ -76,7 +67,16 @@ export function replaceGameStateContents(
   }
   try {
     if (!isRecord(contents)) throw new Error("存檔內容不是物件。");
-    const next = createGameState({ ...contents, revision: current.revision + 1, combat: null });
+    const p = phase26(current), candidate = contents.phase26 as GameStateContents["phase26"];
+    if (!candidate || candidate.runId !== p.runId || candidate.worldId !== p.worldId || candidate.fixtureId !== p.fixtureId) throw new Error("存檔世界不一致。");
+    const ledger = [...p.narrativeLedger];
+    for (const e of candidate.history) {
+      const known = ledger.find(k => k.id === e.id);
+      if (known && canonicalEntry(known) !== canonicalEntry(e)) throw new Error("敘事身分衝突。");
+      if (!known) ledger.push(e);
+    }
+    const next = createGameState({ ...contents, revision: current.revision + 1,
+      phase26:{...candidate,runtimeGeneration:newIdentity(),sequenceHighWater:Math.max(p.sequenceHighWater,...candidate.history.map(e => e.sequence ?? 0)),narrativeLedger:ledger} });
     if (next.character.id !== current.character.id) throw new Error("角色識別碼不一致。");
     return { ok: true, state: next };
   } catch {
@@ -176,6 +176,32 @@ function loadoutError(learned: readonly string[], equipped: readonly string[]): 
 
 /** 伺服器建立初始狀態的入口；不是玩家命令，也不是創角規則。 */
 export function createGameState(seed: unknown): GameState {
+  if (isRecord(seed) && Object.hasOwn(seed, "phase26")) {
+    const { phase26: data, ...base } = seed;
+    // Validate legacy fields without performing fixture migration a second time.
+    const validated = createGameStateBase(base);
+    if (!isRecord(data)) throw new Error("長期資料格式不正確。");
+    const p = data as unknown as Phase26State;
+    const state = {...validated, phase26: p};
+    validatePhase26(state, p);
+    return Object.freeze({...validated,phase26:deepFreeze(structuredClone(p))});
+  }
+  const base = createGameStateBase(seed);
+  const p = migrateKnownTest(base);
+  if (!p) return base;
+  let combat = base.combat;
+  if (combat && !combat.lifecycle) {
+    // Versioned known TEST mapping only. Incomplete old rosters remain blocked from Settlement.
+    combat = createCombatState({...combat,lifecycle:{combatId:`legacy-TEST-combat-${base.revision}`,runId:p.runId,worldId:p.worldId,fixtureId:p.fixtureId,sourceEncounterId:null,returnExplorationContext:base.exploration,rewardEligibleOnVictory:false},
+      participants:combat.participants.map(c => ({...c,characterId:c.side === 'enemy' ? null : c.id === 'TEST-player' ? base.character.id : c.id,
+        ...(c.side === 'party' ? {mp:{currentMp:c.id === 'TEST-player' ? base.character.currentMp : 0,maxMp:c.id === 'TEST-player' ? 24 : 0}} : {})}))});
+  }
+  const migrated={...base,combat,phase26:deepFreeze(p)};
+  validatePhase26(migrated,p);
+  return Object.freeze(migrated);
+}
+function deepFreeze<T>(value:T):T { if (value && typeof value === 'object') { Object.values(value).forEach(deepFreeze); Object.freeze(value); } return value; }
+function createGameStateBase(seed: unknown): GameState {
   if (!(hasExactKeys(seed, ["revision", "activity", "character", "inventory", "exploration", "combat"])
       || hasExactKeys(seed, ["revision", "activity", "character", "inventory", "partyMembers", "exploration", "combat"]))
     || !(hasExactKeys(seed.character, ["id", "learnedActiveSkillIds", "equippedSkillIds", "currentMp", "raceId", "dragonBreathElement"])
@@ -187,6 +213,7 @@ export function createGameState(seed: unknown): GameState {
   }
   const character = seed.character;
   const partyMembers = Object.hasOwn(seed, "partyMembers") ? seed.partyMembers
+    : isRecord(seed.combat) && Array.isArray(seed.combat.participants) && !seed.combat.participants.some(c=>isRecord(c) && c.id === 'TEST-companion-1') ? []
     : createLegacyPartyMembers(typeof character.id === "string" ? character.id : "");
   // 僅供已知 TEST-character 的 Phase 1–18 舊快照升級；正式角色須帶有 MP。
   const currentMp = Object.hasOwn(character, "currentMp") ? character.currentMp : 24;

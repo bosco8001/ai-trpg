@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { advanceCombatTurn, defendCombatTurn, resolveCompanionTurn, resolveNormalAttack,
   rollInitiative, startCombat } from "../src/domain/combat.js";
 import { createCombatState } from "../src/domain/combat-state.js";
-import { createGameState } from "../src/domain/game.js";
+import { createGameState } from "./helpers/phase26-fixture.js";
 import { setCompanionTacticPreference } from "../src/domain/party.js";
 import { createLegacyPartyMembers } from "../src/domain/party-tactics.js";
 import { buildApp } from "../src/server/app.js";
@@ -165,7 +165,7 @@ test("隊友 Turn 的玩家指令均受保護；舊戰鬥 hydrate 不重建名�
   assert.equal(attack.ok, false); assert.equal(defend.ok, false);
   assert.equal(advance.ok, false); if (!advance.ok) assert.equal(advance.code, "companion-turn");
   assert.equal(canPlayerUseNormalAttack(before.combat!, false), false);
-  const old = startCombat(createTestGameState(), { expectedRevision: 0 }, TEST_COMBAT_PARTICIPANTS,
+  const old = startCombat(createGameState({...createTestGameState(),partyMembers:[]}), { expectedRevision: 0 }, TEST_COMBAT_PARTICIPANTS,
     new SequenceD20Roller([12, 17, 8]));
   ok(old);
   const row = { character_id: "TEST-character", revision: String(old.state.revision), snapshot: {
@@ -175,12 +175,12 @@ test("隊友 Turn 的玩家指令均受保護；舊戰鬥 hydrate 不重建名�
   const hydrated = hydrateStateRow(row);
   assert.deepEqual(hydrated.combat, old.state.combat);
   assert.equal(hydrated.combat?.participants.length, 3);
-  assert.equal(hydrated.partyMembers[0]?.id, "TEST-companion-1");
+  assert.equal(hydrated.partyMembers.length,0);
 });
 
 test("companion API 僅接受 revision；成功回權威 state，stale／注入不改狀態", async () => {
   const session = createDomainSession(atCompanion());
-  const app = await buildApp({ domainSession: session, combatSandbox: true,
+  const app = await buildApp({ domainSession: session, domainSandbox: true, combatSandbox: true,
     combatActionRoller: new SequenceD20Roller([10, 8]) });
   try {
     const before = session.getState();
@@ -203,7 +203,7 @@ test("companion API 僅接受 revision；成功回權威 state，stale／注入�
 
 test("隊友當前 Turn 的 Phase 21 API 改 B 後，同一 Turn 立刻防禦", async () => {
   const session = createDomainSession(atCompanion());
-  const app = await buildApp({ domainSession: session, combatSandbox: true,
+  const app = await buildApp({ domainSession: session, domainSandbox: true, combatSandbox: true,
     combatActionRoller: { d20: () => { throw new Error("B must not roll"); } } });
   try {
     const before = session.getState();

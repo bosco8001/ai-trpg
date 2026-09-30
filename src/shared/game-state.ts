@@ -1,3 +1,5 @@
+import { createGameState } from "../domain/game.js";
+import { createCombatState } from "../domain/combat-state.js";
 import { TEST_COMBAT_CONSUMABLE_ID, TEST_COMBAT_CONSUMABLE_NAME } from "./combat-items.js";
 import { isCombatNarrationPresentation, type CombatNarrationPresentation } from "./combat-narration.js";
 import { isCombatHealth, type CombatHealth } from "../domain/combat-health.js";
@@ -23,6 +25,8 @@ export interface CombatInitiativeView {
 }
 
 export interface CombatParticipantView {
+  readonly characterId?: string | null;
+  readonly mp?: {readonly currentMp:number;readonly maxMp:number};
   readonly id: string;
   readonly displayName: string;
   readonly side: CombatSide;
@@ -159,6 +163,7 @@ function isRescueResolution(value: unknown): value is RescueResolutionView {
 export type CombatLastActionView = NormalAttackResolutionView | PhysicalSkillResolutionView | RowMoveResolutionView | ItemUseResolutionView | DefendResolutionView | RescueResolutionView | RunResolutionView | CastingResolutionView | DragonBreathResolutionView;
 
 interface CombatStateViewBase {
+  readonly lifecycle?: import("../domain/settlement.js").CombatLifecycle;
   readonly round: number;
   readonly turnOrder: readonly string[];
   readonly participants: readonly CombatParticipantView[];
@@ -337,6 +342,7 @@ export interface DragonBreathResponse extends AuthoritativeGameStateResponse {
 }
 
 export interface AuthoritativeGameStateView {
+  readonly phase26?: import("../domain/settlement.js").Phase26State;
   readonly revision: number;
   readonly activity: "outside-combat" | "in-combat";
   readonly character: {
@@ -636,6 +642,7 @@ function expectedTurnOrder(participants: readonly CombatParticipantView[]): stri
 }
 
 export function isCombatStateView(value: unknown): value is CombatStateView {
+  if(isRecord(value) && Object.hasOwn(value,'lifecycle')) {try {createCombatState(value);return true;} catch {return false;}}
   if (!isRecord(value) || !exact(value, [
     "status", "endReason", "round", "currentTurnIndex", "currentActorId", "turnOrder", "participants", "lastAction", "skillCooldowns", "activeCastings", "racialAbilityCooldowns",
   ])
@@ -733,6 +740,7 @@ export function isCombatStateView(value: unknown): value is CombatStateView {
 }
 
 export function isAuthoritativeGameStateView(value: unknown): value is AuthoritativeGameStateView {
+  if(isRecord(value) && Object.hasOwn(value,'phase26')) {try {createGameState(value);return true;} catch {return false;}}
   if (!isRecord(value) || !exact(value, ["revision", "activity", "character", "inventory", "partyMembers", "exploration", "combat"])
     || !isSafeInteger(value.revision) || value.revision < 0
     || (value.activity !== "outside-combat" && value.activity !== "in-combat")
@@ -778,7 +786,7 @@ export function isAuthoritativeGameStateView(value: unknown): value is Authorita
 function isCompanionStat(value: unknown): boolean {
   return value === null || (isRecord(value) && exact(value, ["current", "maximum"])
     && isSafeInteger(value.current) && value.current >= 0
-    && isSafeInteger(value.maximum) && value.maximum > 0 && value.current <= value.maximum);
+    && isSafeInteger(value.maximum) && value.maximum >= 0 && value.current <= value.maximum);
 }
 
 export function isCombatPartyOptionsResponse(value: unknown): value is CombatPartyOptionsResponse {
