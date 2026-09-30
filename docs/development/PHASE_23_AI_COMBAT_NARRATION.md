@@ -1,6 +1,6 @@
 # Phase 23：AI 戰鬥敘事
 
-> Phase 1–25 已由使用者手動確認。Phase 26 尚未開始。本文件保留 Phase 23 的實作與驗收紀錄。
+> Phase 1–26 已由使用者手動確認；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留 Phase 23 的實作與驗收紀錄。
 
 ## 權威邊界
 

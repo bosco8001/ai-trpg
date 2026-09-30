@@ -1,6 +1,6 @@
 # Phase 25：瀕死、救助與死亡手動驗收
 
-Phase 1–25 已由使用者手動確認。Phase 26 尚未開始。本頁的 TEST HP 與傷害指令只供工程驗證，不代表正式平衡。普通攻擊與技能仍只裁定命中，不會自動扣 HP。
+Phase 1–26 已由使用者手動確認；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本頁保留 Phase 25 的實作與驗收紀錄。TEST HP 與傷害指令只供工程驗證，不代表正式平衡。普通攻擊與技能仍只裁定命中，不會自動扣 HP。
 
 ## 0. 準備乾淨 Memory 戰鬥
 
@@ -265,6 +265,6 @@ COMBAT_ROLL_FIXTURE_MODE=normal NARRATION_FIXTURE_MODE=normal npm run dev:api
 1. 用瀏覽器裝置模式設為寬 **375px**。確認整頁無水平捲動；每張卡仍可讀 `HP current/max`、瀕死剩餘回合或死亡文字。瀕死與死亡不能只靠顏色辨認。
 2. 系統／瀏覽器啟用「減少動態效果」。確認行動者、瀕死、死亡與勝敗仍有文字／邊框提示；不依賴位移動畫才能理解結果。
 3. 玩家回合按 Tab 到「救助」，按 Enter 開啟。再用 Tab 到合法瀕死目標，按 Enter 確認；取消也可用鍵盤。焦點環應清楚，NPC 自動節奏不應搶焦點。
-4. 結束戰鬥後救助不可操作。刷新後仍是同一 HP／lifeState／勝敗結果；Phase 26 結算尚未接入。
+4. 結束戰鬥後救助不可操作。刷新後仍是同一 HP／lifeState／勝敗結果；Phase 25 交付時尚未接入結算，後續已由 Phase 26 接通勝利／逃跑的明確繼續結算。
 
-Phase 25 手動驗收已由使用者完成並確認全部通過；Phase 26 尚未開始。
+Phase 25 與 Phase 26 手動驗收均已由使用者確認；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。

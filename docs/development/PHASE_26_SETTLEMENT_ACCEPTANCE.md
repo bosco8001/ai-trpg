@@ -1,6 +1,8 @@
 # Phase 26：戰鬥結算與返回探索 — 手動驗收
 
-工程狀態見 [實際驗證紀錄](PHASE_26_VERIFICATION.md)。本文件的項目仍等待使用者驗收；工程檢查不代表玩法、介面、節奏或手機可用性已接受。
+使用者於 2026-09-30 回報「手動測試也通過了」，Phase 26 已由使用者確認。驗收版本為 `a52aee0565d95a8c9e04d1f39128dc71e706fec9`，目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。工程狀態見 [實際驗證紀錄](PHASE_26_VERIFICATION.md)。
+
+下方清單保留作為重測步驟；使用者沒有逐項列出結果，因此不由代理代填每個勾選框。驗收判定來自使用者，不由工程檢查推定。
 
 這一階段像把戰場記分板交回角色簿。結果頁先保留戰場最後的數字；按「繼續」才整包寫回長期資料，再返回原探索位置。
 
@@ -267,4 +269,4 @@ FOR EACH ROW EXECUTE FUNCTION phase26_test_fail_history();
 
 ## 驗收回報
 
-請先回報第一節「詠唱中勝利與 MP 繼承」是否通過，再按上述項目補充問題。可附情境名稱、storage、操作前／後 revision 與可見結果。Phase 26 等待使用者確認；Phase 27 未開始。
+使用者已回報 Phase 26 手動測試通過。若之後重測發現問題，可附情境名稱、storage、操作前／後 revision 與可見結果，先修正目前階段的問題。目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。

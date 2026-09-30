@@ -23,6 +23,7 @@ import { createCombatService } from "./combat/service.js";
 import { registerCombatActionRoutes, registerCombatSandbox } from "./combat/routes.js";
 import type { CombatNarrationService } from "./combat/narration.js";
 import { registerGameStateRoute } from "./game-state-route.js";
+import { registerDataDiagnosticsRoute, type DataDiagnosticsReader } from "./data-diagnostics.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -31,6 +32,7 @@ export async function buildApp(options: {
   domainRepository?: GameStateRepository;
   interpreter?: ActionInterpreter;
   domainSession?: GameStateSession;
+  diagnosticsReader?: DataDiagnosticsReader;
   storage?: "memory" | "postgres";
   narrator?: ExplorationNarrator;
   saveGameRepository?: SaveGameRepository;
@@ -65,6 +67,14 @@ export async function buildApp(options: {
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
+  registerDataDiagnosticsRoute(app, options.diagnosticsReader ?? {
+    async readCurrent() {
+      if (!session.readStateForDiagnostics) throw new Error("缺少唯讀資料來源。");
+      const state = await session.readStateForDiagnostics();
+      return state === undefined ? undefined : { kind: "state", value: state };
+    },
+    readSlot: slotId => saveGameRepository.read(slotId),
+  }, storage);
   registerSettlementRoutes(app,session,storage,combatSandboxEnabled,options.settlementNarrator);
   registerCombatActionRoutes(app, combatService, storage, combatSandboxEnabled, options.combatNarrator);
 

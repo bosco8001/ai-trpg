@@ -7,6 +7,7 @@ import { ExplorationPage, type ConnectionState } from "./ExplorationPage.js";
 import type { AuthoritativeGameStateResponse } from "../shared/game-state.js";
 import { Button } from "./ui/Button.js";
 import { Panel } from "./ui/Panel.js";
+import { DataHealthPanel } from "./DataHealthPanel.js";
 
 const CONNECTION_TIMEOUT_MS = 5000;
 
@@ -93,6 +94,7 @@ export function App() {
               <h2 id="application-state-heading">{stateError ? "目前無法讀取遊戲狀態" : "正在讀取遊戲狀態……"}</h2>
               <p className="connection-panel__hint" role={stateError ? "alert" : "status"}>{stateError ?? "畫面會依權威狀態切換探索或戰鬥。"}</p>
               <Button loading={!stateError} loadingLabel="正在讀取……" disabled={!stateError} onClick={retryAll}>重新嘗試</Button>
+              <DataHealthPanel />
             </Panel>
           </div>
         </main>

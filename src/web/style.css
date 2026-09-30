@@ -2027,3 +2027,50 @@ h1 {
 
 .runtime-system-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .runtime-system-controls .ui-button { flex: 1 1 8rem; }
+/* Phase 28: compact, readable diagnostics in both drawers and recovery screens. */
+.data-health {
+  min-width: 0;
+  margin-top: var(--space-3);
+}
+
+.data-health__report {
+  margin-top: var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.data-health__results {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-health__item {
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-ornament);
+  border-radius: var(--radius-panel);
+}
+
+.data-health__item-heading, .data-health__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.data-health__item-heading h4 {
+  margin: 0;
+}
+
+.data-health__item p {
+  margin-bottom: 0;
+}
+
+.data-health__item[data-status="invalid-data"],
+.data-health__item[data-status="missing-data"],
+.data-health__item[data-status="unsupported-version"] {
+  border-color: var(--state-danger);
+}

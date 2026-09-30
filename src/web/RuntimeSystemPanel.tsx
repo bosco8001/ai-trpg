@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/Button.js';
 import { Panel } from './ui/Panel.js';
+import { DataHealthPanel } from './DataHealthPanel.js';
 import { SaveSlotsPanel, type SaveConfirmation } from './SaveSlotsPanel.js';
 import { listSaveSlots, loadGame, saveGame } from './api.js';
 import type { SaveSlotSummary, SaveSlotId } from '../shared/save-game.js';
@@ -63,9 +64,9 @@ export function RuntimeSystemPanel({ state, onStateUpdate, onRetryState, onMainM
                 void refresh();
         }}>系統／存檔</Button>
     {onMainMenu ? <Button variant="secondary" disabled={disabled || busy !== null} onClick={onMainMenu}>主選單</Button> : null}</div>
-    {open ? <SaveSlotsPanel slots={slots} loading={slots === null} busySlotId={busy} feedback={feedback} confirmation={confirmation} onSave={slot => slot.empty ? void run('save', slot.slotId) : setConfirmation({ kind: 'overwrite', slotId: slot.slotId })} onLoad={slotId => setConfirmation({ kind: 'load', slotId })} onConfirm={() => {
+    {open ? <><SaveSlotsPanel slots={slots} loading={slots === null} busySlotId={busy} feedback={feedback} confirmation={confirmation} onSave={slot => slot.empty ? void run('save', slot.slotId) : setConfirmation({ kind: 'overwrite', slotId: slot.slotId })} onLoad={slotId => setConfirmation({ kind: 'load', slotId })} onConfirm={() => {
                 if (confirmation)
                     void run(confirmation.kind === 'load' ? 'load' : 'save', confirmation.slotId);
-            }} onCancel={() => setConfirmation(null)}/> : null}
+            }} onCancel={() => setConfirmation(null)}/><DataHealthPanel /></> : null}
   </Panel>;
 }

@@ -1,4 +1,6 @@
 import { isHealthResponse, type HealthResponse } from "../shared/health.js";
+import { isDataDiagnosticsReport, type DataDiagnosticsReport } from "../shared/data-diagnostics.js";
+
 import { isInterpretationResponse, type InterpretationResponse } from "../shared/interpretation.js";
 import {
   isExplorationActionResponse,
@@ -55,6 +57,13 @@ import {
   type CombatRow,
 } from "../shared/game-state.js";
 
+export async function loadDataDiagnostics(signal: AbortSignal, fetcher: typeof fetch = fetch): Promise<DataDiagnosticsReport> {
+  const response = await fetcher("/api/data-diagnostics", { method: "GET", cache: "no-store", signal });
+  if (!response.ok) throw new Error("資料檢查暫時無法使用，請稍後重新檢查。");
+  const body: unknown = await response.json();
+  if (!isDataDiagnosticsReport(body)) throw new Error("資料檢查報告格式不正確。");
+  return body;
+}
 async function lifeCommand(path: string, expectedRevision: number, targetId?: string,
   fetcher: typeof fetch = fetch): Promise<CombatLifeResponse> {
   let response: Response;

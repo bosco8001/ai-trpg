@@ -53,4 +53,4 @@ FUTURE REQUIRED：Save / State Repair System。需要 deterministic rules、veri
 
 Future：Persistent Settlement、Combat History／Statistics／Replay、Reward、Narration delivery／recovery／versioning、Resurrection、Persistent Enemy／Encounter composition、Persistent statuses／Formation。未保存的 confirmed facts／原文不能承諾追溯補回。未來 Reward identity 與 Save replay 政策須保留不同 completion 的區別。
 
-Open：Combat 推進 world time 的正式模型。Phase 27 未開始。
+Open：Combat 推進 world time 的正式模型。目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。

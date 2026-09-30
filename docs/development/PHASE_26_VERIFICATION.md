@@ -1,6 +1,12 @@
 # Phase 26 工程驗證紀錄
 
-日期：2026-09-30。使用者手動驗收：等待確認；Phase 27 未開始。工程結果與接受遊戲玩法／介面是兩件事。
+日期：2026-09-30。使用者已回報「手動測試也通過了」，Phase 26 已由使用者確認；驗收版本為 `a52aee0`，目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。工程結果與使用者驗收分別記錄。
+
+## 外部複查與使用者驗收
+
+使用者提供的 Grok 複查報告針對 `a52aee0565d95a8c9e04d1f39128dc71e706fec9`，以 Node 24.21 與隔離 PostgreSQL 17 實際驗證 H1／M1／M2／L1 均已修正，未發現中等或以上新缺陷。報告結果為 PostgreSQL 312/312 通過、無 DB 288 通過／24 略過、新回歸 9/9 通過；另以真實 Phase 25 程式產生的 ended 詠唱資料補驗升級、重啟及結算。
+
+以上為使用者提供的外部驗證證據，與下方代理在 PostgreSQL 15 的本機工程結果分開。Grok 未執行瀏覽器驗收；使用者其後自行回報手動測試通過。詳細重測步驟保留於 [手動驗收文件](PHASE_26_SETTLEMENT_ACCEPTANCE.md)。
 
 ## 審查修正後的最新結果
 
@@ -26,13 +32,13 @@
 | 真正 API 程序重啟 | 三次重啟通過；ended／settled／Load replay 快照逐項比較 |
 | Memory TEST 情境產生器 | victory／escape／defeat／dead-companion 四種 API 情境均成功停在預期結果 |
 
-測試涵蓋既有全部回歸與新增 Phase 26 測試。沒有以 SSR 或 API 檢查宣稱手機、節奏或人工操作已通過；沒有執行瀏覽器人工驗收。專案沒有 lint／format script，未宣稱執行這些檢查。
+測試涵蓋既有全部回歸與新增 Phase 26 測試。代理沒有以 SSR 或 API 檢查宣稱手機、節奏或人工操作已通過，也沒有代為執行瀏覽器人工驗收。使用者其後回報手動測試通過。專案沒有 lint／format script，未宣稱執行這些檢查。
 
 ## 隔離範圍
 
 使用本機 PostgreSQL 15 獨立 cluster `/private/tmp/ai-trpg-phase26-pg`，使用者 `phase26_test`，`127.0.0.1:55426`。測試資料庫：`ai_trpg_phase26_final_test`；實際程序重啟：`ai_trpg_phase26_restart`。單項競爭測試再建立隨機 schema，完成後移除其測試 schema。
 
-沒有連接正式資料庫、沒有覆寫正式 Save、沒有刪 volume、沒有自行 commit／push。原工作區檢查時為乾淨狀態。現有修改均為本次 Phase 26 工作。
+代理工程檢查沒有連接正式資料庫、沒有覆寫正式 Save、沒有刪 volume，也沒有自行 commit／push。使用者其後已提交並推送修正版本 `a52aee0`。工程開始時工作區為乾淨狀態。
 
 ## 競爭與失敗證據
 
@@ -108,4 +114,4 @@ DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_final_test 
 git diff --check
 ```
 
-下一步是 [使用者手動驗收](PHASE_26_SETTLEMENT_ACCEPTANCE.md)，不是 Phase 27。
+使用者已完成並確認 [Phase 26 手動驗收](PHASE_26_SETTLEMENT_ACCEPTANCE.md)。目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)；Phase 27 已由使用者於 2026-10-01 確認手動測試通過。

@@ -1,6 +1,6 @@
 # Phase 26 審查缺陷修正
 
-日期：2026-09-30。H1／M1／M2／L1 的工程修正完成；等待使用者手動驗收，Phase 27 未開始。設計仍以 [已接受規格](PHASE_26_FINAL_SPEC.md) 為準。
+日期：2026-09-30。H1／M1／M2／L1 的工程修正完成；使用者其後已確認手動測試通過，驗收版本為 `a52aee0`。目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。設計仍以 [已接受規格](PHASE_26_FINAL_SPEC.md) 為準。
 
 ## 重現與修正
 
@@ -44,7 +44,7 @@ M1 使用 Phase 25 欄位形狀的測試快照：缺少 phase26／lifecycle／Pa
 | 原有結果頁／History／Load replay 三次重啟 | 通過；ended revision 17、Settlement 18、replay 20、high-water 4 |
 | 混合槽情境產生器 | 空槽建立成功；再次執行安全拒絕，原資料不變 |
 
-使用 PostgreSQL 15.19，專用 cluster `/private/tmp/ai-trpg-phase26-pg`，`phase26_test@127.0.0.1:55426`。全套與重啟使用 `ai_trpg_phase26_review_test`；混合槽產生器使用 `ai_trpg_phase26_review_slots`。沒有使用正式 DATABASE_URL，沒有新增 migration，沒有 commit／push。
+代理工程檢查使用 PostgreSQL 15.19，專用 cluster `/private/tmp/ai-trpg-phase26-pg`，`phase26_test@127.0.0.1:55426`。全套與重啟使用 `ai_trpg_phase26_review_test`；混合槽產生器使用 `ai_trpg_phase26_review_slots`。沒有使用正式 DATABASE_URL，沒有新增 migration。代理交付時未 commit／push；使用者其後已提交並推送 `a52aee0`。外部複查的 PostgreSQL 17 證據另見 [驗證紀錄](PHASE_26_VERIFICATION.md)。
 
 詠唱重啟實際輸出：
 
@@ -70,4 +70,4 @@ npm run build
 TEST_DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_review_test node tests/helpers/phase26-casting-restart-check.mjs
 ```
 
-重啟腳本會 Reset 指定 TEST 世界並使用 Slot 1；重跑必須使用專用隔離 DB。工程成功不代表 Phase 26 已被使用者接受。
+重啟腳本會 Reset 指定 TEST 世界並使用 Slot 1；重跑必須使用專用隔離 DB。使用者其後回報手動測試通過，Phase 26 已由使用者確認；此判定不是由工程測試推定。

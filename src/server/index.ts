@@ -11,6 +11,8 @@ import { createCombatNarrationService } from "./combat/narration.js";
 import { FixtureCombatNarrationAdapter } from "./combat/narration-fixture-adapter.js";
 import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
+import { createPostgresDiagnosticsReader } from "./postgres-data-diagnostics.js";
+import { createTestGameState } from "./test-game-state.js";
 import {
   createCombatActionFixtureRoller,
   createPhase22CombatFixtureRoller,
@@ -80,6 +82,7 @@ const app = await buildApp({
     : undefined,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,
+  diagnosticsReader: pool ? createPostgresDiagnosticsReader(pool, createTestGameState().character.id) : undefined,
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },

@@ -5,6 +5,7 @@ import { useEffect, useReducer, useRef, useState, type KeyboardEvent as ReactKey
 import { Button } from "./ui/Button.js";
 import { Icon, type IconName } from "./ui/Icon.js";
 import { Panel } from "./ui/Panel.js";
+import { DataHealthPanel } from "./DataHealthPanel.js";
 import { executeExplorationAction, listSaveSlots, loadExplorationState, loadGame, saveGame } from "./api.js";
 import { SaveSlotsPanel, type SaveConfirmation } from "./SaveSlotsPanel.js";
 import { MAX_PLAYER_TEXT_LENGTH } from "../shared/interpretation.js";
@@ -372,23 +373,26 @@ export function ExplorationPage({
               <button ref={drawerCloseRef} className="utility-drawer__close" type="button" aria-label={`關閉${activePanel.title}面板`} title="關閉" onClick={closeUtilityPanel}><Icon name="close" /></button>
             </div>
             {activeUtility === "system" ? (
-              <SaveSlotsPanel
-                slots={saveSlots}
-                loading={saveSlotsLoading}
-                busySlotId={busySlotId}
-                feedback={saveFeedback}
-                confirmation={saveConfirmation}
-                onSave={(slot) => {
-                  if (slot.empty) runSaveOperation("save", slot.slotId);
-                  else setSaveConfirmation({ kind: "overwrite", slotId: slot.slotId });
-                }}
-                onLoad={(slotId) => setSaveConfirmation({ kind: "load", slotId })}
-                onConfirm={() => {
-                  if (!saveConfirmation) return;
-                  runSaveOperation(saveConfirmation.kind === "overwrite" ? "save" : "load", saveConfirmation.slotId);
-                }}
-                onCancel={() => setSaveConfirmation(null)}
-              />
+              <>
+                <SaveSlotsPanel
+                  slots={saveSlots}
+                  loading={saveSlotsLoading}
+                  busySlotId={busySlotId}
+                  feedback={saveFeedback}
+                  confirmation={saveConfirmation}
+                  onSave={(slot) => {
+                    if (slot.empty) runSaveOperation("save", slot.slotId);
+                    else setSaveConfirmation({ kind: "overwrite", slotId: slot.slotId });
+                  }}
+                  onLoad={(slotId) => setSaveConfirmation({ kind: "load", slotId })}
+                  onConfirm={() => {
+                    if (!saveConfirmation) return;
+                    runSaveOperation(saveConfirmation.kind === "overwrite" ? "save" : "load", saveConfirmation.slotId);
+                  }}
+                  onCancel={() => setSaveConfirmation(null)}
+                />
+                <DataHealthPanel />
+              </>
             ) : (
               <>
                 <p>{activePanel.description}</p>

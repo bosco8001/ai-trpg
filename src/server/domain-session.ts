@@ -35,6 +35,8 @@ import { settleCombat, phase26, newIdentity } from "../domain/settlement.js";
 import { reserve, append, type NarrativeReservation } from "./history.js";
 import { createTestGameState } from "./test-game-state.js";
 export interface GameStateSession {
+  /** Pure inspection only: no initialization, migration write or gameplay mutation. */
+  readStateForDiagnostics?(): GameState | undefined | Promise<GameState | undefined>;
   settleCombat(input: unknown): Promise<import("../domain/settlement.js").SettlementTransition & {reservation?: import("./history.js").NarrativeReservation}>;
   resetTest(input: unknown): Promise<import("../domain/game.js").StateReplacementResult>;
   reserveNarrative(type: "system" | "tutorial" | "meta"): Promise<import("./history.js").NarrativeReservation | undefined>;
@@ -145,6 +147,7 @@ function methods(read:()=>GameState | Promise<GameState>, boundary:Boundary): Ga
 export function createDomainSession(initialState: GameState) {
   let state = createGameState(initialState);
   return {
+    readStateForDiagnostics: () => state,
     ...methods(()=>state,async transition=>{const {result,nextState}=transition(state);if(nextState) state=createGameState(nextState);return result;}),
     getState: () => state,
     applyCombatDamage(input: unknown) { const result = applyCombatDamage(state, input); if (result.ok) state = result.state; return result; },
@@ -250,5 +253,6 @@ export function createPersistedDomainSession(repository:GameStateRepository,init
     if(nextState && !await repository.saveIfRevision(state.revision,nextState)) return {ok:false,code:'stale-revision',message:'狀態已更新，請重新讀取。'} as typeof result;
     return result;
   };
-  return methods(()=>repository.createIfAbsent(seed),boundary);
+  return { ...methods(()=>repository.createIfAbsent(seed),boundary),
+    readStateForDiagnostics: () => repository.load(seed.character.id) };
 }

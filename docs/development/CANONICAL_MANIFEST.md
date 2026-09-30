@@ -65,3 +65,14 @@ Agent 遇到 unresolved 項目時：
 - [Canon #1–#116 追溯索引](PHASE_26_CANON_INDEX.md)：只供編號追溯，不能取代完整規格。
 
 - [規格與實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)、[工程驗證紀錄](PHASE_26_VERIFICATION.md)、[手動驗收清單](PHASE_26_SETTLEMENT_ACCEPTANCE.md)：工程交付文件；不代替已接受設計或使用者驗收。
+
+## Phase 27 工程交付文件
+
+- [手機戰鬥介面交付與測試指南](PHASE_27_MOBILE_COMBAT.md)：工程交付文件，不是新增 Canon；手機戰鬥介面的權威要求仍為 `docs/gameplay/combat_ui.md`。
+- 目前階段與驗收紀錄見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。工程檢查與外部 Bot 報告不代替使用者手動驗收，也不能替未定規則定案。
+
+## 後續工程規劃
+
+- [Phase 28 唯讀資料健康檢查](PHASE_28_DATA_DIAGNOSTICS.md)：工程交付與測試指南，不是新增 Canon；工程檢查通過，等待使用者手動驗收。
+- [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)：工程盤點與排序提案，不是新增 Canon；目前只批准 R01 的唯讀診斷作為 Phase 28。
+- [未定事項與後續承諾](OPEN_QUESTIONS.md) 分別標記已定待實作、待定、後續承諾與範圍候選；其中的實作排序不覆蓋上述權威規則。
