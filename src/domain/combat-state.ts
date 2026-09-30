@@ -540,6 +540,23 @@ function parseLastAction(value: unknown): CombatLastAction | null | undefined {
 
 /** PostgreSQL 與 domain 建立狀態時共用的完整 runtime validation。 */
 export function createCombatState(value: unknown): CombatState {
+  return parseCombatState(value, false);
+}
+
+/** Phase 1–25 已知 TEST 快照的版本映射；先驗證舊詠唱，再依新版 ended 契約清除，不退 MP。 */
+export function migratePhase25TestCombatState(value: unknown): CombatState {
+  if (!isRecord(value) || Object.hasOwn(value, "lifecycle") || !Array.isArray(value.participants)
+    || value.participants.some(p => {
+      if (!isRecord(p) || ["characterId", "mp", "capacityAdjustment"].some(k => Object.hasOwn(p, k))) return true;
+      const known = typeof p.id === "string" ? legacyTestPositions[p.id] : undefined;
+      return !(known && p.displayName === known.displayName && p.side === known.side && p.controlledBy === undefined
+        || p.id === "TEST-companion-1" && p.displayName === "TEST 隊友" && p.side === "party" && p.controlledBy === "companion");
+    })) throw new Error("無法套用已知 TEST 舊版戰鬥映射。");
+  const validated = parseCombatState(value, true);
+  return validated.status === "ended" ? createCombatState({...validated, activeCastings: []}) : validated;
+}
+
+function parseCombatState(value: unknown, allowLegacyEndedCastings: boolean): CombatState {
   if (isRecord(value) && Object.hasOwn(value, "lifecycle")) {
     const { lifecycle, ...base } = value;
     if (!isRecord(lifecycle) || !exact(lifecycle,["combatId","runId","worldId","fixtureId","sourceEncounterId","returnExplorationContext","rewardEligibleOnVictory"])) throw new Error("戰鬥身分格式不正確。");
@@ -621,7 +638,7 @@ export function createCombatState(value: unknown): CombatState {
       || value.currentActorId !== value.turnOrder[value.currentTurnIndex as number]))
     || (status === "ended" && endReason === "escaped" && (lastAction?.type !== "run" || lastAction.outcome !== "success"
       || lastAction.round !== value.round))
-    || (status === "ended" && activeCastings.length > 0)
+    || (status === "ended" && activeCastings.length > 0 && !allowLegacyEndedCastings)
     || (status === "ended" && (endReason === "victory" || endReason === "escaped") && participants.some(p => p.side === "party" && p.controlledBy !== "companion" && p.health.lifeState === "dead"))
     || (status === "ended" && endReason === "victory" && (participants.some((participant) => participant.side === "enemy" && participant.health.lifeState !== "dead")
       || !participants.some((participant) => participant.side === "party" && participant.health.lifeState === "active")))

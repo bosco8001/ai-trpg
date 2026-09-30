@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const url=process.env.PHASE26_API_URL ?? 'http://127.0.0.1:3001';
 if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(url)) throw new Error('僅允許本機 TEST API。');
 const mode=process.argv[2] ?? 'victory';
-if(!['victory','escape','defeat','dead-companion'].includes(mode)) throw new Error('情境只接受 victory、escape、defeat、dead-companion。');
+if(!['victory','escape','defeat','dead-companion','casting-victory'].includes(mode)) throw new Error('情境只接受 victory、escape、defeat、dead-companion、casting-victory。');
 async function call(path,body) {
   const response=await fetch(url+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
   const result=await response.json();assert.equal(response.status,200,JSON.stringify(result));return result;
@@ -13,10 +13,16 @@ assert.equal(response.sandbox,true,'需要 DOMAIN_SANDBOX 與 COMBAT_SANDBOX。'
 assert.equal(state.phase26?.fixtureId,'phase26-test-v1','拒絕重建非本階段 TEST 世界。');
 state=(await call('/api/dev/combat/reset',{expectedRevision:state.revision})).state;
 const resetRevision=state.revision;
+if(mode==='casting-victory') state=(await call('/api/dev/domain/commands',{type:'set-equipped-skills',skillIds:['TEST-skill-2'],expectedRevision:state.revision})).state;
 state=(await call('/api/dev/combat/start',{expectedRevision:state.revision})).state;
 async function act(path,fields={}) {state=(await call(path,{expectedRevision:state.revision,...fields})).state;}
 async function hurt(targetId,amount) {await act('/api/dev/combat/apply-damage',{targetId,amount});}
-if(mode==='defeat') {await hurt('TEST-companion-1',8);await hurt('TEST-player',10);}
+if(mode==='casting-victory') {
+  await act('/api/dev/combat/advance');await act('/api/combat/casting/start',{skillId:'TEST-skill-2'});
+  assert.equal(state.combat.activeCastings.length,1);
+  await hurt('TEST-enemy-1',6);await hurt('TEST-enemy-2',6);
+  assert.deepEqual(state.combat.activeCastings,[]);assert.equal(state.combat.participants.find(p=>p.id==='TEST-player').mp.currentMp,18);
+} else if(mode==='defeat') {await hurt('TEST-companion-1',8);await hurt('TEST-player',10);}
 else if(mode==='escape') {
   await hurt('TEST-player',4);await act('/api/dev/combat/advance');await act('/api/combat/run');
   assert.equal(state.combat.endReason,'escaped','請啟用 COMBAT_ESCAPE_ROLL_FIXTURE_MODE=success。');

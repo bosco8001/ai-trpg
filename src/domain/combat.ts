@@ -929,7 +929,7 @@ export function runFromCombat(state: GameState, input: unknown, roller: DiceRoll
   });
   const nextCombat = check.outcome === "success"
     ? createCombatState({
-      ...combat, status: "ended", endReason: "escaped", currentTurnIndex: null,
+      ...combat, status: "ended", endReason: "escaped", activeCastings: [], currentTurnIndex: null,
       currentActorId: null, lastAction,
     })
     : createCombatState({ ...advanceToNextTurn(combat), lastAction });
@@ -1251,7 +1251,7 @@ function commitLifeTransition(state: GameState, combat: ActiveCombatState,
   options: { advance: boolean; lastAction?: RescueActionResolution }): LifeTransitionResult {
   const endReason = endReasonAfter(participants);
   let candidate: CombatState;
-  if (endReason) candidate = createCombatState({ ...combat, participants, status: "ended", endReason,
+  if (endReason) candidate = createCombatState({ ...combat, participants, status: "ended", endReason, activeCastings: [],
     currentTurnIndex: null, currentActorId: null, ...(options.lastAction ? { lastAction: options.lastAction } : {}) });
   else {
     const currentDead = participants.find((entry) => entry.id === combat.currentActorId)?.health.lifeState === "dead";

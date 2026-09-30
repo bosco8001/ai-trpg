@@ -2,7 +2,17 @@
 
 日期：2026-09-30。使用者手動驗收：等待確認；Phase 27 未開始。工程結果與接受遊戲玩法／介面是兩件事。
 
-## 實際執行結果
+## 審查修正後的最新結果
+
+詳見 [H1／M1／M2／L1 修正與回歸證據](PHASE_26_REVIEW_FIXES.md)。以下初版 303 項結果保留為歷史證據；最新使用專用 `ai_trpg_phase26_review_test`。
+
+- 隔離 PostgreSQL：312/312 通過，0 失敗，0 略過。
+- 無 DB：288 通過，0 失敗，24 略過，總數 312。
+- typecheck、build、既有 migration 全新套用及已套用 dry-run、diff 檢查通過。
+- 實際 API 三次重啟：詠唱勝利 ended revision 7、Settlement 8、Load 9、下一場 Start 11；Combat／Persistent／下一場 MP 均為 18/24，不退款。
+- 舊 TEST ended 詠唱快照已可 hydrate；未知正式 v1 Save 仍受阻，但健康槽可獨立載入。v2 不能新建未知 legacy-unplaced 身分。
+
+## 初版實際執行結果
 
 | 檢查 | 結果 |
 |---|---|
@@ -69,11 +79,11 @@ Memory 情境產生器的實際 HTTP 結果：
 | 資料 | 相容策略 | 原資料 |
 |---|---|---|
 | 已知 TEST v1 探索 Save | 明確版本映射為 v2，補已知 fixture 的必要 resources／ownership | 讀取與 Load 不覆寫原 Save row；PostgreSQL 測試逐欄比較原列 |
-| Phase 1–25 已知 TEST live snapshot | hydrate 保留既有 revision／Combat facts，補明確映射，首次安全保存 Phase 26 infrastructure | 不重建正式世界、不回滿現有 Combat current |
+| Phase 1–25 已知 TEST live snapshot | hydrate 保留既有 revision／Combat facts；合法 ended 舊詠唱先驗證再清除、不退 MP；首次安全保存 Phase 26 infrastructure | 不重建正式世界、不回滿現有 Combat current |
 | v2 active／ended／Game Over Save | 完整驗證後同 run 原子 Load；live revision +1，新 generation，CombatId 原樣 | 原 Save 不修改 |
-| 未知正式 v1 Save／缺 world identity | `migration-blocked`，保留原檔 | PostgreSQL 驗證拒絕後 live state 與原 Save 均不變 |
+| 未知正式 v1 Save／缺 world identity | 單槽 `migration-blocked`，保留原檔；不阻擋健康槽清單與 Load | PostgreSQL 驗證拒絕後 live state 與原 Save 均不變 |
 | 缺失／跨 world／重複 references、非法 resources | 安全拒絕，不修補、不部分提交 | 保留原資料 |
-| 合法 legacy-unplaced Entry | 保留 ID／文字／已知順序／nullable sequence，獨立區段 | 不猜 chronology、不分配新 sequence |
+| 合法 legacy-unplaced Entry | v2 Load 必須已存在身分帳，禁止新增未知 legacy 身分；保留 ID／文字／已知順序／nullable sequence，獨立區段 | 不猜 chronology、不分配新 sequence |
 | 舊前端本地探索文字 | 舊 Save 未保存，沒有可驗證資料可恢復 | 不憑空生成舊歷史 |
 
 正式角色數值／modifier 接入、跨 run import 與損壞資料 Repair 不在本階段。

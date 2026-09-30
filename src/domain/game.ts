@@ -1,5 +1,5 @@
 import { migrateKnownTest, validatePhase26, phase26, newIdentity, canonicalEntry, type Phase26State } from "./settlement.js";
-import { createCombatState, type CombatState } from "./combat-state.js";
+import { createCombatState, migratePhase25TestCombatState, type CombatState } from "./combat-state.js";
 import { isInventory, normalizeInventory, type InventoryStack } from "./combat-items.js";
 import { createLegacyPartyMembers, isPartyMemberStates, type PartyMemberState } from "./party-tactics.js";
 
@@ -73,6 +73,7 @@ export function replaceGameStateContents(
     for (const e of candidate.history) {
       const known = ledger.find(k => k.id === e.id);
       if (known && canonicalEntry(known) !== canonicalEntry(e)) throw new Error("敘事身分衝突。");
+      if (!known && e.category === "legacy-unplaced") throw new Error("舊敘事只能由版本映射建立。");
       if (!known) ledger.push(e);
     }
     const next = createGameState({ ...contents, revision: current.revision + 1,
@@ -186,7 +187,12 @@ export function createGameState(seed: unknown): GameState {
     validatePhase26(state, p);
     return Object.freeze({...validated,phase26:deepFreeze(structuredClone(p))});
   }
-  const base = createGameStateBase(seed);
+  // 僅缺少 Phase 26 資料的已知 TEST 舊格式可走版本映射；新版仍使用嚴格驗證。
+  const source = isRecord(seed) && isRecord(seed.character) && seed.character.id === "TEST-character"
+    && isRecord(seed.combat) && !Object.hasOwn(seed.combat, "lifecycle")
+    && seed.combat.status === "ended" && Array.isArray(seed.combat.activeCastings) && seed.combat.activeCastings.length > 0
+    ? {...seed, combat: migratePhase25TestCombatState(seed.combat)} : seed;
+  const base = createGameStateBase(source);
   const p = migrateKnownTest(base);
   if (!p) return base;
   let combat = base.combat;

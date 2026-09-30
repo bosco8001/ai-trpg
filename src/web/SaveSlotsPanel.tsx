@@ -1,4 +1,4 @@
-import type { SaveSlotId, SaveSlotSummary } from "../shared/save-game.js";
+import { isBlockedSaveSlot, type SaveSlotId, type SaveSlotSummary } from "../shared/save-game.js";
 import { Button } from "./ui/Button.js";
 
 export interface SaveConfirmation {
@@ -49,9 +49,11 @@ export function SaveSlotsPanel({
               <li key={slot.slotId} className="save-slot" data-empty={slot.empty}>
                 <div className="save-slot__heading">
                   <h4>存檔 {slot.slotId}</h4>
-                  <span>{slot.empty ? "尚無存檔" : `格式 v${slot.formatVersion}`}</span>
+                  <span>{slot.empty ? "尚無存檔" : isBlockedSaveSlot(slot) ? "無法載入" : `格式 v${slot.formatVersion}`}</span>
                 </div>
-                {slot.empty ? <p>這個存檔槽目前是空的。</p> : (
+                {slot.empty ? <p>這個存檔槽目前是空的。</p> : isBlockedSaveSlot(slot) ? (
+                  <p>{slot.message} 原存檔仍保留，其他可用存檔槽仍可載入。</p>
+                ) : (
                   <dl>
                     <div><dt>位置</dt><dd>{slot.locationId}</dd></div>
                     <div><dt>保存時間</dt><dd><time dateTime={slot.savedAt}>{formatSavedAt(slot.savedAt)}</time></dd></div>
@@ -74,7 +76,7 @@ export function SaveSlotsPanel({
                   <div className="save-slot__actions">
                     <Button variant={slot.empty ? "primary" : "secondary"} disabled={busySlotId !== null}
                       onClick={() => onSave(slot)}>{slot.empty ? "儲存" : "覆蓋"}</Button>
-                    {!slot.empty ? (
+                    {!slot.empty && !isBlockedSaveSlot(slot) ? (
                       <Button variant="secondary" disabled={busySlotId !== null}
                         onClick={() => onLoad(slot.slotId)}>載入</Button>
                     ) : null}

@@ -5,16 +5,30 @@ export const SAVE_FORMAT_VERSION = 2 as const;
 export const SAVE_SLOT_IDS = [1, 2, 3] as const;
 export type SaveSlotId = typeof SAVE_SLOT_IDS[number];
 
+export interface LoadableSaveSlotSummary {
+  readonly slotId: SaveSlotId;
+  readonly empty: false;
+  readonly formatVersion: 1 | typeof SAVE_FORMAT_VERSION;
+  readonly sourceRevision: number;
+  readonly savedAt: string;
+  readonly locationId: ExplorationLocationId;
+}
+export type SaveSlotIssue = "invalid-save" | "migration-blocked" | "unsupported-format";
+export interface BlockedSaveSlotSummary {
+  readonly slotId: SaveSlotId;
+  readonly empty: false;
+  readonly loadable: false;
+  readonly issue: SaveSlotIssue;
+  readonly message: string;
+}
 export type SaveSlotSummary =
   | { readonly slotId: SaveSlotId; readonly empty: true }
-  | {
-      readonly slotId: SaveSlotId;
-      readonly empty: false;
-      readonly formatVersion: 1 | typeof SAVE_FORMAT_VERSION;
-      readonly sourceRevision: number;
-      readonly savedAt: string;
-      readonly locationId: ExplorationLocationId;
-    };
+  | LoadableSaveSlotSummary
+  | BlockedSaveSlotSummary;
+
+export function isBlockedSaveSlot(slot: SaveSlotSummary): slot is BlockedSaveSlotSummary {
+  return !slot.empty && "loadable" in slot && slot.loadable === false;
+}
 
 export interface SaveSlotsResponse {
   readonly slots: readonly SaveSlotSummary[];
@@ -22,7 +36,7 @@ export interface SaveSlotsResponse {
 
 export interface SaveOperationResponse {
   readonly authoritative?: AuthoritativeGameStateResponse;
-  readonly slot: Extract<SaveSlotSummary, { empty: false }>;
+  readonly slot: LoadableSaveSlotSummary;
   readonly state: ExplorationStateSummary;
 }
 
@@ -45,6 +59,9 @@ function isRevision(value: unknown): value is number {
 export function isSaveSlotSummary(value: unknown): value is SaveSlotSummary {
   if (!isRecord(value) || !isSaveSlotId(value.slotId) || typeof value.empty !== "boolean") return false;
   if (value.empty) return exact(value, ["slotId", "empty"]);
+  if (value.loadable === false) return exact(value, ["slotId", "empty", "loadable", "issue", "message"])
+    && (value.issue === "invalid-save" || value.issue === "migration-blocked" || value.issue === "unsupported-format")
+    && typeof value.message === "string" && value.message.trim().length > 0;
   return exact(value, ["slotId", "empty", "formatVersion", "sourceRevision", "savedAt", "locationId"])
     && (value.formatVersion === 1 || value.formatVersion === SAVE_FORMAT_VERSION) && isRevision(value.sourceRevision)
     && typeof value.savedAt === "string" && !Number.isNaN(Date.parse(value.savedAt))
@@ -59,5 +76,5 @@ export function isSaveSlotsResponse(value: unknown): value is SaveSlotsResponse 
 
 export function isSaveOperationResponse(value: unknown): value is SaveOperationResponse {
   return isRecord(value) && (exact(value, ["slot", "state"]) || exact(value,["slot","state","authoritative"]) && isAuthoritativeGameStateResponse(value.authoritative))
-    && isSaveSlotSummary(value.slot) && !value.slot.empty && isExplorationStateSummary(value.state);
+    && isSaveSlotSummary(value.slot) && !value.slot.empty && !isBlockedSaveSlot(value.slot) && isExplorationStateSummary(value.state);
 }

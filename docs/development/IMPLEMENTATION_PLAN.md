@@ -303,6 +303,8 @@ CombatState 與 party preference 繼續放在既有 JSONB snapshot，無 migrati
 
 PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久化 generation、allocator 與 first-write-wins Entry 身分帳；migration 提供 run identity 與敘事去重保障。Save Format v2 保存完整 mutable Gameplay 與已保存 History；Load 同 run、revision 前進、新 generation、CombatId 與 Entry provenance 保留。舊 v1 已知 TEST 映射保留原列，缺必要 world references 則 migration-blocked。前端接通 Continue／blocking recovery／Game Over／系統存檔／探索 History；timeout／conflict 不自動重送 mutation。
 
-工程檢查：隔離 `ai_trpg_phase26_final_test` PostgreSQL 的 `npm test` 303 項通過、0 失敗、0 略過；typecheck、build、全新與已套用 migration dry-run、diff 檢查通過；實際 API 程序三次重啟與四種 Memory TEST 情境產生器通過。完整證據及限制見 [驗證紀錄](PHASE_26_VERIFICATION.md)，逐節對照見 [實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)。
+工程檢查：審查修正後，隔離 `ai_trpg_phase26_review_test` PostgreSQL 的 `npm test` 312 項通過、0 失敗、0 略過；typecheck、build、全新與已套用 migration dry-run、diff 檢查通過；實際 API 程序三次重啟與四種 Memory TEST 情境產生器通過。完整證據及限制見 [驗證紀錄](PHASE_26_VERIFICATION.md)，逐節對照見 [實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)。
+
+[審查修正紀錄](PHASE_26_REVIEW_FIXES.md)：H1／M1／M2／L1 已重現及修正；無 DB 為 288 通過、24 略過。詠唱中勝利、結果頁 Save／Load、三次 API 重啟、結算及下一場 MP 18/24 已通過工程檢查。
 
 **Phase 26 工程完成，等待使用者手動驗收。** [手動驗收清單與第一步](PHASE_26_SETTLEMENT_ACCEPTANCE.md)。沒有自行 commit／push，Phase 27 未開始。FUTURE REQUIRED Repair、Persistent Settlement／Combat History／Statistics／Replay、Reward、Narration delivery／recovery／versioning、Resurrection、Persistent Enemy／Encounter composition、Persistent statuses／Formation 與 world time open commitment 均保留。

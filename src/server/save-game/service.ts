@@ -7,6 +7,7 @@ import {
   SAVE_SLOT_IDS,
   isSaveSlotId,
   type SaveOperationResponse,
+  type LoadableSaveSlotSummary,
   type SaveSlotId,
   type SaveSlotSummary,
   type SaveSlotsResponse,
@@ -92,7 +93,7 @@ export function decodeSaveSnapshot(record: StoredSaveSlot): SaveSnapshotV2 {
   }
 }
 
-function occupied(record: StoredSaveSlot, snapshot: SaveSnapshotV2): Extract<SaveSlotSummary, { empty: false }> {
+function occupied(record: StoredSaveSlot, snapshot: SaveSnapshotV2): LoadableSaveSlotSummary {
   return {
     slotId: record.slotId,
     empty: false,
@@ -141,7 +142,16 @@ export function createSaveGameService(
         return {
           slots: SAVE_SLOT_IDS.map((slotId): SaveSlotSummary => {
             const record = byId.get(slotId);
-            return record ? occupied(record, decodeSaveSnapshot(record)) : { slotId, empty: true };
+            if (!record) return { slotId, empty: true };
+            try {
+              return occupied(record, decodeSaveSnapshot(record));
+            } catch (error) {
+              if (error instanceof SaveGameFailure && (error.code === "invalid-save"
+                || error.code === "migration-blocked" || error.code === "unsupported-format")) {
+                return {slotId, empty: false, loadable: false, issue: error.code, message: error.message};
+              }
+              throw error;
+            }
           }),
         };
       } catch (error) {

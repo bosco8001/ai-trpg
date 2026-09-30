@@ -417,6 +417,8 @@ Phase 26 工程完成，等待使用者手動驗收。勝利／逃跑停在結�
 
 [第一個手動驗收步驟與完整清單](docs/development/PHASE_26_SETTLEMENT_ACCEPTANCE.md)、[實際工程驗證](docs/development/PHASE_26_VERIFICATION.md)、[規格與實作對照](docs/development/PHASE_26_IMPLEMENTATION_MAPPING.md)、[已接受完整規格](docs/development/PHASE_26_FINAL_SPEC.md)、[Canon 索引](docs/development/PHASE_26_CANON_INDEX.md)。
 
-本次隔離 PostgreSQL 回歸 303 項通過、0 失敗、0 略過；typecheck、build、migration dry-run 與 diff 檢查通過。三次實際 API 程序重啟保留 CombatId／資源／History，Load 的 revision／generation 與 allocator 均符合契約。v1 已知 TEST Save 讀取遷移不改原列；缺可驗證世界資料則 migration-blocked。新增 migration 只在隔離 DB 驗證，正式 DB 尚未套用。
+審查缺陷修正後，隔離 PostgreSQL 回歸 312 項通過、0 失敗、0 略過；typecheck、build、migration dry-run 與 diff 檢查通過。三次實際 API 程序重啟保留 CombatId／資源／History，Load 的 revision／generation 與 allocator 均符合契約。v1 已知 TEST Save 讀取遷移不改原列；缺可驗證世界資料則 migration-blocked。新增 migration 只在隔離 DB 驗證，正式 DB 尚未套用。
+
+[審查缺陷修正與回歸證據](docs/development/PHASE_26_REVIEW_FIXES.md)：詠唱中勝利不退款、舊 TEST ended 詠唱映射、受阻存檔逐槽隔離，以及未知 legacy Entry 拒絕。無 DB 回歸 288 通過、24 略過。
 
 FUTURE REQUIRED Save / State Repair System、Reward／Resurrection／Combat History 與其他 [未定事項](docs/development/OPEN_QUESTIONS.md) 保留。未自行 commit／push，Phase 27 未開始。

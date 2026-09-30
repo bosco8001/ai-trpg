@@ -1,6 +1,6 @@
 # Phase 26 規格與實作對照
 
-設計來源：[已接受完整規格](PHASE_26_FINAL_SPEC.md)、[Canon 追溯索引](PHASE_26_CANON_INDEX.md)。兩份來源文件原樣保存；其中「尚未實作」是來源整理當時的狀態。最新工程狀態見 [驗證紀錄](PHASE_26_VERIFICATION.md)。
+設計來源：[已接受完整規格](PHASE_26_FINAL_SPEC.md)、[Canon 追溯索引](PHASE_26_CANON_INDEX.md)。兩份來源文件原樣保存；其中「尚未實作」是來源整理當時的狀態。最新工程狀態見 [驗證紀錄](PHASE_26_VERIFICATION.md) 與 [審查修正](PHASE_26_REVIEW_FIXES.md)。
 
 ## 既有結構與明確映射
 
@@ -41,9 +41,10 @@ Save 使用單一 SQL statement 從 live JSONB 取完整切面，沒有使用先
 ## 舊資料與保守限制
 
 - v1 已知 TEST Save：依已知版本補齊 TEST identity/resources/world，解碼為 v2；讀取與 Load 不覆寫原 Save。
-- 舊 TEST live snapshot：保留已確認 Combat HP、玩家已付 MP、Party 與 revision；只按已知 roster 補必要映射。不從 initiative 推導 Party。
+- 舊 TEST live snapshot：合法 ended 舊詠唱先驗證再清除、不退 MP；保留已確認 Combat HP、玩家已付 MP、Party 與 revision；只按已知 roster 補必要映射。不從 initiative 推導 Party。
+- 存檔清單逐槽回報 invalid-save／migration-blocked／unsupported-format，健康槽仍可 Load，原始 Save 不改。
 - 缺正式 identity/resources/world，或未知／不完整 roster：安全阻擋；沒有 Repair／猜測／正式角色預設數值。
-- 舊前端本地文字從未保存於 Save，不能憑空重建。已有合法 `legacy-unplaced` Entry 保存原 ID、文字、已知順序與 nullable sequence，獨立顯示；新服務只產生 placed Entry。
+- 舊前端本地文字從未保存於 Save，不能憑空重建。已有合法 `legacy-unplaced` Entry 保存原 ID、文字、已知順序與 nullable sequence，獨立顯示；新服務只產生 placed Entry；v2 Load 不能新增身分帳原本沒有的 legacy 條目。
 - capacity domain 支援不等於新增正式成長／裝備／buff 行動。正式數值與 modifier 接入仍待後續規格。
 
 ## Future / open commitments
