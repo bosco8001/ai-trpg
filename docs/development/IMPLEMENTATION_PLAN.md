@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–25 已由使用者手動確認。Phase 26 工程完成，等待使用者手動驗收；Phase 27 未開始。
+Phase 1–26 已由使用者手動確認；Phase 26 於 2026-09-30 回報手動測試通過。Phase 27 工程交付完成，等待使用者手動驗收。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -307,4 +307,11 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 [審查修正紀錄](PHASE_26_REVIEW_FIXES.md)：H1／M1／M2／L1 已重現及修正；無 DB 為 288 通過、24 略過。詠唱中勝利、結果頁 Save／Load、三次 API 重啟、結算及下一場 MP 18/24 已通過工程檢查。
 
-**Phase 26 工程完成，等待使用者手動驗收。** [手動驗收清單與第一步](PHASE_26_SETTLEMENT_ACCEPTANCE.md)。沒有自行 commit／push，Phase 27 未開始。FUTURE REQUIRED Repair、Persistent Settlement／Combat History／Statistics／Replay、Reward、Narration delivery／recovery／versioning、Resurrection、Persistent Enemy／Encounter composition、Persistent statuses／Formation 與 world time open commitment 均保留。
+**Phase 26 已由使用者於 2026-09-30 確認手動測試通過。** 驗收版本：`a52aee0565d95a8c9e04d1f39128dc71e706fec9`。使用者回報「手動測試也通過了」；判定來自使用者，代理沒有代替使用者驗收。[驗收紀錄與重測清單](PHASE_26_SETTLEMENT_ACCEPTANCE.md)。使用者已 commit／push 修正版本，代理未自行 commit／push；Phase 27「完整手機戰鬥介面 polish」的工程交付見下節。FUTURE REQUIRED Repair、Persistent Settlement／Combat History／Statistics／Replay、Reward、Narration delivery／recovery／versioning、Resurrection、Persistent Enemy／Encounter composition、Persistent statuses／Formation 與 world time open commitment 均保留。
+
+
+## Phase 27 交付紀錄
+
+2026-10-01：手機戰鬥介面調整完成，等待使用者手動驗收。緊湊 HUD、可橫向捲動順序、戰場／指令捷徑、敵人編號及 HP 條、可收縮角色卡、三欄基本指令與獨立救助列已接通；隊伍彈窗改為單一捲動，補上 viewport safe area、觸控與大文字處理。系統判定在戰場下方，操作欄以敘事、主角／戰況、詠唱、技能、指令排列。沒有變更 domain、API、資料庫或遊戲數值。
+
+檔案、實機啟動與手動驗收清單見 [Phase 27 文件](PHASE_27_MOBILE_COMBAT.md)。`npm run build` 通過；`npm test` 288 通過、24 個 PostgreSQL 項目跳過、0 失敗。靜態 DOM 在 320／375／430px、橫向、桌面、200% 字級、多隊友彈窗與結果頁無橫向溢出。這些工程結果不代表實機觸控、節奏或手動驗收通過。既定計畫到 Phase 27 為止，後續範圍待使用者確認本階段後另行決定。

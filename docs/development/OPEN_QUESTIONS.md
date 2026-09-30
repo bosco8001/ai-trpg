@@ -72,4 +72,4 @@
 - 未保存的 confirmed facts 或原文不能承諾追溯補回；未來 Reward identity 與 Save replay 需區分不同 completion。
 - Combat 推進 world time 的正式模型仍未定。Escape 的本場 enemy facts 不代表永久敵人死亡／傷勢／療傷規則。
 - 正式永久 capacity／modifier mechanic 尚未接入；Phase 26 只支援必要同步／clamp 契約與明確 TEST fixture，沒有新增正式玩家行動。
-- [已接受完整規格](PHASE_26_FINAL_SPEC.md) 與 [實作／相容限制](PHASE_26_IMPLEMENTATION_MAPPING.md)。Phase 27 未開始。
+- [已接受完整規格](PHASE_26_FINAL_SPEC.md) 與 [實作／相容限制](PHASE_26_IMPLEMENTATION_MAPPING.md)。Phase 27 僅完成手機戰鬥介面工程調整，等待使用者手動驗收；沒有替上述事項定案。

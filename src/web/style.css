@@ -11,6 +11,7 @@ html {
   font-size: 100%;
   line-height: 1.7;
   scroll-padding-block: var(--space-6);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -214,6 +215,9 @@ h1 {
   text-align: center;
   cursor: pointer;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
   transition: background-color var(--motion-fast) var(--ease-settle),
     border-color var(--motion-fast) var(--ease-settle),
     box-shadow var(--motion-fast) var(--ease-settle);
@@ -224,19 +228,21 @@ h1 {
   background: var(--action-primary);
 }
 
-.ui-button--primary:hover:not(:disabled) {
-  background: var(--action-primary-hover);
-}
-
 .ui-button--secondary {
   color: var(--text-primary);
   border-color: var(--border-interactive);
   background: var(--surface-elevated);
 }
 
-.ui-button--secondary:hover:not(:disabled) {
-  border-color: var(--action-primary);
-  background: var(--surface-panel);
+@media (hover: hover) and (pointer: fine) {
+  .ui-button--primary:hover:not(:disabled) {
+    background: var(--action-primary-hover);
+  }
+
+  .ui-button--secondary:hover:not(:disabled) {
+    border-color: var(--action-primary);
+    background: var(--surface-panel);
+  }
 }
 
 .ui-button:active:not(:disabled) {
@@ -1050,6 +1056,7 @@ h1 {
 
 .combat-header,
 .combat-layout,
+.combat-field-column,
 .combat-header__turns,
 .combat-battlefield,
 .combat-rail,
@@ -1186,6 +1193,14 @@ h1 {
   align-items: start;
 }
 
+.combat-field-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.combat-mobile-nav { display: none; }
+
 .combat-battlefield {
   padding: var(--space-4);
   border: var(--border-width) solid var(--border-ornament);
@@ -1293,10 +1308,30 @@ h1 {
 
 .combat-participant__heading {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
   justify-content: space-between;
 }
+
+.combat-participant__number { color: var(--state-danger); }
+
+/* 只呈現伺服器 HP；文字保留完整數值與生命狀態。 */
+.combat-health-bar {
+  height: 0.375rem;
+  margin-block: var(--space-2) var(--space-3);
+  overflow: hidden;
+  background: var(--surface-page);
+  border: 1px solid var(--border-ornament);
+}
+
+.combat-health-bar span {
+  display: block;
+  height: 100%;
+  background: var(--action-primary);
+}
+
+.combat-participant[data-side="enemy"] .combat-health-bar span { background: var(--state-danger); }
 
 .combat-participant__heading p {
   margin: 0;
@@ -1333,10 +1368,11 @@ h1 {
 
 .combat-rail {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
-.combat-rail__panel { padding: var(--space-4); }
+.combat-rail__panel { min-width: 0; padding: var(--space-4); overflow-wrap: anywhere; }
 .combat-rail__panel::before { inset-inline-start: var(--space-4); width: 3rem; }
 
 .combat-rail h2 {
@@ -1488,7 +1524,7 @@ h1 {
   .combat-section-heading > p { max-inline-size: none; margin: 0; text-align: start; }
   .combat-battlefield { padding: var(--space-3); }
   .combat-lane { padding: var(--space-2); min-block-size: 7rem; }
-  .combat-lane__cards { grid-template-columns: minmax(0, 1fr); }
+  .combat-lane__cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
   .combat-feedback .ui-button { width: 100%; }
 }
 
@@ -1752,11 +1788,15 @@ h1 {
 }
 
 .combat-party-dialog {
-  width: min(36rem, calc(100vw - 2rem));
+  position: fixed;
+  inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  margin: auto;
+  width: min(36rem, calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 2rem));
   max-width: none;
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1rem);
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--text-primary);
   border: var(--border-width) solid var(--border-ornament);
   border-block-start: 3px solid var(--action-primary);
@@ -1769,15 +1809,17 @@ h1 {
 
 .combat-party-dialog__frame {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: var(--space-3);
   min-width: 0;
   min-height: 0;
-  max-height: inherit;
   padding: var(--space-4);
 }
 
 .combat-party-dialog__header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--surface-panel);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1805,8 +1847,6 @@ h1 {
   align-content: start;
   gap: var(--space-3);
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 1px var(--space-1) var(--space-2) 1px;
 }
 
@@ -1904,10 +1944,86 @@ h1 {
 
 @media (max-width: 30rem) {
   .combat-party-dialog {
-    width: calc(100vw - 1rem);
+    width: calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1rem);
     max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 0.75rem);
   }
   .combat-party-dialog__frame { padding: var(--space-3); }
   .combat-party-dialog__header { align-items: flex-start; }
   .combat-party-dialog__close { min-width: 4rem; }
 }
+
+/* Phase 27：手機保持自然頁面捲動，不以固定高度裁切戰場或操作。 */
+@media (max-width: 63.999rem) {
+  .combat-shell__inner { gap: var(--space-3); }
+  .combat-header { gap: var(--space-2); padding-block-end: var(--space-3); }
+  .combat-header h1 { font-size: 1.5rem; }
+  .combat-header__identity {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    align-items: baseline;
+  }
+  .combat-header__identity .combat-eyebrow { width: 100%; margin: 0; }
+  .combat-header__identity > p:last-child { margin: 0; font-size: 0.875rem; }
+  .combat-header__turn-heading { flex-direction: row; flex-wrap: wrap; }
+  .combat-turn-order { padding-block: var(--space-1) var(--space-2); }
+  .combat-turn-order li {
+    flex-wrap: wrap;
+    max-inline-size: min(22rem, 90%);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .combat-turn-order li > span { min-width: 0; }
+  .combat-mobile-nav { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .combat-mobile-nav a {
+    display: grid;
+    flex: 1 1 8rem;
+    place-items: center;
+    min-height: 2.75rem;
+    padding: var(--space-2);
+    color: var(--action-primary);
+    border: 1px solid var(--border-interactive);
+    border-radius: var(--radius-control);
+    background: var(--surface-elevated);
+    touch-action: manipulation;
+    font-size: 0.875rem;
+    text-underline-offset: 0.2em;
+  }
+  .combat-mobile-nav a:active { background: var(--surface-panel); }
+  .combat-lane { min-block-size: 0; padding: var(--space-2); }
+  .combat-lane__cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+  .combat-lane__cards > :only-child { grid-column: 1 / -1; }
+  .combat-participant { padding: var(--space-2); }
+  .combat-participant h4 { font-size: 1rem; }
+  .combat-participant dl { font-size: 0.8125rem; }
+  .combat-participant dl > div { flex-wrap: wrap; }
+  .combat-participant__health { margin: 0; font-size: 0.875rem; }
+  .combat-current-badge { letter-spacing: normal; }
+  .combat-rail__panel { padding: var(--space-3); }
+  .combat-rail__panel::before { inset-inline-start: var(--space-3); }
+  .combat-status-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+  .combat-status-list > div { flex-wrap: wrap; }
+  .combat-skill-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+  .combat-skill-list li { min-width: 0; padding: var(--space-2); }
+  .combat-commands { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .combat-commands [data-command="rescue"] { grid-column: 1 / -1; }
+  .combat-shell .ui-button {
+    min-height: 3rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .combat-row-move-mode__choices { width: 100%; }
+  .combat-row-move-mode__choices .ui-button { flex: 1 1 9rem; }
+  .combat-ended-result { overflow-wrap: anywhere; }
+  .combat-ended-result > .ui-button { width: 100%; margin-block: var(--space-2); }
+  .combat-ended-participants {
+    display: grid;
+    gap: var(--space-2);
+    padding-inline-start: var(--space-6);
+  }
+  .combat-party-member__preference select { min-height: 3rem; font-size: 1rem; }
+}
+
+.runtime-system-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.runtime-system-controls .ui-button { flex: 1 1 8rem; }

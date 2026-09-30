@@ -57,12 +57,12 @@ export function RuntimeSystemPanel({ state, onStateUpdate, onRetryState, onMainM
                 setBusy(null);
         }
     }
-    return <Panel className="combat-rail__panel"><Button variant="secondary" disabled={disabled || busy !== null} aria-expanded={open} onClick={() => {
+    return <Panel className="combat-rail__panel"><div className="runtime-system-controls"><Button variant="secondary" disabled={disabled || busy !== null} aria-expanded={open} onClick={() => {
             setOpen(!open);
             if (!open)
                 void refresh();
         }}>系統／存檔</Button>
-    {onMainMenu ? <Button variant="secondary" disabled={disabled || busy !== null} onClick={onMainMenu}>主選單</Button> : null}
+    {onMainMenu ? <Button variant="secondary" disabled={disabled || busy !== null} onClick={onMainMenu}>主選單</Button> : null}</div>
     {open ? <SaveSlotsPanel slots={slots} loading={slots === null} busySlotId={busy} feedback={feedback} confirmation={confirmation} onSave={slot => slot.empty ? void run('save', slot.slotId) : setConfirmation({ kind: 'overwrite', slotId: slot.slotId })} onLoad={slotId => setConfirmation({ kind: 'load', slotId })} onConfirm={() => {
                 if (confirmation)
                     void run(confirmation.kind === 'load' ? 'load' : 'save', confirmation.slotId);

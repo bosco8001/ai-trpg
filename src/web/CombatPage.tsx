@@ -59,6 +59,7 @@ function modifierTerm(value: number): string {
 
 function ParticipantCard({
   participant,
+  enemyNumber,
   current,
   targeting,
   targetOption,
@@ -66,6 +67,7 @@ function ParticipantCard({
   onSelectTarget,
 }: {
   participant: CombatParticipantView;
+  enemyNumber: number | undefined;
   current: boolean;
   targeting: boolean;
   targetOption: NormalAttackTargetOptionView | undefined;
@@ -85,10 +87,13 @@ function ParticipantCard({
         <p>{participant.side === "enemy" ? "敵方" : "我方"}・{participant.row === "front" ? "前排" : "後排"}</p>
         {current ? <span className="combat-current-badge">目前行動</span> : null}
       </div>
-      <h4>{participant.displayName}</h4>
+      <h4>{enemyNumber !== undefined ? <span className="combat-participant__number">#{enemyNumber} </span> : null}{participant.displayName}</h4>
       <p className="combat-participant__health">HP {participant.health.currentHp} / {participant.health.maxHp}・{participant.health.lifeState === "active"
         ? "可行動" : participant.health.lifeState === "dying"
           ? `瀕死・剩餘 ${participant.health.dyingTurnsRemaining} 回合` : "死亡"}</p>
+      <div className="combat-health-bar" aria-hidden="true">
+        <span style={{ width: `${participant.health.currentHp / participant.health.maxHp * 100}%` }} />
+      </div>
       <dl>
         <div><dt>先攻</dt><dd>{participant.initiative.total}</dd></div>
         <div><dt>骰值</dt><dd>{initiativeDetail(participant)}</dd></div>
@@ -140,7 +145,7 @@ function CombatTurnOrder({ state, visualActorId }: { state: CombatStateView; vis
     if (current) element.scrollTo({ left: Math.max(0, current.offsetLeft - element.offsetLeft), behavior: reduced ? "instant" : "smooth" });
   }, [state, visualActorId]);
   return (
-    <ol ref={list} className="combat-turn-order" aria-label="行動順序；由權威順序輪轉顯示">
+    <ol ref={list} className="combat-turn-order" tabIndex={0} aria-label="行動順序；可橫向捲動，由權威順序輪轉顯示">
       {getVisualTurnOrderEntries(state, visualActorId).map(({ participant, current }, index) => (
         <li key={participant.id} data-actor-id={participant.id} data-current={current || undefined} aria-current={current ? "step" : undefined}>
           <span className="combat-turn-order__index" aria-hidden="true">{index + 1}</span>
@@ -394,6 +399,7 @@ export function CombatPage({
   };
   const [skillUseError, setSkillUseError] = useState<string | null>(null);
   const attackButton = useRef<HTMLButtonElement>(null);
+  const attackTargetHeading = useRef<HTMLHeadingElement>(null);
   const defendButton = useRef<HTMLButtonElement>(null);
   const defendHeading = useRef<HTMLHeadingElement>(null);
   const restoreDefendFocus = useRef(false);
@@ -436,6 +442,7 @@ export function CombatPage({
   });
   const visualActorId = pacing.visualActorId ?? currentActorId;
   const visualActor = combat?.participants.find((participant) => participant.id === visualActorId);
+  const player = combat?.participants.find((participant) => participant.side === "party" && participant.controlledBy !== "companion");
   const controlMutationBusy = mutationInFlight || pacing.phase !== "idle";
   const requestInFlight = controlMutationBusy || isLoadingTargets || isLoadingRowMoveOptions
     || isLoadingBagOptions || isLoadingSkillOptions;
@@ -522,6 +529,7 @@ export function CombatPage({
     return () => { active = false; };
   }, [gameState.state.revision, currentActorId, skillOptionsReloadId]);
   useEffect(() => {
+    if (isTargeting) attackTargetHeading.current?.focus();
     if (!isTargeting && restoreAttackFocus.current) {
       attackButton.current?.focus();
       restoreAttackFocus.current = false;
@@ -756,10 +764,10 @@ export function CombatPage({
             </div>
           </header>
           <div className="combat-layout">
-            <Panel className="combat-rail__panel" aria-labelledby="combat-ended-heading">
+            <Panel className="combat-rail__panel combat-ended-result" aria-labelledby="combat-ended-heading">
               <p className="combat-eyebrow">{combat.endReason === "escaped" ? "逃跑成功" : combat.endReason === "victory" ? "戰鬥勝利" : "隊伍戰敗"}</p>
               <h2 id="combat-ended-heading">{combat.endReason === "escaped" ? "你已成功逃離戰鬥。" : combat.endReason === "victory" ? "敵人已全部死亡。" : "隊伍失去戰鬥能力。"}</h2>
-              <ul>{combat.participants.map((participant) => <li key={participant.id}>{participant.displayName}：HP {participant.health.currentHp} / {participant.health.maxHp}・{participant.health.lifeState === "active"
+              <ul className="combat-ended-participants">{combat.participants.map((participant) => <li key={participant.id}>{participant.displayName}：HP {participant.health.currentHp} / {participant.health.maxHp}・{participant.health.lifeState === "active"
                 ? "可行動" : participant.health.lifeState === "dying" ? `瀕死・剩餘 ${participant.health.dyingTurnsRemaining} 回合` : "死亡"}{participant.mp ? `・MP ${participant.mp.currentMp} / ${participant.mp.maxMp}` : ""}</li>)}</ul>
               {combat.endReason !== 'party-defeat' ? <Button ref={continueButton} loading={settling} loadingLabel="正在結算並整理敘事……" disabled={settlementBlocked} onClick={()=>void continueToExploration()}>繼續</Button> : <p>請載入健康存檔或返回主選單。</p>}
               {recovery ? <p role="alert">{recovery}</p> : null}
@@ -797,12 +805,12 @@ export function CombatPage({
                 <div className="combat-commands">
                   <Button variant="secondary" data-command="attack" disabled>普通攻擊</Button>
                   <Button variant="secondary" data-command="defend" disabled>防禦</Button>
-                  <Button variant="secondary" data-command="rescue" disabled>救助</Button>
                   <Button variant="secondary" data-command="inventory" disabled>背包</Button>
                   <Button ref={partyButton} variant="secondary" data-command="party"
                     aria-expanded={isPartyOpen} aria-controls="combat-party-dialog" onClick={toggleParty}>隊伍</Button>
                   <Button variant="secondary" data-command="move" disabled>站位</Button>
                   <Button variant="secondary" data-command="flee" disabled>逃走</Button>
+                  <Button variant="secondary" data-command="rescue" disabled>救助</Button>
                 </div>
               </Panel>
             </aside>
@@ -817,6 +825,9 @@ export function CombatPage({
   }
 
   const lanes = getCombatPresentationLanes(combat.participants);
+  // 敵人編號只供辨識；沿用本場名冊順序，不因換排或死亡重新編號。
+  const enemyNumbers = new Map(combat.participants.filter((participant) => participant.side === "enemy")
+    .map((participant, index) => [participant.id, index + 1]));
   const targetOptionsById = new Map((targetOptions?.targets ?? []).map((target) => [target.targetId, target]));
   const selectedSkill = skillOptions?.skills.find((skill) => skill.skillId === selectedSkillId);
   const skillTargetsById = new Map((selectedSkill?.targets ?? []).map((target) => [target.targetId, target]));
@@ -1291,237 +1302,217 @@ export function CombatPage({
             </div>
             <CombatTurnOrder state={combat} visualActorId={visualActorId} />
           </section>
+          <nav className="combat-mobile-nav" aria-label="戰鬥區域捷徑">
+            <a href="#battlefield-heading">查看戰場</a>
+            <a href="#combat-commands-heading">前往指令</a>
+          </nav>
         </header>
 
         <div className="combat-layout">
-          <section className="combat-battlefield" aria-labelledby="battlefield-heading">
-            <div className="combat-section-heading">
-              <div><p className="combat-eyebrow">戰場</p><h2 id="battlefield-heading">參戰者位置</h2></div>
-              <p>排位來自權威狀態；完成換排會消耗整個回合。</p>
-            </div>
-            {selectedSkillId ? (
-              <section className="combat-target-mode" aria-labelledby="combat-skill-target-heading" aria-live="polite">
-                <h3 id="combat-skill-target-heading" ref={skillTargetHeading} tabIndex={-1}>請選擇技能目標</h3>
-                <p>{selectedSkill?.displayName ?? selectedSkillId}・只可指定合法敵方目標。</p>
-                <Button variant="secondary" onClick={cancelSkillTargetSelection} disabled={isUsingSkill}>取消</Button>
-              </section>
-            ) : null}
-            {isBagOpen ? (
-              <section id="combat-bag-panel" className="combat-bag-mode" aria-labelledby="combat-bag-heading" aria-live="polite">
-                <div className="combat-bag-mode__heading">
-                  <div>
-                    <p className="combat-eyebrow">只讀查看</p>
-                    <h3 id="combat-bag-heading" ref={bagHeading} tabIndex={-1}>戰鬥背包</h3>
+          <div className="combat-field-column">
+            <section className="combat-battlefield" aria-labelledby="battlefield-heading">
+              <div className="combat-section-heading">
+                <div><p className="combat-eyebrow">戰場</p><h2 id="battlefield-heading" tabIndex={-1}>參戰者位置</h2></div>
+                <p>排位來自權威狀態；完成換排會消耗整個回合。</p>
+              </div>
+              {selectedSkillId ? (
+                <section className="combat-target-mode" aria-labelledby="combat-skill-target-heading" aria-live="polite">
+                  <h3 id="combat-skill-target-heading" ref={skillTargetHeading} tabIndex={-1}>請選擇技能目標</h3>
+                  <p>{selectedSkill?.displayName ?? selectedSkillId}・只可指定合法敵方目標。</p>
+                  <Button variant="secondary" onClick={cancelSkillTargetSelection} disabled={isUsingSkill}>取消</Button>
+                </section>
+              ) : null}
+              {isBagOpen ? (
+                <section id="combat-bag-panel" className="combat-bag-mode" aria-labelledby="combat-bag-heading" aria-live="polite">
+                  <div className="combat-bag-mode__heading">
+                    <div>
+                      <p className="combat-eyebrow">只讀查看</p>
+                      <h3 id="combat-bag-heading" ref={bagHeading} tabIndex={-1}>戰鬥背包</h3>
+                    </div>
                   </div>
-                </div>
-                {isLoadingBagOptions ? <p className="combat-bag-mode__notice">正在讀取背包狀態……</p> : null}
-                {bagOptionsError ? (
-                  <div className="combat-bag-mode__error" role="alert">
-                    <p>{bagOptionsError}</p>
-                    <Button
-                      variant="secondary"
-                      disabled={isUsingItem || isLoadingBagOptions}
-                      onClick={() => setBagOptionsReloadId((value) => value + 1)}
-                    >
-                      重新讀取背包
-                    </Button>
-                  </div>
-                ) : null}
-                {gameState.state.inventory.length > 0 ? (
-                  <ul className="combat-bag-list">
-                    {gameState.state.inventory.map((stack) => {
-                      const item = bagOptions?.items.find((entry) => entry.itemId === stack.itemId);
-                      const optionsMatch = bagOptions?.revision === gameState.state.revision
-                        && bagOptions.currentActorId === currentActorId;
-                      const canUse = optionsMatch && item?.usable === true
-                        && isServerListedUsableCombatItem(
-                          bagOptions, stack.itemId, gameState.state.revision, currentActorId,
-                        );
-                      const disabledReason = item?.unavailableReason === "not-player-turn"
-                        ? "目前不是可操作角色的回合。"
-                        : item?.unavailableReason === "casting-active" ? "請先繼續或取消詠唱。"
-                        : item?.unavailableReason === "quantity-depleted"
-                          ? "數量為 0，無法使用。"
-                          : bagOptionsError ? "目前無法確認物品是否可使用。"
-                            : isLoadingBagOptions ? "正在確認物品是否可使用。"
-                                : !optionsMatch ? "戰鬥狀態已更新，正在確認物品。"
-                                  : !item ? "目前無法確認這件物品是否可使用。" : "";
-                      const itemName = item?.displayName ?? getCombatItemDisplayName(stack.itemId) ?? stack.itemId;
-                      const disabledReasonId = "combat-item-disabled-reason-" + stack.itemId;
-                      return (
-                        <li key={stack.itemId} className="combat-bag-item">
-                          <div className="combat-bag-item__summary">
-                            <h4>{itemName}</h4>
-                            <p>數量：{stack.quantity}</p>
-                          </div>
-                          {pendingItemId === stack.itemId ? (
-                            <div className="combat-item-confirm" role="group" aria-label="確認使用物品">
-                              <p>確定使用 {itemName}？</p>
-                              <div className="combat-item-confirm__buttons">
-                                <Button
-                                  ref={itemConfirmButton}
-                                  variant="primary"
-                                  disabled={!canUse || requestInFlight}
-                                  loading={isUsingItem}
-                                  loadingLabel="正在使用……"
-                                  onClick={() => confirmItemUse(stack.itemId)}
-                                >
-                                  確認使用
-                                </Button>
-                                <Button variant="secondary" disabled={isUsingItem} onClick={cancelItemConfirmation}>
-                                  取消
-                                </Button>
+                  {isLoadingBagOptions ? <p className="combat-bag-mode__notice">正在讀取背包狀態……</p> : null}
+                  {bagOptionsError ? (
+                    <div className="combat-bag-mode__error" role="alert">
+                      <p>{bagOptionsError}</p>
+                      <Button
+                        variant="secondary"
+                        disabled={isUsingItem || isLoadingBagOptions}
+                        onClick={() => setBagOptionsReloadId((value) => value + 1)}
+                      >
+                        重新讀取背包
+                      </Button>
+                    </div>
+                  ) : null}
+                  {gameState.state.inventory.length > 0 ? (
+                    <ul className="combat-bag-list">
+                      {gameState.state.inventory.map((stack) => {
+                        const item = bagOptions?.items.find((entry) => entry.itemId === stack.itemId);
+                        const optionsMatch = bagOptions?.revision === gameState.state.revision
+                          && bagOptions.currentActorId === currentActorId;
+                        const canUse = optionsMatch && item?.usable === true
+                          && isServerListedUsableCombatItem(
+                            bagOptions, stack.itemId, gameState.state.revision, currentActorId,
+                          );
+                        const disabledReason = item?.unavailableReason === "not-player-turn"
+                          ? "目前不是可操作角色的回合。"
+                          : item?.unavailableReason === "casting-active" ? "請先繼續或取消詠唱。"
+                          : item?.unavailableReason === "quantity-depleted"
+                            ? "數量為 0，無法使用。"
+                            : bagOptionsError ? "目前無法確認物品是否可使用。"
+                              : isLoadingBagOptions ? "正在確認物品是否可使用。"
+                                  : !optionsMatch ? "戰鬥狀態已更新，正在確認物品。"
+                                    : !item ? "目前無法確認這件物品是否可使用。" : "";
+                        const itemName = item?.displayName ?? getCombatItemDisplayName(stack.itemId) ?? stack.itemId;
+                        const disabledReasonId = "combat-item-disabled-reason-" + stack.itemId;
+                        return (
+                          <li key={stack.itemId} className="combat-bag-item">
+                            <div className="combat-bag-item__summary">
+                              <h4>{itemName}</h4>
+                              <p>數量：{stack.quantity}</p>
+                            </div>
+                            {pendingItemId === stack.itemId ? (
+                              <div className="combat-item-confirm" role="group" aria-label="確認使用物品">
+                                <p>確定使用 {itemName}？</p>
+                                <div className="combat-item-confirm__buttons">
+                                  <Button
+                                    ref={itemConfirmButton}
+                                    variant="primary"
+                                    disabled={!canUse || requestInFlight}
+                                    loading={isUsingItem}
+                                    loadingLabel="正在使用……"
+                                    onClick={() => confirmItemUse(stack.itemId)}
+                                  >
+                                    確認使用
+                                  </Button>
+                                  <Button variant="secondary" disabled={isUsingItem} onClick={cancelItemConfirmation}>
+                                    取消
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="combat-bag-item__action">
-                              <Button
-                                ref={bagUseButton}
-                                variant="secondary"
-                                data-item-use={stack.itemId}
-                                disabled={!canUse || requestInFlight}
-                                aria-describedby={disabledReason ? disabledReasonId : undefined}
-                                onClick={() => setPendingItemId(stack.itemId)}
-                              >
-                                使用
-                              </Button>
-                              {disabledReason ? <p id={disabledReasonId}>{disabledReason}</p> : null}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : <p className="combat-bag-mode__notice">目前沒有物品。</p>}
-                <div className="combat-bag-mode__footer">
-                  <Button variant="secondary" disabled={isUsingItem} onClick={toggleBag}>關閉</Button>
-                </div>
-              </section>
-            ) : null}
-            {isTargeting ? (
-              <section className="combat-target-mode" aria-labelledby="combat-target-heading" aria-live="polite">
-                <div>
-                  <h3 id="combat-target-heading">請選擇攻擊目標</h3>
-                  <p>{isLoadingTargets ? "正在讀取合法目標……" : "只有伺服器列出的合法敵人可以選擇。"}</p>
-                </div>
-                <Button variant="secondary" disabled={isResolving} onClick={cancelTargeting}>取消</Button>
-              </section>
-            ) : null}
-            {isRowMoveMode && rowMoveOptions ? (
-              <section className="combat-row-move-mode" aria-labelledby="combat-row-move-heading" aria-live="polite">
-                <div className="combat-row-move-mode__intro">
-                  <h3 id="combat-row-move-heading" ref={rowMoveHeading} tabIndex={-1}>
-                    目前位置：我方{rowMoveOptions.currentRow === "front" ? "前排" : "後排"}
-                  </h3>
-                  <p>確認後會移動排位並結束目前回合。</p>
-                </div>
-                <div className="combat-row-move-mode__choices">
-                  {rowMoveOptions.legalTargetRows.map((targetRow) => (
-                    <Button
-                      key={targetRow}
-                      variant="primary"
-                      data-target-row={targetRow}
-                      disabled={requestInFlight}
-                      loading={isMovingRow}
-                      loadingLabel="正在移動……"
-                      onClick={() => confirmRowMove(targetRow)}
-                    >
-                      移至{targetRow === "front" ? "前排" : "後排"}
-                    </Button>
-                  ))}
-                  <Button variant="secondary" disabled={isMovingRow} onClick={cancelRowMove}>取消</Button>
-                </div>
-              </section>
-            ) : null}
-            {isDefendConfirmationOpen ? (
-              <section id="combat-defend-panel" className="combat-row-move-mode" aria-labelledby="combat-defend-heading" aria-live="polite">
-                <div className="combat-row-move-mode__intro">
-                  <h3 id="combat-defend-heading" ref={defendHeading} tabIndex={-1}>確定要選擇防禦嗎？</h3>
-                  <p>防禦會消耗目前行動。實際減傷效果尚未接入。</p>
-                </div>
-                <div className="combat-row-move-mode__choices">
-                  <Button
-                    variant="primary"
-                    data-action="confirm-defend"
-                    disabled={controlMutationBusy}
-                    loading={isSubmittingDefend}
-                    loadingLabel="正在防禦……"
-                    onClick={confirmDefend}
-                  >
-                    確認防禦
-                  </Button>
-                  <Button variant="secondary" disabled={isSubmittingDefend} onClick={cancelDefendConfirmation}>取消</Button>
-                </div>
-              </section>
-            ) : null}
-            {isRunConfirmationOpen ? (
-              <section id="combat-run-panel" className="combat-row-move-mode" aria-labelledby="combat-run-heading" aria-live="polite">
-                <div className="combat-row-move-mode__intro">
-                  <h3 id="combat-run-heading" ref={runHeading} tabIndex={-1}>確定要嘗試逃跑嗎？</h3>
-                  <p>逃跑會消耗目前行動。</p>
-                  <p>一般逃跑判定：D20 + 敏捷修正，DC 8。</p>
-                </div>
-                <div className="combat-row-move-mode__choices">
-                  <Button variant="primary" data-action="confirm-run" disabled={controlMutationBusy}
-                    loading={isSubmittingRun} loadingLabel="正在逃跑……" onClick={confirmRun}>確認逃跑</Button>
-                  <Button variant="secondary" disabled={isSubmittingRun} onClick={cancelRunConfirmation}>取消</Button>
-                </div>
-              </section>
-            ) : null}
-            <div className="combat-lanes">
-              {lanes.map((lane, index) => (
-                <section key={lane.id} className="combat-lane" data-lane={lane.id} aria-labelledby={"lane-" + lane.id}>
-                  {index === 2 ? <div className="combat-frontline" aria-label="前線分隔">前線</div> : null}
-                  <h3 id={"lane-" + lane.id}>{lane.label}</h3>
-                  <div className="combat-lane__cards">
-                    {lane.participants.length > 0
-                      ? lane.participants.map((participant) => (
-                        <ParticipantCard
-                          key={participant.id}
-                          participant={participant}
-                          current={participant.id === visualActorId}
-                          targeting={(isTargeting && !isLoadingTargets) || selectedSkillId !== null}
-                          targetOption={selectedSkillId ? skillTargetsById.get(participant.id) : targetOptionsById.get(participant.id)}
-                          canSubmitTarget={!requestInFlight}
-                          onSelectTarget={selectedSkillId ? selectSkillTarget : selectTarget}
-                        />
-                      ))
-                      : <p className="combat-lane__empty">目前沒有參戰者。</p>}
+                            ) : (
+                              <div className="combat-bag-item__action">
+                                <Button
+                                  ref={bagUseButton}
+                                  variant="secondary"
+                                  data-item-use={stack.itemId}
+                                  disabled={!canUse || requestInFlight}
+                                  aria-describedby={disabledReason ? disabledReasonId : undefined}
+                                  onClick={() => setPendingItemId(stack.itemId)}
+                                >
+                                  使用
+                                </Button>
+                                {disabledReason ? <p id={disabledReasonId}>{disabledReason}</p> : null}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : <p className="combat-bag-mode__notice">目前沒有物品。</p>}
+                  <div className="combat-bag-mode__footer">
+                    <Button variant="secondary" disabled={isUsingItem} onClick={toggleBag}>關閉</Button>
                   </div>
                 </section>
-              ))}
-            </div>
-          </section>
+              ) : null}
+              {isTargeting ? (
+                <section className="combat-target-mode" aria-labelledby="combat-target-heading" aria-live="polite">
+                  <div>
+                    <h3 id="combat-target-heading" ref={attackTargetHeading} tabIndex={-1}>請選擇攻擊目標</h3>
+                    <p>{isLoadingTargets ? "正在讀取合法目標……" : "只有伺服器列出的合法敵人可以選擇。"}</p>
+                  </div>
+                  <Button variant="secondary" disabled={isResolving} onClick={cancelTargeting}>取消</Button>
+                </section>
+              ) : null}
+              {isRowMoveMode && rowMoveOptions ? (
+                <section className="combat-row-move-mode" aria-labelledby="combat-row-move-heading" aria-live="polite">
+                  <div className="combat-row-move-mode__intro">
+                    <h3 id="combat-row-move-heading" ref={rowMoveHeading} tabIndex={-1}>
+                      目前位置：我方{rowMoveOptions.currentRow === "front" ? "前排" : "後排"}
+                    </h3>
+                    <p>確認後會移動排位並結束目前回合。</p>
+                  </div>
+                  <div className="combat-row-move-mode__choices">
+                    {rowMoveOptions.legalTargetRows.map((targetRow) => (
+                      <Button
+                        key={targetRow}
+                        variant="primary"
+                        data-target-row={targetRow}
+                        disabled={requestInFlight}
+                        loading={isMovingRow}
+                        loadingLabel="正在移動……"
+                        onClick={() => confirmRowMove(targetRow)}
+                      >
+                        移至{targetRow === "front" ? "前排" : "後排"}
+                      </Button>
+                    ))}
+                    <Button variant="secondary" disabled={isMovingRow} onClick={cancelRowMove}>取消</Button>
+                  </div>
+                </section>
+              ) : null}
+              {isDefendConfirmationOpen ? (
+                <section id="combat-defend-panel" className="combat-row-move-mode" aria-labelledby="combat-defend-heading" aria-live="polite">
+                  <div className="combat-row-move-mode__intro">
+                    <h3 id="combat-defend-heading" ref={defendHeading} tabIndex={-1}>確定要選擇防禦嗎？</h3>
+                    <p>防禦會消耗目前行動。實際減傷效果尚未接入。</p>
+                  </div>
+                  <div className="combat-row-move-mode__choices">
+                    <Button
+                      variant="primary"
+                      data-action="confirm-defend"
+                      disabled={controlMutationBusy}
+                      loading={isSubmittingDefend}
+                      loadingLabel="正在防禦……"
+                      onClick={confirmDefend}
+                    >
+                      確認防禦
+                    </Button>
+                    <Button variant="secondary" disabled={isSubmittingDefend} onClick={cancelDefendConfirmation}>取消</Button>
+                  </div>
+                </section>
+              ) : null}
+              {isRunConfirmationOpen ? (
+                <section id="combat-run-panel" className="combat-row-move-mode" aria-labelledby="combat-run-heading" aria-live="polite">
+                  <div className="combat-row-move-mode__intro">
+                    <h3 id="combat-run-heading" ref={runHeading} tabIndex={-1}>確定要嘗試逃跑嗎？</h3>
+                    <p>逃跑會消耗目前行動。</p>
+                    <p>一般逃跑判定：D20 + 敏捷修正，DC 8。</p>
+                  </div>
+                  <div className="combat-row-move-mode__choices">
+                    <Button variant="primary" data-action="confirm-run" disabled={controlMutationBusy}
+                      loading={isSubmittingRun} loadingLabel="正在逃跑……" onClick={confirmRun}>確認逃跑</Button>
+                    <Button variant="secondary" disabled={isSubmittingRun} onClick={cancelRunConfirmation}>取消</Button>
+                  </div>
+                </section>
+              ) : null}
+              <div className="combat-lanes">
+                {lanes.map((lane, index) => (
+                  <section key={lane.id} className="combat-lane" data-lane={lane.id} aria-labelledby={"lane-" + lane.id}>
+                    {index === 2 ? <div className="combat-frontline" aria-label="前線分隔">前線</div> : null}
+                    <h3 id={"lane-" + lane.id}>{lane.label}</h3>
+                    <div className="combat-lane__cards">
+                      {lane.participants.length > 0
+                        ? lane.participants.map((participant) => (
+                          <ParticipantCard
+                            key={participant.id}
+                            participant={participant}
+                            enemyNumber={enemyNumbers.get(participant.id)}
+                            current={participant.id === visualActorId}
+                            targeting={(isTargeting && !isLoadingTargets) || selectedSkillId !== null}
+                            targetOption={selectedSkillId ? skillTargetsById.get(participant.id) : targetOptionsById.get(participant.id)}
+                            canSubmitTarget={!requestInFlight}
+                            onSelectTarget={selectedSkillId ? selectSkillTarget : selectTarget}
+                          />
+                        ))
+                        : <p className="combat-lane__empty">目前沒有參戰者。</p>}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </section>
+            <LastActionPanel combat={combat} />
+          </div>
 
           <aside className="combat-rail" aria-label="戰鬥資訊與指令">
-            <Panel className="combat-rail__panel" aria-labelledby="combat-status-heading">
-              <p className="combat-eyebrow">戰況</p>
-              <h2 id="combat-status-heading" ref={statusHeading} tabIndex={-1}>目前狀態</h2>
-              <dl className="combat-status-list">
-                <div><dt>回合</dt><dd>第 {combat.round} 回合</dd></div>
-                <div><dt>目前行動</dt><dd>{visualActor?.displayName ?? combat.currentActorId}</dd></div>
-                <div><dt>參戰者</dt><dd>{combat.participants.length} 名</dd></div>
-                <div><dt>活動</dt><dd>戰鬥中</dd></div>
-                <div><dt>MP</dt><dd>{(gameState.state.combat?.participants.find(p => p.side === "party" && p.controlledBy !== "companion")?.mp?.currentMp ?? gameState.state.character.currentMp)} <small>（TEST 數值）</small></dd></div>
-                <div><dt>工程版本</dt><dd>{gameState.state.revision}</dd></div>
-              </dl>
-            </Panel>
-
-            <LastActionPanel combat={combat} />
-
-            {combat.activeCastings.map((casting) => <Panel key={casting.actorId} className="combat-rail__panel" aria-live="polite" aria-labelledby={`casting-${casting.actorId}`}>
-              <p className="combat-eyebrow">權威詠唱進度</p>
-              <h2 id={`casting-${casting.actorId}`}>正在詠唱：TEST 多回合法術</h2>
-              <p>進度：{casting.completedCastingTurns} / {casting.totalCastingTurns}</p>
-              <p>已投入：{casting.mpSpent} / {casting.totalMpCost} MP</p>
-              <p>下一次繼續：6 MP</p>
-              {casting.actorId === currentActorId && hasPlayerActionActor ? <div className="combat-row-move-mode__choices">
-                <Button variant="primary" disabled={controlMutationBusy} onClick={() => submitCasting("continue")}>繼續詠唱</Button>
-                <Button variant="secondary" disabled={controlMutationBusy} onClick={() => submitCasting("cancel")}>取消詠唱</Button>
-              </div> : <p>等待施法者的下一個回合。</p>}
-              <p>取消後，已投入的 MP 不會返還。</p>
-            </Panel>)}
-
             <Panel className="combat-rail__panel" aria-labelledby="combat-narration-heading">
               <p className="combat-eyebrow">AI 戰鬥敘事</p>
               <h2 id="combat-narration-heading">最近敘事</h2>
@@ -1536,6 +1527,37 @@ export function CombatPage({
                     ? <p>正在整理戰鬥敘事……</p> : <p>目前沒有戰鬥敘事。</p>}
               </div>
             </Panel>
+
+            <Panel className="combat-rail__panel" aria-labelledby="combat-status-heading">
+              <p className="combat-eyebrow">戰況</p>
+              <h2 id="combat-status-heading" ref={statusHeading} tabIndex={-1}>目前狀態</h2>
+              <dl className="combat-status-list">
+                {player ? <>
+                  <div><dt>主角</dt><dd>{player.displayName}</dd></div>
+                  <div><dt>站位</dt><dd>{player.row === "front" ? "前排" : "後排"}</dd></div>
+                  <div><dt>HP</dt><dd>{player.health.currentHp} / {player.health.maxHp}</dd></div>
+                </> : null}
+                <div><dt>回合</dt><dd>第 {combat.round} 回合</dd></div>
+                <div><dt>目前行動</dt><dd>{visualActor?.displayName ?? combat.currentActorId}</dd></div>
+                <div><dt>參戰者</dt><dd>{combat.participants.length} 名</dd></div>
+                <div><dt>活動</dt><dd>戰鬥中</dd></div>
+                <div><dt>MP</dt><dd>{player?.mp ? `${player.mp.currentMp} / ${player.mp.maxMp}` : gameState.state.character.currentMp} <small>（TEST 數值）</small></dd></div>
+                <div><dt>工程版本</dt><dd>{gameState.state.revision}</dd></div>
+              </dl>
+            </Panel>
+
+            {combat.activeCastings.map((casting) => <Panel key={casting.actorId} className="combat-rail__panel" aria-live="polite" aria-labelledby={`casting-${casting.actorId}`}>
+              <p className="combat-eyebrow">權威詠唱進度</p>
+              <h2 id={`casting-${casting.actorId}`}>正在詠唱：TEST 多回合法術</h2>
+              <p>進度：{casting.completedCastingTurns} / {casting.totalCastingTurns}</p>
+              <p>已投入：{casting.mpSpent} / {casting.totalMpCost} MP</p>
+              <p>下一次繼續：6 MP</p>
+              {casting.actorId === currentActorId && hasPlayerActionActor ? <div className="combat-row-move-mode__choices">
+                <Button variant="primary" disabled={controlMutationBusy} onClick={() => submitCasting("continue")}>繼續詠唱</Button>
+                <Button variant="secondary" disabled={controlMutationBusy} onClick={() => submitCasting("cancel")}>取消詠唱</Button>
+              </div> : <p>等待施法者的下一個回合。</p>}
+              <p>取消後，已投入的 MP 不會返還。</p>
+            </Panel>)}
 
             <Panel className="combat-rail__panel" aria-labelledby="combat-skills-heading">
               <p className="combat-eyebrow">技能</p>
@@ -1625,7 +1647,7 @@ export function CombatPage({
 
             <Panel className="combat-rail__panel" aria-labelledby="combat-commands-heading">
               <p className="combat-eyebrow">指令</p>
-              <h2 id="combat-commands-heading">基本指令</h2>
+              <h2 id="combat-commands-heading" tabIndex={-1}>基本指令</h2>
               <p className="combat-rail__notice">主要行動依目前回合開放；隊伍資訊與偏好設定不消耗回合。</p>
               <div className="combat-commands">
                 <Button
@@ -1650,10 +1672,6 @@ export function CombatPage({
                 >
                   防禦
                 </Button>
-                <Button variant="secondary" data-command="rescue" aria-expanded={isRescueOpen}
-                  aria-controls="combat-rescue-panel"
-                  disabled={!hasPlayerActionActor || rescueTargets.length === 0 || controlMutationBusy || selectionModeActive}
-                  onClick={() => setIsRescueOpen(true)}>救助</Button>
                 <Button
                   ref={bagButton}
                   variant="primary"
@@ -1698,6 +1716,10 @@ export function CombatPage({
                 >
                   逃跑
                 </Button>
+                <Button variant="secondary" data-command="rescue" aria-expanded={isRescueOpen}
+                  aria-controls="combat-rescue-panel"
+                  disabled={!hasPlayerActionActor || rescueTargets.length === 0 || controlMutationBusy || selectionModeActive}
+                  onClick={() => setIsRescueOpen(true)}>救助</Button>
               </div>
               {isRescueOpen ? <section id="combat-rescue-panel" className="combat-row-move-mode" aria-label="選擇救助目標" aria-live="polite">
                 <h3>選擇瀕死隊員</h3>

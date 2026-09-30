@@ -2,7 +2,7 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–25 已由使用者手動確認。Phase 26 工程完成，等待使用者手動驗收；Phase 27 未開始。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–26 已由使用者手動確認；Phase 26 於 2026-09-30 回報手動測試通過。Phase 27 工程交付完成，等待使用者手動驗收；見 [手機戰鬥介面測試指南](docs/development/PHASE_27_MOBILE_COMBAT.md)。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
@@ -413,7 +413,7 @@ TEST 戰鬥會從權威 current actor 自動接續：TEST 敵方只呼叫既有 
 
 ## Phase 26：戰鬥結算與返回探索
 
-Phase 26 工程完成，等待使用者手動驗收。勝利／逃跑停在結果頁，按「繼續」才原子寫回長期 HP／MP、處理瀕死／死亡與來源 Encounter，返回原探索位置。Game Over 保留 ended Combat；active／ended／Game Over 均可完整 Save／Load。戰後與探索敘事保存於同一權威狀態，Load／Reset 更換 generation，舊 callback 不污染新世界。
+Phase 26 已由使用者於 2026-09-30 確認手動測試通過；驗收版本為 `a52aee0`。勝利／逃跑停在結果頁，按「繼續」才原子寫回長期 HP／MP、處理瀕死／死亡與來源 Encounter，返回原探索位置。Game Over 保留 ended Combat；active／ended／Game Over 均可完整 Save／Load。戰後與探索敘事保存於同一權威狀態，Load／Reset 更換 generation，舊 callback 不污染新世界。
 
 [第一個手動驗收步驟與完整清單](docs/development/PHASE_26_SETTLEMENT_ACCEPTANCE.md)、[實際工程驗證](docs/development/PHASE_26_VERIFICATION.md)、[規格與實作對照](docs/development/PHASE_26_IMPLEMENTATION_MAPPING.md)、[已接受完整規格](docs/development/PHASE_26_FINAL_SPEC.md)、[Canon 索引](docs/development/PHASE_26_CANON_INDEX.md)。
 
@@ -421,4 +421,11 @@ Phase 26 工程完成，等待使用者手動驗收。勝利／逃跑停在結�
 
 [審查缺陷修正與回歸證據](docs/development/PHASE_26_REVIEW_FIXES.md)：詠唱中勝利不退款、舊 TEST ended 詠唱映射、受阻存檔逐槽隔離，以及未知 legacy Entry 拒絕。無 DB 回歸 288 通過、24 略過。
 
-FUTURE REQUIRED Save / State Repair System、Reward／Resurrection／Combat History 與其他 [未定事項](docs/development/OPEN_QUESTIONS.md) 保留。未自行 commit／push，Phase 27 未開始。
+FUTURE REQUIRED Save / State Repair System、Reward／Resurrection／Combat History 與其他 [未定事項](docs/development/OPEN_QUESTIONS.md) 保留。使用者已提交並推送修正版本 `a52aee0`；代理未自行 commit／push。Phase 27 工程交付完成，等待使用者手動驗收；見 [手機戰鬥介面測試指南](docs/development/PHASE_27_MOBILE_COMBAT.md)。
+
+
+## Phase 27：完整手機戰鬥介面 polish
+
+手機新增緊湊 HUD、戰場／指令捷徑、可收縮角色卡、敵人編號及 HP 條。六個基本指令採三欄兩列，救助獨立一列；隊伍彈窗、放大文字、戰後結果及系統按鈕完成排版調整。權威規則與保存契約沿用 Phase 26。
+
+工程交付完成，等待使用者手動驗收。啟動、實機連線、各指令與結果頁測試見 [Phase 27 手動測試與工程紀錄](docs/development/PHASE_27_MOBILE_COMBAT.md)。
