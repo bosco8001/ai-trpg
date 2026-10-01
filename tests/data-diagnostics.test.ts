@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import pg from "pg";
@@ -199,6 +201,65 @@ test("failed initial game-state screen still offers diagnostics", () => {
 });
 
 const pgOptions = { skip: !process.env.TEST_DATABASE_URL && "需明確提供隔離 TEST_DATABASE_URL。" };
+test("PostgreSQL diagnostics inherits PGOPTIONS with pg URL precedence and keeps readonly deadlines", pgOptions, async t => {
+  const base = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const schema = "phase28_env_" + randomUUID().replaceAll("-", "");
+  await base.query(`CREATE SCHEMA ${schema}`);
+  t.after(async () => { await base.query(`DROP SCHEMA ${schema} CASCADE`); await base.end(); });
+  await base.query(`CREATE TABLE ${schema}.game_states (character_id text PRIMARY KEY, revision bigint, snapshot jsonb)`);
+  await base.query(`CREATE TABLE ${schema}.save_slots (slot_id integer PRIMARY KEY, format_version integer, source_revision bigint, snapshot jsonb, saved_at timestamptz)`);
+  const { revision: _revision, ...snapshot } = createTestGameState();
+  await base.query(`INSERT INTO ${schema}.game_states VALUES ($1,71,$2)`, [snapshot.character.id, JSON.stringify(snapshot)]);
+  const before = (await base.query(`SELECT * FROM ${schema}.game_states`)).rows;
+  const database = new URL(process.env.TEST_DATABASE_URL!);
+  for (const key of ["options", "statement_timeout", "application_name"]) database.searchParams.delete(key);
+  // A child process avoids changing the environment of concurrent test files.
+  const script = `
+    import pg from 'pg';
+    const { createPostgresDiagnosticsPool, createPostgresDiagnosticsReader } = await import(process.env.PHASE28_DIAGNOSTICS_MODULE);
+    const { inspectData } = await import(process.env.PHASE28_INSPECT_MODULE);
+    const results=[];
+    for (const options of [undefined, '', '-c search_path='+process.env.PHASE28_TEST_SCHEMA+',pg_catalog -c application_name=phase28_url -c statement_timeout=0 -c default_transaction_read_only=off']) {
+      const url=new URL(process.env.TEST_DATABASE_URL);
+      if(options !== undefined) url.searchParams.set('options',options);
+      const normal=new pg.Pool({connectionString:url.href});
+      const diagnostics=createPostgresDiagnosticsPool(url.href);
+      try {
+        const sql="SELECT current_setting('search_path') AS path, current_setting('application_name') AS name, current_setting('statement_timeout') AS timeout, current_setting('default_transaction_read_only') AS readonly";
+        const a=(await normal.query(sql)).rows[0], b=(await diagnostics.query(sql)).rows[0];
+        const report=await inspectData(createPostgresDiagnosticsReader(diagnostics,'TEST-character'),'postgres');
+        results.push({normal:a,diagnostics:b,report});
+      } finally { await normal.end();await diagnostics.end(); }
+    }
+    process.stdout.write(JSON.stringify(results));
+  `;
+  const output = await promisify(execFile)(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], {
+    timeout: 10000,
+    env: { ...process.env, TEST_DATABASE_URL: database.href,
+      PGOPTIONS: `-c search_path=${schema},public -c application_name=phase28_env -c statement_timeout=0 -c default_transaction_read_only=off`,
+      PHASE28_TEST_SCHEMA: schema,
+      PHASE28_DIAGNOSTICS_MODULE: new URL("../src/server/postgres-data-diagnostics.ts", import.meta.url).href,
+      PHASE28_INSPECT_MODULE: new URL("../src/server/data-diagnostics.ts", import.meta.url).href },
+  });
+  const results = JSON.parse(output.stdout);
+  assert.equal(results.length, 3);
+  for (const [index, result] of results.entries()) {
+    const path = index === 2 ? `${schema},pg_catalog` : `${schema},public`;
+    assert.equal(result.normal.path, path);
+    assert.equal(result.diagnostics.path, path);
+    assert.equal(result.diagnostics.name, index === 2 ? "phase28_url" : "phase28_env");
+    assert.equal(result.normal.timeout, "0");
+    assert.equal(result.normal.readonly, "off");
+    assert.equal(result.diagnostics.timeout, "2s");
+    assert.equal(result.diagnostics.readonly, "on");
+    assert.equal(result.report.current.status, "healthy");
+    assert.equal(result.report.current.revision, 71);
+    assert.deepEqual(result.report.slots.map((slot: { status: string }) => slot.status), ["empty", "empty", "empty"]);
+  }
+  assert.deepEqual((await base.query(`SELECT * FROM ${schema}.game_states`)).rows, before);
+  assert.equal((await base.query(`SELECT count(*) AS n FROM ${schema}.save_slots`)).rows[0].n, "0");
+});
+
 test("PostgreSQL diagnostic deadline cancels blocked SELECTs, isolates healthy data and recovers without writes", { ...pgOptions, timeout: 15000 }, async t => {
   const base = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
   const identity = randomUUID().replaceAll("-", "");

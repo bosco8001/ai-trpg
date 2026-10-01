@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { DATA_DIAGNOSTIC_DESCRIPTIONS, DATA_DIAGNOSTIC_LABELS, type DataDiagnosticResult, type DataDiagnosticsReport } from "../shared/data-diagnostics.js";
 import { loadDataDiagnostics } from "./api.js";
 import { Button } from "./ui/Button.js";
@@ -33,11 +33,13 @@ export function DataHealthPanel() {
   const [report, setReport] = useState<DataDiagnosticsReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const inFlight = useRef(false);
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 5000);
     let disposed = false;
+    inFlight.current = true;
     setBusy(true);
     setReport(null);
     setError("");
@@ -47,9 +49,9 @@ export function DataHealthPanel() {
       if (!disposed) setError("目前無法取得檢查報告，請確認服務後重新檢查。不能據此判定資料已損壞。");
     }).finally(() => {
       window.clearTimeout(timeout);
-      if (!disposed) setBusy(false);
+      if (!disposed) { inFlight.current = false; setBusy(false); }
     });
-    return () => { disposed = true; window.clearTimeout(timeout); controller.abort(); };
+    return () => { disposed = true; window.clearTimeout(timeout); controller.abort(); inFlight.current = false; };
   }, [open, attempt]);
   return <section className="data-health">
     <Button variant="secondary" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
@@ -63,7 +65,14 @@ export function DataHealthPanel() {
       </p>
       {error ? <p role="alert">{error}</p> : null}
       {report ? <DataHealthReport report={report} /> : null}
-      <Button variant="secondary" disabled={busy} onClick={() => setAttempt(value => value + 1)}>
+      <Button variant="secondary" aria-disabled={busy} onClick={() => {
+        if (busy || inFlight.current) return;
+        inFlight.current = true;
+        setBusy(true);
+        setReport(null);
+        setError("");
+        setAttempt(value => value + 1);
+      }}>
         重新檢查資料
       </Button>
     </div> : null}

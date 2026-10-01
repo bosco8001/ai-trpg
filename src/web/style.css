@@ -2033,6 +2033,13 @@ h1 {
   margin-top: var(--space-3);
 }
 
+.data-health .ui-button[aria-disabled="true"] {
+  color: var(--text-muted);
+  border-color: var(--border-interactive);
+  background: var(--surface-elevated);
+  cursor: wait;
+}
+
 .data-health__report {
   margin-top: var(--space-3);
   overflow-wrap: anywhere;

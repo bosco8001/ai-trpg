@@ -332,3 +332,5 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 完整檔案清單、工程限制與隔離錯誤樣本見 [Phase 28 手動測試指南](PHASE_28_DATA_DIAGNOSTICS.md)。目前等待使用者手動驗收，沒有開始原始備份或修復階段。
 
 使用者其後提供 Grok 對 `068ae7cd39a9719aed246de02afb4e88dd26375a` 的外部報告：沒有阻擋驗收、高或中嚴重度缺陷，提出三組低嚴重度事項。已在同一 Phase 28 修正舊文件狀態、診斷查詢逾時與無障礙提示；修正版建置通過，隔離 PostgreSQL 15 的 325 項測試通過。詳見 [Phase 28 外部審查後修正](PHASE_28_REVIEW_FIXES.md)。外部報告與本次工程檢查均不代表使用者已接受 Phase 28。
+
+第二次外部複查 `67d2d87b95eadf0ed58cef5f6868fc39cbd6da6f` 確認 L1–L3 已解決，另提出 N1／N2 低嚴重度問題。已在同一階段保留 `PGOPTIONS` 的既有優先順序，並讓重新檢查按鈕在忙碌時保持鍵盤焦點、阻止重複觸發。建置通過，隔離 PostgreSQL 15 的 326 項測試通過；焦點與重複 Enter 已做瀏覽器工程檢查。Phase 28 仍待使用者手動驗收，備份尚未開始。

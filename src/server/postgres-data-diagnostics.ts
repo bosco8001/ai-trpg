@@ -6,8 +6,8 @@ import { hydrateSaveSlotRow } from "./save-game/postgres-repository.js";
 /** Dedicated connections keep diagnostic deadlines separate from gameplay writes. */
 export function createPostgresDiagnosticsPool(connectionString: string): Pool {
   const url = new URL(connectionString);
-  // Preserve deployment options (including search_path), then pin diagnostic limits.
-  const options = url.searchParams.get("options") ?? "";
+  // Match pg precedence: nonempty URL options override PGOPTIONS; otherwise inherit it.
+  const options = url.searchParams.get("options") || process.env.PGOPTIONS || "";
   url.searchParams.set("options", `${options} -c default_transaction_read_only=on -c statement_timeout=2000`.trim());
   url.searchParams.set("statement_timeout", "2000");
   return new pg.Pool({ connectionString: url.href, max: 4, connectionTimeoutMillis: 1000 });
