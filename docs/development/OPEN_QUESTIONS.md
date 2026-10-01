@@ -1,6 +1,6 @@
 # 未定事項與後續承諾
 
-更新：2026-10-01。Phase 1–29 已由使用者手動驗收通過；Phase 28 驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。Phase 30 有限候選預覽已批准並完成工程交付，等待手動驗收；修復套用尚未開始。後續工作與建議順序見 [Phase 27 之後的工作清單](POST_PHASE_27_ROADMAP.md)。
+更新：2026-10-01。Phase 1–30 已由使用者確認驗收；Phase 28 驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。使用者已要求進入 R03，現為規格討論，修復套用尚未實作。後續工作與建議順序見 [Phase 27 之後的工作清單](POST_PHASE_27_ROADMAP.md)。
 
 本文件同時追蹤未定規則、已定但未實作的缺口，以及後續承諾。**出現在清單不代表規則已定案或 phase 已獲批准。** Agent 不得把 Prototype、TEST 數值、自己的偏好或這份工程排序升級為 Canon。
 
@@ -19,7 +19,8 @@
 - **後續必做：Save / State Repair System。** 使用 deterministic rules、verified evidence、backup、candidate validation、atomic apply、repair report；LLM 不猜 authoritative identity／resources。
 - **Phase 28 已由使用者手動驗收通過**：目前狀態與三槽存檔逐項唯讀診斷；正常系統面板與初始狀態讀取失敗畫面都有入口。不初始化、不寫入映射、不備份或修復，正常格式不保證能在目前 Run 載入。詳見 [Phase 28](PHASE_28_DATA_DIAGNOSTICS.md)。
 - **Phase 29 已由使用者手動驗收通過**：下載目前資料與三槽的完整原始備份，含已保存敘事／識別紀錄。單一 JSON、完整檔案預設 10 MiB 上限、整次接收 30 秒、手動重試、檔內 SHA-256 與一致快照已接通；備份期間可繼續遊戲，來源不合法仍保留原值，讀取失敗則不提供部分檔案。依瀏覽器下載設定保存，不送給 LLM。詳見 [Phase 29 規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md) 與 [測試指南](PHASE_29_RAW_DATA_BACKUP.md)。
-- **Phase 30 已批准、工程交付待手動驗收**：目前完整 v2 資料與 Save v2 的活動標記／MP 相容欄位候選，四項獨立讀取、同份原始資料證據、完整候選驗證、逐欄差異與受阻原因、過期後手動重新預覽。缺值／非法目標值／其他錯誤保持受阻，不寫入、不呼叫 LLM。詳見 [規格](PHASE_30_REPAIR_PREVIEW_SPEC.md) 與 [測試指南](PHASE_30_REPAIR_PREVIEW.md)。
+- **Phase 30 已由使用者確認驗收通過**：目前完整 v2 資料與 Save v2 的活動標記／MP 相容欄位候選，四項獨立讀取、同份原始資料證據、完整候選驗證、逐欄差異與受阻原因、過期後手動重新預覽。缺值／非法目標值／其他錯誤保持受阻，不寫入、不呼叫 LLM。詳見 [規格](PHASE_30_REPAIR_PREVIEW_SPEC.md) 與 [測試指南](PHASE_30_REPAIR_PREVIEW.md)。
+- **R03 規格討論中**：已選定目前資料與三槽、每次只修一份；尚未實作。其餘選項見 [討論紀錄](R03_REPAIR_APPLY_DISCUSSION.md)。後續測試與工程驗證交由 Grok Bot 執行，最終階段接受由使用者決定，分工見 AGENTS 第 4 節。
 - **待定**：新增修復類型、跨來源證據、確認／套用流程、備份前置驗證、競爭守衛及修復報告；未來自動備份與伺服器留存政策亦未定。不讓正常 Load 暗中修復。
 - **後續待評估**：使用者自訂備份上限 UI；目前只有可調整的工程限制，不在 Phase 29 擴大介面。
 - History 修復須證明是目前 lineage，且沒有後續相關 mutation；單獨最新 Settlement HP 不足以重建目前 HP。無足夠證據時保持受阻。
@@ -157,7 +158,7 @@
 - Phase 26 的勝利／逃跑明確繼續才結算、瀕死穩定 1 HP、死者保留 Character 並移出 active Party、回原探索位置；Game Over 不結算。
 - Active／ended／Game Over 的 Save Format v2 完整存讀檔、已知 TEST v1 映射、持久化探索／戰後 Entry、generation／revision／去重邊界。
 - Phase 25 的瀕死倒數、救助、死亡與詠唱清除；Phase 27 的手機戰鬥界面在該交付範圍內已由使用者驗收。
-- Phase 28 的目前資料與三槽唯讀健康檢查已由使用者驗收；Phase 29 原始備份已由使用者手動驗收通過。Phase 30 有限候選預覽已完成工程交付、待手動驗收；修復套用仍屬後續工作。
+- Phase 28 的目前資料與三槽唯讀健康檢查已由使用者驗收；Phase 29 原始備份已由使用者手動驗收通過；Phase 30 有限候選預覽已由使用者確認 R02 通過。R03 已進入規格討論，修復套用尚未實作。
 - 工程已接通不代表所有正式玩法完整；例如背包消耗有了，正式藥水治療仍未接入。
 - 詳見 [已批准階段計畫](IMPLEMENTATION_PLAN.md)、[Phase 26 實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)、[Phase 27 驗收紀錄](PHASE_27_MOBILE_COMBAT.md)。
 
@@ -172,4 +173,4 @@
 
 遇到待定項，先確認與該小階段直接相關的規則，不一次要求使用者決定整個遊戲。低風險工程細節可合理選擇；TEST／placeholder 必須清楚標示。
 
-排序本身不批准所有後續工作。Phase 28 的唯讀診斷已驗收；使用者其後逐項確認並要求實作 Phase 29 原始備份，並於 2026-10-01 確認手動驗收通過。Phase 30 的有限候選預覽已經另行確認完整規格並交付，等待手動驗收；套用仍須另外討論並分階段交付。Canon 與未定遊戲規則沒有因此改變。
+排序本身不批准所有後續工作。Phase 28 的唯讀診斷已驗收；使用者其後逐項確認並要求實作 Phase 29 原始備份，並於 2026-10-01 確認手動驗收通過。Phase 30 的有限候選預覽已由使用者確認 R02 通過；R03 套用正逐項討論，之後分階段交付。Canon 與未定遊戲規則沒有因此改變。

@@ -2,15 +2,15 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–29 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過。階段順序與驗收紀錄見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–30 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過，Phase 30 於 2026-10-01 回報「R02通過」。階段順序與驗收紀錄見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。後續測試與工程驗證由 Grok Bot 執行，開發代理的分工見 [AGENTS 第 4 節](AGENTS.md#4-測試交由-grok-bot階段驗收由使用者決定)。
 
 Phase 28 的唯讀資料健康檢查**已由使用者手動驗收通過**，驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。探索／戰鬥／主選單的系統面板及初始狀態讀取失敗畫面都有入口；啟動與隔離錯誤樣本見 [Phase 28 測試指南](docs/development/PHASE_28_DATA_DIAGNOSTICS.md)。這一階段只檢查，不備份或修復。
 
 Phase 29 的[手動下載原始資料備份](docs/development/PHASE_29_RAW_DATA_BACKUP.md)**已由使用者於 2026-10-01 確認手動驗收通過**；完整原始備份、單一 JSON、預設 10 MiB 上限、30 秒等待、手動重試、SHA-256 校驗及備份時繼續遊戲已接通。已確認行為見 [Phase 29 規格](docs/development/PHASE_29_RAW_DATA_BACKUP_SPEC.md)。
 
-Phase 30 的[修復候選預覽](docs/development/PHASE_30_REPAIR_PREVIEW.md)已完成工程交付，**等待使用者手動驗收**。目前資料與三槽獨立分析，只預覽活動標記與玩家 MP 相容欄位的完整候選；不補缺值、不寫入、不呼叫 LLM。初始讀取失敗時也有獨立入口。批准範圍見 [Phase 30 規格](docs/development/PHASE_30_REPAIR_PREVIEW_SPEC.md)。
+Phase 30 的[修復候選預覽](docs/development/PHASE_30_REPAIR_PREVIEW.md)**已由使用者於 2026-10-01 確認驗收通過**。目前資料與三槽獨立分析，只預覽活動標記與玩家 MP 相容欄位的完整候選；不補缺值、不寫入、不呼叫 LLM。初始讀取失敗時也有獨立入口。批准範圍見 [Phase 30 規格](docs/development/PHASE_30_REPAIR_PREVIEW_SPEC.md)。
 
-後續工作已重新盤點為 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md)，建議實作順序見 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。Phase 28／29 已由使用者驗收；R02 已另批准為 Phase 30，修復套用及其他後續小項仍是規劃提案。
+後續工作已重新盤點為 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md)，建議實作順序見 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。Phase 28／29／30 已由使用者驗收；使用者已要求進入 R03 規格討論，修復套用尚未實作，其他後續小項仍是規劃提案。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 

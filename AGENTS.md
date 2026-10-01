@@ -61,35 +61,18 @@ If the user reports a problem:
 
 ---
 
-## 4. The User Owns Gameplay / Acceptance Testing
+## 4. 測試交由 Grok Bot，階段驗收由使用者決定
 
-The AI agent must not act as the final gameplay tester or acceptance tester.
+依使用者於 2026-10-01 的長期指示，本專案的測試與工程驗證交由 Grok Bot 執行。開發代理負責實作、閱讀程式與報告、準備測試案例及修正回報的問題。
 
-The user will manually test:
-- gameplay feel;
-- UI feel;
-- combat flow;
-- balance;
-- narrative experience;
-- mobile usability;
-- whether a phase is acceptable.
-
-The AI may run appropriate engineering checks such as:
-- build checks;
-- type checks;
-- lint;
-- formatting;
-- static analysis;
-- directly relevant automated unit/integration tests.
-
-But the AI must not claim:
-- “gameplay is verified”;
-- “the UI feels correct”;
-- “the balance is good”;
-- “the feature is accepted”;
-- “manual testing passed”.
-
-Only the user can make those judgments.
+- 開發代理不自行執行測試或驗證命令，包含 build、typecheck、lint、格式檢查、自動化靜態分析、單元／整合測試、資料庫測試、瀏覽器及 UI 測試；即使修正很小，也交由 Grok Bot 驗證。
+- 可以撰寫必要測試與隔離樣本，但交付時須標示尚未執行。
+- **每次實作或修正完成，必須主動在交付回覆附上一份可直接貼給 Grok Bot 的完整審查 prompt，不等待使用者再次索取。** Prompt 須包含 repository／分支、基準與目標完整 SHA（尚未 commit 時用明確待填欄位）、本次範圍、必要文件、測試命令／重點及回報要求；外部工程審查不代替使用者的最終驗收。
+- 提供 prompt 前先讀取 Git 狀態、分支與版本。若本次變更尚未在 Grok 可讀取的遠端版本，先附上限定本次檔案的 commit／push 指令及取得完整 SHA 的命令，再給 prompt。若無需 push，明確說明原因。這是提供使用者指令，不代表開發代理自行 commit／push。
+- 可以讀取檔案、Git 狀態與版本資訊，以了解及記錄變更；這不等同測試通過。
+- 使用者轉交的 Grok 結果須標示為外部回報，不能改寫成開發代理親自執行的結果。Grok 的報告未提供結果時，維持待驗證。
+- 遊戲手感、UI 感受、平衡、故事體驗、手機可用性及最終階段是否接受，仍由使用者決定。只有使用者明確回報通過，才記錄階段驗收並進入下一個主要階段。
+- 本政策持續適用後續階段；只有使用者明確修訂時才更改。
 
 ---
 
@@ -186,7 +169,7 @@ The intended workflow is:
 
 1. Agent explains the next small phase.
 2. Agent implements only that phase.
-3. Agent runs appropriate engineering checks.
+3. 開發代理準備交給 Grok Bot 的測試與工程驗證，遵循第 4 節。
 4. Agent summarizes the change.
 5. Agent gives the user a short manual test checklist.
 6. User tests manually.
@@ -212,7 +195,7 @@ A brief analogy explaining what was changed.
 A short checklist of manual tests for the user.
 
 ### Engineering checks
-List only the automated checks actually run.
+依第 4 節標示待 Grok Bot 驗證，或列出使用者已提供的外部驗證結果；保留結果的來源與版本。
 
 ### Next phase
 Name the next logical phase, but do not start it until the user approves the current phase.

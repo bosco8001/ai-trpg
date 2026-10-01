@@ -1,6 +1,6 @@
 # Phase 30：有限修復候選與唯讀預覽規格
 
-日期：2026-10-01（Asia/Hong_Kong）。使用者已逐項確認下列範圍，並在完整確認稿後選擇「A：同意完整規格，開始實作」。工程交付見 [測試指南](PHASE_30_REPAIR_PREVIEW.md)，目前等待使用者手動驗收。
+日期：2026-10-01（Asia/Hong_Kong）。使用者已逐項確認下列範圍，並在完整確認稿後選擇「A：同意完整規格，開始實作」。使用者其後於同日確認「R02通過」，驗收紀錄及工程交付見 [測試指南](PHASE_30_REPAIR_PREVIEW.md)。
 
 本頁記錄已批准的工程規格，不新增玩法 Canon，不批准修復套用或還原。權威來源仍為 [Canonical Manifest](CANONICAL_MANIFEST.md)、[Phase 26 完整規格](PHASE_26_FINAL_SPEC.md) 及 [未定事項](OPEN_QUESTIONS.md)。R02 是工作索引，本次交付才是 Phase 30。
 
