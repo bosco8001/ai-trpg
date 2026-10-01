@@ -1,6 +1,6 @@
 # Phase 29：手動下載原始資料備份規格
 
-日期：2026-10-01（Asia/Hong_Kong）。**使用者已確認本階段範圍與下列六項選擇，並要求實作 Phase 29。工程交付已完成，等待使用者手動驗收。** 交付範圍、格式與實際檢查見 [Phase 29 交付與測試指南](PHASE_29_RAW_DATA_BACKUP.md)。Phase 1–28 已由使用者手動驗收通過。
+日期：2026-10-01（Asia/Hong_Kong）。**使用者已確認本階段範圍與下列六項選擇，並要求實作 Phase 29。工程交付已完成，使用者於 2026-10-01 確認手動驗收通過。** 交付範圍、格式與實際檢查見 [Phase 29 交付與測試指南](PHASE_29_RAW_DATA_BACKUP.md)。Phase 1–29 已由使用者手動驗收通過。
 
 本文件記錄本階段已確認的工程行為，不新增玩法 Canon，也不批准修復或還原功能。資料身分、資源、存讀檔與敘事邊界仍遵守 [Canonical Manifest](CANONICAL_MANIFEST.md)、[Phase 26 完整規格](PHASE_26_FINAL_SPEC.md) 及 [OPEN_QUESTIONS](OPEN_QUESTIONS.md)。
 
@@ -78,4 +78,4 @@
 
 還原、修復候選、修復套用、自動備份、備份管理、加密、壓縮、多角色／多 campaign 與使用者自訂上限 UI 均未因本規格獲批准實作。後續各自討論並拆成小階段。
 
-Phase 29 已完成工程交付，等待使用者手動驗收；依 [交付與測試指南](PHASE_29_RAW_DATA_BACKUP.md) 測試，不自動開始下一個小階段。
+Phase 29 已由使用者手動驗收通過；驗收紀錄與原有重測步驟見 [交付與測試指南](PHASE_29_RAW_DATA_BACKUP.md)，不自動開始下一個小階段。

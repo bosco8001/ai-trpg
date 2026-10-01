@@ -76,6 +76,6 @@ Agent 遇到 unresolved 項目時：
 - [Phase 28 唯讀資料健康檢查](PHASE_28_DATA_DIAGNOSTICS.md)：工程交付與測試指南，不是新增 Canon；已由使用者於 2026-10-01 確認手動驗收通過。
 - [Phase 28 外部審查後修正](PHASE_28_REVIEW_FIXES.md)：文件狀態、查詢逾時與無障礙提示的工程紀錄；不新增 Canon，不代替使用者驗收。
 - [Phase 29 手動下載原始資料備份規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)：使用者逐項確認的工程範圍與行為；不新增玩法 Canon，不批准還原或修復功能。
-- [Phase 29 原始備份交付與測試指南](PHASE_29_RAW_DATA_BACKUP.md)：工程交付紀錄，等待使用者手動驗收，不是新增玩法 Canon。
-- [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)：工程盤點與排序提案，不是新增 Canon；R01 的診斷已作為 Phase 28 驗收，原始備份作為 Phase 29 已工程交付、待手動驗收。
+- [Phase 29 原始備份交付與測試指南](PHASE_29_RAW_DATA_BACKUP.md)：工程交付與使用者驗收紀錄，Phase 29 已由使用者於 2026-10-01 確認手動驗收通過，不是新增玩法 Canon。
+- [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)：工程盤點與排序提案，不是新增 Canon；R01 的診斷已作為 Phase 28 驗收，原始備份作為 Phase 29 已由使用者手動驗收通過。
 - [未定事項與後續承諾](OPEN_QUESTIONS.md) 分別標記已定待實作、待定、後續承諾與範圍候選；其中的實作排序不覆蓋上述權威規則。

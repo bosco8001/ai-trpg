@@ -1,6 +1,6 @@
 # Phase 29：原始資料備份交付與手動測試
 
-日期：2026-10-01（Asia/Hong_Kong）。Phase 29 已實作並完成下列工程檢查，**等待使用者手動驗收**。已確認行為見 [Phase 29 規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)；本頁是交付紀錄，不新增玩法 Canon。
+日期：2026-10-01（Asia/Hong_Kong）。Phase 29 已實作並完成下列工程檢查，**已由使用者於 2026-10-01 確認手動驗收通過**。本頁保留原有重測步驟與各次工程限制；使用者驗收紀錄見下方。已確認行為見 [Phase 29 規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)；本頁是交付紀錄，不新增玩法 Canon。
 
 ## 可見結果
 
@@ -143,7 +143,15 @@ node --import tsx tests/helpers/phase29-backup-preview.mjs normal
 - 檔名採 UTC 與毫秒；PG `saved_at` 保留來源時間點及微秒，不要求來源字串一律轉成 UTC。
 - Grok 的故意破壞測試有兩個案例以卡住結束；明確失敗的測試逾時可後續評估，報告未提供足以定位這兩個案例的細節。本次沒有宣稱已修正。
 
-本次只修正文件並記錄外部報告；`git diff --check` 與文件連結檢查通過，沒有重跑建置或程式測試。**Phase 29 仍等待使用者手動驗收。**
+本次只修正文件並記錄外部報告；`git diff --check` 與文件連結檢查通過，沒有重跑建置或程式測試。**該次文件修正交付時仍待使用者手動驗收；使用者其後已確認通過，見下節。**
+
+## 使用者手動驗收紀錄
+
+2026-10-01（Asia/Hong_Kong），使用者回報：「Phase 29 手動測試通過」。本頁記錄使用者的整體驗收結論，不補寫未提供的逐項結果，也不把 Grok 外部報告或本機工程檢查當成使用者驗收。
+
+回報時本地分支 `codex/phase27-mobile-ui` 的 HEAD 為 `7960c9ba33aaa10d8b3ecaee1bfc37fd06e9694f`，程式實作為 `e8865532b0702a51880e42beaad97929459451fd`，其後只有 L1 文件修正。這是專案版本對照，使用者未另指定測試 SHA、手機平台或讀屏環境；不宣稱所有環境已逐項測試，也不代表分支已合併。
+
+本次只同步驗收狀態，沒有程式變更，不重跑建置或程式測試。後續修復候選、唯讀預覽或套用仍須各自討論及批准。
 
 ## 檔案範圍與下一步
 
@@ -153,4 +161,4 @@ node --import tsx tests/helpers/phase29-backup-preview.mjs normal
 - 新增測試／樣本／檢查工具：`tests/raw-data-backup.test.ts`、`tests/helpers/phase29-backup-preview.mjs`、`tests/helpers/verify-raw-backup.mjs`。
 - 文件：本頁、Phase 29 規格與階段狀態文件。沒有修改 domain 遊戲規則、Save／Load／結算寫入路徑或 migration。
 
-先等待使用者手動驗收 Phase 29。下一個建議討論的小項是有限修復候選與唯讀預覽，須先確認允許的錯誤類型、證據及拒絕條件；不能因已有備份就自動開始修復或套用。
+Phase 29 已由使用者手動驗收通過。下一個建議討論的小項是有限修復候選與唯讀預覽，須先確認允許的錯誤類型、證據及拒絕條件；不能因已有備份就自動開始修復或套用。
