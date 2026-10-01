@@ -38,7 +38,7 @@
 
 ## 手動測試
 
-完整步驟見 [README](../../README.md#phase-6文字探索介面手動測試)。可測試桌面、約 375px 手機寬度、Enter／Shift+Enter、Tab 焦點、200% zoom、減少動態效果，以及 API 離線時仍可進行本機文字紀錄。
+本節保留 Phase 6 當時的測試項目：桌面、約 375px 手機寬度、Enter／Shift+Enter、Tab 焦點、200% zoom、減少動態效果，以及 API 離線時仍可進行本機文字紀錄。目前版本的安裝與啟動方式見 [專案 README](../../README.md)；本頁的歷史行為不代表目前版本仍停留在 Phase 6。
 
 ## 工程檢查
 

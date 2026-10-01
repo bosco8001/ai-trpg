@@ -106,7 +106,7 @@ Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自
 
 ## Phase 5 交付紀錄
 
-建立後端專用的 `LanguageModel` 介面、文字請求／結果型別、adapter 邊界與可注入的逾時設定。外部回應一律先以 `unknown` 接收，再檢查為非空純文字；格式錯誤、服務不可用與逾時只產生固定的中立錯誤。固定回應 adapter 不連網、不需要金鑰，可供後續 application 測試替換。詳細手動測試見 [README](../../README.md#phase-5文字模型介面手動檢查)。
+建立後端專用的 `LanguageModel` 介面、文字請求／結果型別、adapter 邊界與可注入的逾時設定。外部回應一律先以 `unknown` 接收，再檢查為非空純文字；格式錯誤、服務不可用與逾時只產生固定的中立錯誤。固定回應 adapter 不連網、不需要金鑰，可供後續 application 測試替換。固定回應模型的工程檢查入口見 [LLM 檢查腳本](../../src/server/llm/check.ts)。
 
 新增 `src/server/llm/contracts.ts`、`language-model.ts`、`fake-adapter.ts`、`check.ts` 與 `tests/llm.test.ts`。修改 `package.json`、`README.md`、`OPEN_QUESTIONS.md` 與本計畫。沒有新增 npm 套件、環境變數或前端 API；實際供應商／模型仍未定。
 
@@ -114,7 +114,7 @@ Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自
 
 ## Phase 6 交付紀錄
 
-將 Phase 1／2 的連線頁演進為第一個可操作的文字探索介面。固定測試敘事、玩家輸入與系統測試回覆以 local UI history 顯示；Enter 送出、Shift+Enter 換行，空白輸入不建立紀錄。API 健康狀態保留為頁首輔助資訊。畫面重用既有 semantic tokens、Button、Panel、焦點環與 reduced-motion 設定。詳見 [Phase 6 文件](PHASE_6_EXPLORATION.md) 與 [README 手動測試](../../README.md#phase-6文字探索介面手動測試)。
+將 Phase 1／2 的連線頁演進為第一個可操作的文字探索介面。固定測試敘事、玩家輸入與系統測試回覆以 local UI history 顯示；Enter 送出、Shift+Enter 換行，空白輸入不建立紀錄。API 健康狀態保留為頁首輔助資訊。畫面重用既有 semantic tokens、Button、Panel、焦點環與 reduced-motion 設定。當時的交付範圍與測試項目見 [Phase 6 文件](PHASE_6_EXPLORATION.md)。
 
 新增 `src/web/exploration.ts`、`src/web/ExplorationPage.tsx`、`tests/exploration.test.ts`、`docs/development/PHASE_6_EXPLORATION.md`。修改 `src/web/App.tsx`、`src/web/style.css`、`README.md` 與本計畫。沒有修改 domain、PostgreSQL schema、LLM adapter 或 canonical 文件。
 
@@ -122,7 +122,7 @@ Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自
 
 ## Phase 7 交付紀錄
 
-加入後端探索文字解析服務：玩家文字經 Phase 5 中立 `LanguageModel` 介面及固定測試 adapter，經嚴格 runtime validation 才形成 candidate action。解析 API 與探索頁顯示「候選解析（固定測試）」、歧義澄清或未支援；沒有執行 domain 命令或保存資料。輸入上限 500 字屬工程限制，不是遊戲規則。詳見 [Phase 7 文件](PHASE_7_INTERPRETATION.md) 與 [README 手動測試](../../README.md#phase-7自然語言候選解析手動測試)。
+加入後端探索文字解析服務：玩家文字經 Phase 5 中立 `LanguageModel` 介面及固定測試 adapter，經嚴格 runtime validation 才形成 candidate action。解析 API 與探索頁顯示「候選解析（固定測試）」、歧義澄清或未支援；沒有執行 domain 命令或保存資料。輸入上限 500 字屬工程限制，不是遊戲規則。當時的交付範圍、固定測試句與預期解析見 [Phase 7 文件](PHASE_7_INTERPRETATION.md)。
 
 修改 `src/server/llm/` 的請求契約，新增 `src/server/interpretation/` 與 `src/shared/interpretation.ts`，接入 `src/server/app.ts`、`index.ts`、`src/web/`，新增 `tests/interpretation.test.ts` 並更新相關文件。正式模型仍未決定；Phase 8 才驗證與更新狀態，Phase 9 才敘述已確定結果。
 
