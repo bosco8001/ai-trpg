@@ -1,6 +1,6 @@
 # Phase 17：逃跑行動
 
-> Phase 1–17 已由使用者確認，包括 PostgreSQL 重啟後保留逃跑成功的終止戰鬥畫面。Phase 18 工程實作完成，等待使用者手動確認；Phase 19 尚未開始。
+> Phase 17 已由使用者手動驗收通過；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留當時的實作與測試紀錄。
 
 ## 權威規則與工程邊界
 

@@ -58,11 +58,13 @@ export function DataHealthPanel() {
     {open ? <div id={id} className="data-health__report" aria-busy={busy}>
       <h3>資料健康檢查</h3>
       <p>只讀取目前遊戲資料與三個存檔槽，不會更改遊戲或存檔。這份報告不會暫停其他遊戲操作，也不是備份。</p>
-      {busy ? <p role="status">正在檢查資料……</p> : null}
+      <p role="status" aria-live="polite" aria-atomic="true">
+        {busy ? "正在檢查資料……" : report ? "資料健康檢查已完成，以下列出目前資料與三個存檔槽的結果。" : ""}
+      </p>
       {error ? <p role="alert">{error}</p> : null}
       {report ? <DataHealthReport report={report} /> : null}
       <Button variant="secondary" disabled={busy} onClick={() => setAttempt(value => value + 1)}>
-        重新檢查
+        重新檢查資料
       </Button>
     </div> : null}
   </section>;

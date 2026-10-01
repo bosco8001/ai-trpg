@@ -1,6 +1,6 @@
 # Phase 21：隊伍資訊與戰術偏好介面
 
-> Phase 1–21 已由使用者確認。本文記錄 Phase 21 當時的交付邊界；Phase 22 工程完成，等待使用者手動確認。
+> Phase 21 已由使用者手動驗收通過；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留當時的實作與測試紀錄。
 
 ## 階段範圍
 
@@ -260,7 +260,7 @@ curl -s http://127.0.0.1:3002/api/combat/party
 
 工程檢查：`npm test` 使用獨立 `ai_trpg_phase21_test`，222 項通過、0 項失敗、0 項略過；包含 Phase 18–20 regression 與重新建立 repository／session／pool 後從 PostgreSQL 讀回 preference、revision、actor、Round 及完整 combat snapshot。`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run` 與 `git diff --check` 通過；dry-run 無待執行 migration。
 
-自動測試沒有替代瀏覽器流程。Party 開啟／關閉、偏好操作、敵方回合、active casting、browser refresh、手動 API process restart、375px mobile 與 keyboard 流程，以及 Phase 21 是否接受，仍由使用者依以上清單手動確認。
+自動測試沒有替代瀏覽器流程。Party 開啟／關閉、偏好操作、敵方回合、active casting、browser refresh、手動 API process restart、375px mobile 與 keyboard 流程屬於手動驗收範圍。Phase 21 其後已由使用者確認通過；以上清單保留作回歸測試。
 
 ## 保留的未解問題
 

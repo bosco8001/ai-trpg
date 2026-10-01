@@ -274,7 +274,7 @@ export function ExplorationPage({
           <div className="connection-brief" data-state={connectionState}>
             <p role="status" aria-live="polite"><span aria-hidden="true" className="connection-brief__marker" />{connectionLabels[connectionState]}</p>
             {onRetryConnection ? (
-              <Button className="connection-brief__retry" variant="secondary" loading={connectionState === "checking"} loadingLabel="確認中……" onClick={onRetryConnection}>重新檢查</Button>
+              <Button className="connection-brief__retry" variant="secondary" loading={connectionState === "checking"} loadingLabel="確認連線中……" onClick={onRetryConnection}>重新檢查連線</Button>
             ) : null}
           </div>
         </header>

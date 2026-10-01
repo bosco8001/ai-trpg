@@ -10,7 +10,7 @@ import { createTestGameState } from "../src/server/test-game-state.js";
 import { createSaveSnapshot } from "../src/server/save-game/service.js";
 import { InMemorySaveGameRepository } from "../src/server/save-game/memory-repository.js";
 import { inspectData, type DataDiagnosticsReader } from "../src/server/data-diagnostics.js";
-import { createPostgresDiagnosticsReader } from "../src/server/postgres-data-diagnostics.js";
+import { createPostgresDiagnosticsPool, createPostgresDiagnosticsReader } from "../src/server/postgres-data-diagnostics.js";
 import { InvalidStoredSaveRecordError } from "../src/server/save-game/postgres-repository.js";
 import { isDataDiagnosticsReport } from "../src/shared/data-diagnostics.js";
 import { loadDataDiagnostics } from "../src/web/api.js";
@@ -199,6 +199,56 @@ test("failed initial game-state screen still offers diagnostics", () => {
 });
 
 const pgOptions = { skip: !process.env.TEST_DATABASE_URL && "需明確提供隔離 TEST_DATABASE_URL。" };
+test("PostgreSQL diagnostic deadline cancels blocked SELECTs, isolates healthy data and recovers without writes", { ...pgOptions, timeout: 15000 }, async t => {
+  const base = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const identity = randomUUID().replaceAll("-", "");
+  const schema = "phase28_timeout_" + identity;
+  await base.query(`CREATE SCHEMA ${schema}`);
+  const writer = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: `-c search_path=${schema}` });
+  const url = new URL(process.env.TEST_DATABASE_URL!);
+  url.searchParams.set("options", `-c search_path=${schema} -c statement_timeout=0`);
+  url.searchParams.set("statement_timeout", "0");
+  url.searchParams.set("application_name", "phase28_diagnostics_" + identity);
+  const diagnostics = createPostgresDiagnosticsPool(url.href);
+  let locked = false;
+  const lock = await writer.connect();
+  t.after(async () => {
+    if (locked) await lock.query("ROLLBACK");
+    lock.release();
+    await diagnostics.end(); await writer.end();
+    await base.query(`DROP SCHEMA ${schema} CASCADE`); await base.end();
+  });
+  const originalTimeout = (await writer.query("SHOW statement_timeout")).rows;
+  assert.equal((await diagnostics.query("SHOW statement_timeout")).rows[0].statement_timeout, "2s");
+  assert.equal((await diagnostics.query("SHOW default_transaction_read_only")).rows[0].default_transaction_read_only, "on");
+  await writer.query("CREATE TABLE game_states (character_id text PRIMARY KEY, revision bigint, snapshot jsonb)");
+  await writer.query("CREATE TABLE save_slots (slot_id integer PRIMARY KEY, format_version integer, source_revision bigint, snapshot jsonb, saved_at timestamptz)");
+  const state = createTestGameState(), { revision, ...snapshot } = state;
+  await writer.query("INSERT INTO game_states VALUES ($1,$2,$3)", [state.character.id, revision, JSON.stringify(snapshot)]);
+  await writer.query("INSERT INTO save_slots VALUES (1,2,0,$1,$2)", [JSON.stringify(createSaveSnapshot(state).state), "2026-10-01T00:00:00Z"]);
+  const before = { current: (await writer.query("SELECT * FROM game_states")).rows,
+    slots: (await writer.query("SELECT * FROM save_slots")).rows };
+  await lock.query("BEGIN"); locked = true;
+  await lock.query("LOCK TABLE save_slots IN ACCESS EXCLUSIVE MODE");
+  const app = await buildApp({ diagnosticsReader: createPostgresDiagnosticsReader(diagnostics, state.character.id), storage: "postgres" });
+  t.after(() => app.close());
+  const started = performance.now();
+  const response = await app.inject("/api/data-diagnostics");
+  assert.equal(response.statusCode, 200, response.body);
+  assert.ok(performance.now() - started < 5000, "database cancellation must finish before the frontend deadline");
+  assert.equal(response.json().current.status, "healthy");
+  assert.deepEqual(response.json().slots.map((s: { status: string }) => s.status), ["unavailable", "unavailable", "unavailable"]);
+  const waiting = await base.query("SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND state='active'", ["phase28_diagnostics_" + identity]);
+  assert.equal(waiting.rowCount, 0, "timed-out SELECTs must stop on PostgreSQL itself");
+  await lock.query("ROLLBACK"); locked = false;
+  const recovered = await app.inject("/api/data-diagnostics");
+  assert.equal(recovered.json().current.status, "healthy");
+  assert.deepEqual(recovered.json().slots.map((s: { status: string }) => s.status), ["healthy", "empty", "empty"]);
+  assert.deepEqual({ current: (await writer.query("SELECT * FROM game_states")).rows,
+    slots: (await writer.query("SELECT * FROM save_slots")).rows }, before);
+  assert.deepEqual((await writer.query("SHOW statement_timeout")).rows, originalTimeout);
+});
+
 test("PostgreSQL SELECT-only inspection isolates raw metadata errors and preserves every stored byte", pgOptions, async t => {
   const base = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 2 });
   const schema = "phase28_" + randomUUID().replaceAll("-", "");

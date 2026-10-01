@@ -1,6 +1,6 @@
 # Phase 22：半自動隊友戰鬥行為
 
-> Phase 1–21 已由使用者確認。Phase 22 工程完成，等待使用者手動確認。Phase 23 尚未開始。
+> Phase 22 已由使用者手動驗收通過；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留當時的實作與測試紀錄。
 
 ## 這一階段的邊界
 
@@ -176,4 +176,4 @@ curl -s http://127.0.0.1:3002/api/game-state
 
 ## 工程檢查
 
-`npm test` 以隔離的 `ai_trpg_phase22_test` PostgreSQL 執行：232 項通過、0 失敗、0 略過。`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過；沒有待執行 migration。工程流程另實際停止並重啟 API，確認相同資料庫中的隊友先攻、turnOrder、偏好、lastAction、Round、actor、revision 完整保留，且可繼續戰鬥。這些是工程檢查，使用者手動驗收仍未完成。
+`npm test` 以隔離的 `ai_trpg_phase22_test` PostgreSQL 執行：232 項通過、0 失敗、0 略過。`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過；沒有待執行 migration。工程流程另實際停止並重啟 API，確認相同資料庫中的隊友先攻、turnOrder、偏好、lastAction、Round、actor、revision 完整保留，且可繼續戰鬥。這些是當時的工程檢查；Phase 22 其後已由使用者確認手動驗收通過。

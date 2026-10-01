@@ -1,6 +1,6 @@
 # Phase 19：多回合施法
 
-> Phase 1–19 已由使用者確認。Phase 20 工程完成，等待使用者手動確認；Phase 21 尚未開始。
+> Phase 19 已由使用者手動驗收通過；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留當時的實作與測試紀錄。
 
 ## 權威規則與工程範圍
 

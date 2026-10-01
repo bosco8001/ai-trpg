@@ -11,7 +11,7 @@ import { createCombatNarrationService } from "./combat/narration.js";
 import { FixtureCombatNarrationAdapter } from "./combat/narration-fixture-adapter.js";
 import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
-import { createPostgresDiagnosticsReader } from "./postgres-data-diagnostics.js";
+import { createPostgresDiagnosticsPool, createPostgresDiagnosticsReader } from "./postgres-data-diagnostics.js";
 import { createTestGameState } from "./test-game-state.js";
 import {
   createCombatActionFixtureRoller,
@@ -64,6 +64,9 @@ if (process.env.NODE_ENV === "production" && combatEscapeRollMode !== undefined)
 const pool = storage === "postgres"
   ? new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 3000 })
   : undefined;
+const diagnosticsPool = storage === "postgres"
+  ? createPostgresDiagnosticsPool(process.env.DATABASE_URL!)
+  : undefined;
 
 const app = await buildApp({
   logger: true,
@@ -82,7 +85,7 @@ const app = await buildApp({
     : undefined,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,
-  diagnosticsReader: pool ? createPostgresDiagnosticsReader(pool, createTestGameState().character.id) : undefined,
+  diagnosticsReader: diagnosticsPool ? createPostgresDiagnosticsReader(diagnosticsPool, createTestGameState().character.id) : undefined,
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },
@@ -111,6 +114,14 @@ if (pool) {
   });
   app.addHook("onClose", async () => {
     await pool.end();
+  });
+}
+if (diagnosticsPool) {
+  diagnosticsPool.on("error", (error) => {
+    app.log.error({ err: error }, "資料診斷連線中斷");
+  });
+  app.addHook("onClose", async () => {
+    await diagnosticsPool.end();
   });
 }
 

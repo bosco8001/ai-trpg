@@ -1,6 +1,6 @@
 # Phase 24：回合順序動畫與 NPC 節奏
 
-> Phase 1–26 已由使用者手動確認；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留 Phase 24 的實作與驗收紀錄。
+> Phase 24 已由使用者手動驗收通過；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留當時的實作與測試紀錄。
 
 ## 權威與呈現
 
@@ -150,7 +150,7 @@ curl -s http://127.0.0.1:3001/api/combat/party
 
 ## 工程檢查
 
-`tests/combat-pacing.test.ts` 使用假時鐘，不需真實等待數秒，覆蓋前置／後置停頓、完整 NPC 鏈、玩家停止、StrictMode cleanup／remount、重複 observe、單一 in-flight、舊 timer／舊回應、stale hydrate、錯誤停止與明確恢復、production 不支援角色、model／fallback 敘事、視覺順序與高亮。後端既有測試覆蓋 endpoint 的 expectedRevision、validation、敘事只在提交後產生與 PostgreSQL 保存。使用者仍需完成上方瀏覽器、手機、鍵盤與重啟的手動驗收。
+`tests/combat-pacing.test.ts` 使用假時鐘，不需真實等待數秒，覆蓋前置／後置停頓、完整 NPC 鏈、玩家停止、StrictMode cleanup／remount、重複 observe、單一 in-flight、舊 timer／舊回應、stale hydrate、錯誤停止與明確恢復、production 不支援角色、model／fallback 敘事、視覺順序與高亮。後端既有測試覆蓋 endpoint 的 expectedRevision、validation、敘事只在提交後產生與 PostgreSQL 保存。Phase 24 其後已由使用者確認手動驗收通過；上方清單保留作後續回歸測試。
 
 本次工程執行：隔離 `ai_trpg_phase24_test` 的 `npm test` 254 項通過，`npm run typecheck`、`npm run build`、`npm run db:migrate:dry-run`、`git diff --check` 通過；dry run 沒有待執行 migration。隔離 `ai_trpg_phase24_restart` 的實際 API 停止／重啟，讀回 revision 6、Round 2、玩家 actor、四人原始 turnOrder、最近隊友行動及偏好 A。這些工程結果不代替使用者對動畫節奏、手機與鍵盤的手動驗收。
 

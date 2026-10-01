@@ -330,3 +330,5 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 `npm run build` 通過；新建隔離 PostgreSQL 15 的完整工程測試 324 項通過、無略過。診斷連線強制唯讀，重複檢查並比較所有原始列；未初始化、寫入或改寫錯誤資料。瀏覽器工程檢查確認正常與失敗入口能讀取獨立報告。
 
 完整檔案清單、工程限制與隔離錯誤樣本見 [Phase 28 手動測試指南](PHASE_28_DATA_DIAGNOSTICS.md)。目前等待使用者手動驗收，沒有開始原始備份或修復階段。
+
+使用者其後提供 Grok 對 `068ae7cd39a9719aed246de02afb4e88dd26375a` 的外部報告：沒有阻擋驗收、高或中嚴重度缺陷，提出三組低嚴重度事項。已在同一 Phase 28 修正舊文件狀態、診斷查詢逾時與無障礙提示；修正版建置通過，隔離 PostgreSQL 15 的 325 項測試通過。詳見 [Phase 28 外部審查後修正](PHASE_28_REVIEW_FIXES.md)。外部報告與本次工程檢查均不代表使用者已接受 Phase 28。

@@ -1,6 +1,8 @@
 # Phase 25：瀕死、救助與死亡手動驗收
 
-Phase 1–26 已由使用者手動確認；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本頁保留 Phase 25 的實作與驗收紀錄。TEST HP 與傷害指令只供工程驗證，不代表正式平衡。普通攻擊與技能仍只裁定命中，不會自動扣 HP。
+Phase 25 已由使用者手動驗收通過；目前階段狀態見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md)。本文件保留當時的實作與測試紀錄。
+
+TEST HP 與傷害指令只供工程驗證，不代表正式平衡。普通攻擊與技能仍只裁定命中，不會自動扣 HP。
 
 ## 0. 準備乾淨 Memory 戰鬥
 
