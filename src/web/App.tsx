@@ -9,6 +9,7 @@ import { Button } from "./ui/Button.js";
 import { Panel } from "./ui/Panel.js";
 import { DataHealthPanel } from "./DataHealthPanel.js";
 import { RawDataBackupPanel } from "./RawDataBackupPanel.js";
+import { RepairPreviewPanel } from "./RepairPreviewPanel.js";
 
 const CONNECTION_TIMEOUT_MS = 5000;
 
@@ -97,6 +98,7 @@ export function App() {
               <Button loading={!stateError} loadingLabel="正在讀取……" disabled={!stateError} onClick={retryAll}>重新嘗試</Button>
               <DataHealthPanel />
               <RawDataBackupPanel />
+              <RepairPreviewPanel />
             </Panel>
           </div>
         </main>

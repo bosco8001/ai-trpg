@@ -25,6 +25,8 @@ import type { CombatNarrationService } from "./combat/narration.js";
 import { registerGameStateRoute } from "./game-state-route.js";
 import { registerDataDiagnosticsRoute, type DataDiagnosticsReader } from "./data-diagnostics.js";
 import { createMemoryBackupReader, registerRawBackupRoute, RawBackupFailure, type RawBackupReader } from "./raw-data-backup.js";
+import { createMemoryRepairReader, type RepairPreviewReader } from "./repair-preview-reader.js";
+import { registerRepairPreviewRoute } from "./repair-preview.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -36,6 +38,7 @@ export async function buildApp(options: {
   diagnosticsReader?: DataDiagnosticsReader;
   backupReader?: RawBackupReader;
   backupMaxBytes?: number;
+  repairPreviewReader?: RepairPreviewReader;
   storage?: "memory" | "postgres";
   narrator?: ExplorationNarrator;
   saveGameRepository?: SaveGameRepository;
@@ -70,6 +73,11 @@ export async function buildApp(options: {
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
+  registerRepairPreviewRoute(app, options.repairPreviewReader ?? createMemoryRepairReader(createTestGameState().character.id, () => {
+    if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
+      throw new RawBackupFailure("unavailable");
+    return { current: session.readStateForBackup(), slots: saveGameRepository.readAllForBackup() };
+  }));
   registerRawBackupRoute(app, options.backupReader ?? createMemoryBackupReader(createTestGameState().character.id, () => {
     if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
       throw new RawBackupFailure("unavailable");

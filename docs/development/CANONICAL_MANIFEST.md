@@ -73,6 +73,9 @@ Agent 遇到 unresolved 項目時：
 
 ## 後續工程規劃
 
+- [Phase 30 修復候選預覽規格](PHASE_30_REPAIR_PREVIEW_SPEC.md)：使用者確認的有限工程規則，只產生唯讀候選，不新增玩法 Canon、不批准修復套用。
+- [Phase 30 交付與測試指南](PHASE_30_REPAIR_PREVIEW.md)：工程交付，等待使用者手動驗收；不代替已接受設計。
+
 - [Phase 28 唯讀資料健康檢查](PHASE_28_DATA_DIAGNOSTICS.md)：工程交付與測試指南，不是新增 Canon；已由使用者於 2026-10-01 確認手動驗收通過。
 - [Phase 28 外部審查後修正](PHASE_28_REVIEW_FIXES.md)：文件狀態、查詢逾時與無障礙提示的工程紀錄；不新增 Canon，不代替使用者驗收。
 - [Phase 29 手動下載原始資料備份規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)：使用者逐項確認的工程範圍與行為；不新增玩法 Canon，不批准還原或修復功能。

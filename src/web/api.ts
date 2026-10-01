@@ -1,4 +1,5 @@
 import { isHealthResponse, type HealthResponse } from "../shared/health.js";
+import { invalidateRepairSource } from "./repair-preview.js";
 import { isDataDiagnosticsReport, type DataDiagnosticsReport } from "../shared/data-diagnostics.js";
 
 import { isInterpretationResponse, type InterpretationResponse } from "../shared/interpretation.js";
@@ -610,7 +611,7 @@ export async function listSaveSlots(fetcher: typeof fetch = fetch): Promise<Save
   return body;
 }
 
-async function changeSaveSlot(
+async function performSaveSlotChange(
   method: "PUT" | "POST",
   slotId: SaveSlotId,
   expectedRevision: number,
@@ -643,6 +644,14 @@ async function changeSaveSlot(
 
 export function saveGame(slotId: SaveSlotId, expectedRevision: number, fetcher: typeof fetch = fetch) {
   return changeSaveSlot("PUT", slotId, expectedRevision, fetcher);
+}
+
+async function changeSaveSlot(method: "PUT" | "POST", slotId: SaveSlotId, expectedRevision: number, fetcher: typeof fetch) {
+  const source = method === "PUT" ? slotId : "current";
+  // 回應遺失也可能已提交；操作前後都保守失效，不重送或推斷成功。
+  invalidateRepairSource(source);
+  try { return await performSaveSlotChange(method, slotId, expectedRevision, fetcher); }
+  finally { invalidateRepairSource(source); }
 }
 
 export function loadGame(slotId: SaveSlotId, expectedRevision: number, fetcher: typeof fetch = fetch) {

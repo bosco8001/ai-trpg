@@ -7,6 +7,7 @@ import { Icon, type IconName } from "./ui/Icon.js";
 import { Panel } from "./ui/Panel.js";
 import { DataHealthPanel } from "./DataHealthPanel.js";
 import { RawDataBackupPanel } from "./RawDataBackupPanel.js";
+import { RepairPreviewPanel } from "./RepairPreviewPanel.js";
 import { executeExplorationAction, listSaveSlots, loadExplorationState, loadGame, saveGame } from "./api.js";
 import { SaveSlotsPanel, type SaveConfirmation } from "./SaveSlotsPanel.js";
 import { MAX_PLAYER_TEXT_LENGTH } from "../shared/interpretation.js";
@@ -394,6 +395,7 @@ export function ExplorationPage({
                 />
                 <DataHealthPanel />
                 <RawDataBackupPanel />
+                <RepairPreviewPanel currentState={authoritativeState?.state} />
               </>
             ) : (
               <>

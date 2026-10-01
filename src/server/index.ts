@@ -15,6 +15,7 @@ import { createPostgresDiagnosticsPool, createPostgresDiagnosticsReader } from "
 import { createTestGameState } from "./test-game-state.js";
 import { backupMaxBytes } from "./raw-data-backup.js";
 import { createPostgresBackupReader } from "./postgres-raw-data-backup.js";
+import { createPostgresRepairReader } from "./repair-preview-reader.js";
 import {
   createCombatActionFixtureRoller,
   createPhase22CombatFixtureRoller,
@@ -73,6 +74,7 @@ const backupPool = storage === "postgres"
   ? createPostgresDiagnosticsPool(process.env.DATABASE_URL!)
   : undefined;
 const rawBackupMaxBytes = backupMaxBytes(process.env.RAW_BACKUP_MAX_BYTES);
+const repairPreviewPool = storage === "postgres" ? createPostgresDiagnosticsPool(process.env.DATABASE_URL!) : undefined;
 
 const app = await buildApp({
   logger: true,
@@ -94,6 +96,7 @@ const app = await buildApp({
   diagnosticsReader: diagnosticsPool ? createPostgresDiagnosticsReader(diagnosticsPool, createTestGameState().character.id) : undefined,
   backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id) : undefined,
   backupMaxBytes: rawBackupMaxBytes,
+  repairPreviewReader: repairPreviewPool ? createPostgresRepairReader(repairPreviewPool, createTestGameState().character.id) : undefined,
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },
@@ -135,6 +138,10 @@ if (diagnosticsPool) {
 if (backupPool) {
   backupPool.on("error", (error) => app.log.error({ err: error }, "原始備份連線中斷"));
   app.addHook("onClose", async () => { await backupPool.end(); });
+}
+if (repairPreviewPool) {
+  repairPreviewPool.on("error", error => app.log.error({ err: error }, "候選預覽連線中斷"));
+  app.addHook("onClose", async () => { await repairPreviewPool.end(); });
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
