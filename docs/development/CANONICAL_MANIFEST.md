@@ -73,9 +73,11 @@ Agent 遇到 unresolved 項目時：
 
 ## 後續工程規劃
 
-- [R03 原子套用討論紀錄](R03_REPAIR_APPLY_DISCUSSION.md)：只記錄使用者已選項目與待定問題，完整規格尚未定案，套用尚未實作，不新增 Canon。
+- [R03 原子套用討論紀錄](R03_REPAIR_APPLY_DISCUSSION.md)：十項選擇及第一階段完整範圍已確認；第二階段套用契約仍待確認，套用尚未實作，不新增 Canon。
+- [Phase 31 已批准完整範圍](R03_FIRST_STAGE_PROPOSAL.md)：2026-10-02 批准的持久備份、準備識別碼、查詢與下載，不批准套用、不新增 Canon。
+- [Phase 31 工程交付](PHASE_31_REPAIR_PREPARATION.md)：待 Grok Bot 驗證及使用者接受，開發代理未執行測試；不代替玩法設計。
 - [Phase 30 修復候選預覽規格](PHASE_30_REPAIR_PREVIEW_SPEC.md)：使用者確認的有限工程規則，只產生唯讀候選，不新增玩法 Canon、不批准修復套用。
-- [Phase 30 交付與測試指南](PHASE_30_REPAIR_PREVIEW.md)：工程交付與使用者驗收紀錄，已由使用者於 2026-10-01 確認 R02 通過；不代替已接受設計。R03 已進入規格討論，套用尚未實作。
+- [Phase 30 交付與測試指南](PHASE_30_REPAIR_PREVIEW.md)：工程交付與使用者驗收紀錄，已由使用者於 2026-10-01 確認 R02 通過；不代替已接受設計。R03 第一階段為 Phase 31，套用尚未實作。
 
 - [Phase 28 唯讀資料健康檢查](PHASE_28_DATA_DIAGNOSTICS.md)：工程交付與測試指南，不是新增 Canon；已由使用者於 2026-10-01 確認手動驗收通過。
 - [Phase 28 外部審查後修正](PHASE_28_REVIEW_FIXES.md)：文件狀態、查詢逾時與無障礙提示的工程紀錄；不新增 Canon，不代替使用者驗收。

@@ -16,6 +16,9 @@ import { createTestGameState } from "./test-game-state.js";
 import { backupMaxBytes } from "./raw-data-backup.js";
 import { createPostgresBackupReader } from "./postgres-raw-data-backup.js";
 import { createPostgresRepairReader } from "./repair-preview-reader.js";
+import { createRepairArchivePool, PostgresRepairArchive } from "./postgres-repair-archive.js";
+import { repairArchiveLimit } from "./repair-archive.js";
+import { REPAIR_ARCHIVE_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES } from "../shared/repair-preparation.js";
 import {
   createCombatActionFixtureRoller,
   createPhase22CombatFixtureRoller,
@@ -75,6 +78,9 @@ const backupPool = storage === "postgres"
   : undefined;
 const rawBackupMaxBytes = backupMaxBytes(process.env.RAW_BACKUP_MAX_BYTES);
 const repairPreviewPool = storage === "postgres" ? createPostgresDiagnosticsPool(process.env.DATABASE_URL!) : undefined;
+const repairArchivePool = storage === "postgres" ? createRepairArchivePool(process.env.DATABASE_URL!) : undefined;
+const repairBackupMaxBytes = repairArchiveLimit(process.env.REPAIR_BACKUP_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES);
+const repairArchiveMaxBytes = repairArchiveLimit(process.env.REPAIR_ARCHIVE_MAX_BYTES, REPAIR_ARCHIVE_MAX_BYTES);
 
 const app = await buildApp({
   logger: true,
@@ -97,6 +103,10 @@ const app = await buildApp({
   backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id) : undefined,
   backupMaxBytes: rawBackupMaxBytes,
   repairPreviewReader: repairPreviewPool ? createPostgresRepairReader(repairPreviewPool, createTestGameState().character.id) : undefined,
+  repairArchive: repairArchivePool ? new PostgresRepairArchive(repairArchivePool, repairBackupMaxBytes, repairArchiveMaxBytes) : undefined,
+  repairBackupDirectory: process.env.REPAIR_BACKUP_DIRECTORY,
+  repairBackupMaxBytes,
+  repairArchiveMaxBytes,
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },
@@ -142,6 +152,10 @@ if (backupPool) {
 if (repairPreviewPool) {
   repairPreviewPool.on("error", error => app.log.error({ err: error }, "候選預覽連線中斷"));
   app.addHook("onClose", async () => { await repairPreviewPool.end(); });
+}
+if (repairArchivePool) {
+  repairArchivePool.on("error", () => app.log.error("修復備份連線中斷"));
+  app.addHook("onClose", async () => { await repairArchivePool.end(); });
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

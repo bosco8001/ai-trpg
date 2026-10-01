@@ -10,7 +10,9 @@ Phase 29 的[手動下載原始資料備份](docs/development/PHASE_29_RAW_DATA_
 
 Phase 30 的[修復候選預覽](docs/development/PHASE_30_REPAIR_PREVIEW.md)**已由使用者於 2026-10-01 確認驗收通過**。目前資料與三槽獨立分析，只預覽活動標記與玩家 MP 相容欄位的完整候選；不補缺值、不寫入、不呼叫 LLM。初始讀取失敗時也有獨立入口。批准範圍見 [Phase 30 規格](docs/development/PHASE_30_REPAIR_PREVIEW_SPEC.md)。
 
-後續工作已重新盤點為 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md)，建議實作順序見 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。Phase 28／29／30 已由使用者驗收；使用者已要求進入 R03 規格討論，修復套用尚未實作，其他後續小項仍是規劃提案。
+Phase 31 是 R03 第一階段的[持久備份與修復準備](docs/development/PHASE_31_REPAIR_PREPARATION.md)，已依使用者於 2026-10-02 批准的[完整範圍](docs/development/R03_FIRST_STAGE_PROPOSAL.md) 實作，**待 Grok Bot 工程驗證及使用者驗收**。每次保存一份有效候選的完整原稿，提供識別碼查詢及下載；Memory 存本機私有目錄、PG 存新備份表，重啟後可取回。沒有修復套用或還原入口，開發代理沒有執行測試。
+
+後續工作見 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md) 及 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。Phase 28／29／30 已驗收；Phase 31 待驗證與驗收，R03 原子套用的寫入契約仍待確認，其他後續小項仍是規劃提案。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 

@@ -138,4 +138,4 @@ node --import tsx tests/helpers/phase30-repair-preview.mjs normal
 
 ## 下一步
 
-使用者已要求進入 R03。現在逐項確認套用範圍、備份前置驗證、來源／版本／lineage 守衛、原子套用與修復報告；細節定案後才實作下一個小階段。R03 是工作索引，不直接當作 phase 編號，也不將全部項目綁成一個巨大階段。
+使用者已要求進入 R03，並於 2026-10-02 批准第一階段作為 [Phase 31 持久備份與修復準備](PHASE_31_REPAIR_PREPARATION.md)，待 Grok Bot 驗證及使用者接受。原子套用與完成報告的完整寫入契約仍待確認，不自動開始第二階段。R03 是工作索引，不直接當作 phase 編號。

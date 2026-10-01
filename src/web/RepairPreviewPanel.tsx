@@ -4,6 +4,7 @@ import { REPAIR_ISSUES, REPAIR_STATUS_LABELS, REPAIR_TIMEOUT_MS,
   type RepairPreviewReport, type RepairSource } from "../shared/repair-preview.js";
 import { changedRepairSources, invalidateRepairSource, loadRepairPreview, repairEpochs, subscribeRepairChanges } from "./repair-preview.js";
 import { Button } from "./ui/Button.js";
+import { RepairPreparationPanel } from "./RepairPreparationPanel.js";
 
 const display = (v: number | string) => v === "in-combat" ? "戰鬥中" : v === "outside-combat" ? "戰鬥外" : String(v);
 export function RepairPreviewReportView({ report, stale = [] }: { report: RepairPreviewReport; stale?: readonly RepairSource[] }) {
@@ -91,5 +92,6 @@ export function RepairPreviewPanel({ currentState }: { currentState?: Authoritat
         <Button variant="secondary" aria-disabled={!busy} onClick={() => { if (request.current) cancel(); }}>取消候選預覽</Button>
       </div>
     </div> : null}
+    <RepairPreparationPanel report={open ? report : null} stale={stale} />
   </section>;
 }

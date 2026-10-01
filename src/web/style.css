@@ -2111,3 +2111,9 @@ h1 {
 .repair-preview__changes dd { margin: 0; font-weight: 600; }
 .repair-preview__item details { margin-top: var(--space-3); }
 .repair-preview__item summary { padding-block: var(--space-2); cursor: pointer; }
+.repair-preparation { min-width: 0; margin-top: var(--space-3); overflow-wrap: anywhere; }
+.repair-preparation__candidate { margin-block: var(--space-3); }
+.repair-preparation__id { display: block; box-sizing: border-box; width: 100%; min-width: 0; min-height: 3rem; margin-block: var(--space-2); font: inherit; }
+.repair-preparation .ui-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.repair-preparation details { margin-block: var(--space-3); }
+.repair-preparation summary { min-height: 3rem; display: list-item; cursor: pointer; }

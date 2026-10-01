@@ -27,6 +27,9 @@ import { registerDataDiagnosticsRoute, type DataDiagnosticsReader } from "./data
 import { createMemoryBackupReader, registerRawBackupRoute, RawBackupFailure, type RawBackupReader } from "./raw-data-backup.js";
 import { createMemoryRepairReader, type RepairPreviewReader } from "./repair-preview-reader.js";
 import { registerRepairPreviewRoute } from "./repair-preview.js";
+import { createRepairPreparationService, registerRepairPreparationRoutes } from "./repair-preparation.js";
+import { FileRepairArchive } from "./file-repair-archive.js";
+import { PreparationFailure, type RepairArchive } from "./repair-archive.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -39,6 +42,10 @@ export async function buildApp(options: {
   backupReader?: RawBackupReader;
   backupMaxBytes?: number;
   repairPreviewReader?: RepairPreviewReader;
+  repairArchive?: RepairArchive;
+  repairBackupDirectory?: string;
+  repairBackupMaxBytes?: number;
+  repairArchiveMaxBytes?: number;
   storage?: "memory" | "postgres";
   narrator?: ExplorationNarrator;
   saveGameRepository?: SaveGameRepository;
@@ -73,11 +80,21 @@ export async function buildApp(options: {
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
-  registerRepairPreviewRoute(app, options.repairPreviewReader ?? createMemoryRepairReader(createTestGameState().character.id, () => {
+  const repairReader = options.repairPreviewReader ?? createMemoryRepairReader(createTestGameState().character.id, () => {
     if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
       throw new RawBackupFailure("unavailable");
     return { current: session.readStateForBackup(), slots: saveGameRepository.readAllForBackup() };
-  }));
+  });
+  registerRepairPreviewRoute(app, repairReader);
+  const unavailableArchive: RepairArchive = {
+    async get() { throw new PreparationFailure("unavailable"); },
+    async list() { throw new PreparationFailure("unavailable"); },
+    async put() { throw new PreparationFailure("unavailable"); },
+  };
+  const archive = options.repairArchive ?? (storage === "memory"
+    ? new FileRepairArchive(options.repairBackupDirectory ?? ".repair-backups", options.repairBackupMaxBytes, options.repairArchiveMaxBytes)
+    : unavailableArchive);
+  registerRepairPreparationRoutes(app, createRepairPreparationService(repairReader, archive, options.repairBackupMaxBytes), options.repairBackupMaxBytes);
   registerRawBackupRoute(app, options.backupReader ?? createMemoryBackupReader(createTestGameState().character.id, () => {
     if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
       throw new RawBackupFailure("unavailable");
