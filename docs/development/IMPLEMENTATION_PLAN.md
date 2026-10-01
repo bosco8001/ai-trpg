@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–28 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27／28 於 2026-10-01 回報手動測試通過。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`；備份與修復尚未開始。
+Phase 1–28 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27／28 於 2026-10-01 回報手動測試通過。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。Phase 29 原始備份範圍已逐項確認，尚未開始程式實作；修復尚未開始。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -35,10 +35,11 @@ Phase 1–28 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27／
 | 26 | 戰鬥結算與返回探索 |
 | 27 | 完整手機戰鬥介面 polish |
 | 28 | 唯讀目前狀態／三槽存檔健康檢查 |
+| 29 | 手動下載目前資料／三槽的完整原始備份（規格已確認，尚未實作） |
 
 每個階段開始前先解釋範圍與手動測試方式；完成工程檢查後停下，由使用者手動確認才繼續。Phase 3 先以記憶體檢查 domain，Phase 4 才驗證重啟後仍能載入。Responsive 從 Phase 2 建立；persistence 從 Phase 4 貫穿後續功能。
 
-2026-10-01 的後續盤點見 [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)，未定規則與承諾見 [OPEN_QUESTIONS](OPEN_QUESTIONS.md)。R01–R39 是工作索引，不是 phase 編號；使用者只批准其中 R01 的唯讀診斷小項作為 Phase 28，備份另拆下一小階段。
+2026-10-01 的後續盤點見 [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)，未定規則與承諾見 [OPEN_QUESTIONS](OPEN_QUESTIONS.md)。R01–R39 是工作索引，不是 phase 編號；R01 的唯讀診斷作為 Phase 28 已驗收，原始備份另拆為 Phase 29，其餘小項未自動獲批准。
 
 Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自行定案，暫時測試資料與設定必須標記。這份工程計畫不新增正式世界觀或遊戲規則。
 
@@ -338,3 +339,9 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 使用者再提供 Grok 對 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f` 的外部複查報告：N1／N2 已解決，沒有新缺陷或阻擋手動驗收的問題，隔離 PostgreSQL 17 的 326 項測試通過。外部報告與使用者驗收分開記錄，詳見 [Phase 28 修正紀錄](PHASE_28_REVIEW_FIXES.md)。
 
 **Phase 28 已由使用者於 2026-10-01（Asia/Hong_Kong）確認手動測試通過。** 驗收版本為 `codex/phase27-mobile-ui` 的 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`；使用者原文：「Phase 28 手動測試通過」。此處只記錄使用者整體驗收結論，不補寫未提供的逐項結果；不代表分支已合併，也不批准原始備份或修復的後續實作。下一個建議討論的小項為原始備份，須另確認方式與保存位置。
+
+## Phase 29 規格確認紀錄（尚未實作）
+
+2026-10-01（Asia/Hong_Kong），使用者同意以目前配置角色資料與三槽的單一 JSON 下載作為下一小階段，要求先逐項討論再實作。六項選擇依序為 A、A、B、A、A、A：完整原始內容與已保存敘事、10 MiB 完整檔案上限、30 秒整次接收上限、失敗手動重試、檔內 SHA-256 校驗值、備份期間可繼續遊戲。
+
+完整範圍、原始資料保留、一致唯讀快照、失敗處理與待驗收目標見 [Phase 29 規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)。使用者自訂上限 UI 只列為後續待評估；備份不送給 LLM。此輪只記錄規格，沒有程式實作或工程測試，也沒有批准還原、修復候選或套用。

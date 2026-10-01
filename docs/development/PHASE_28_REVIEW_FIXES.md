@@ -89,4 +89,4 @@ DOM 與提示已做瀏覽器工程檢查；沒有宣稱真實 VoiceOver／其他
 
 2026-10-01（Asia/Hong_Kong），使用者其後回報：「Phase 28 手動測試通過」。驗收版本為 `codex/phase27-mobile-ui` 的 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。只記錄整體驗收結論，不補寫未提供的逐項結果；外部報告仍不代替使用者驗收。
 
-原始備份與修復尚未開始，下一個小階段須另行討論及批准。
+修正驗收後，使用者另行逐項確認 [Phase 29 原始備份規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)，尚未開始實作；修復候選與套用仍須另行討論及批准。最新階段狀態見 [Implementation Plan](IMPLEMENTATION_PLAN.md)。
