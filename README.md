@@ -2,9 +2,9 @@
 
 這是 docs-first、從零建立的瀏覽器 AI TRPG。先閱讀 [AGENTS.md](AGENTS.md) 與 [權威文件清單](docs/development/CANONICAL_MANIFEST.md)。遊戲規則以清單中的文件為準；HTML 戰鬥原型不作為正式程式模板。
 
-Phase 1–27 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27 於 2026-10-01 回報手動測試通過；見 [手機戰鬥介面測試指南](docs/development/PHASE_27_MOBILE_COMBAT.md)。階段順序見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
+Phase 1–28 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27／28 於 2026-10-01 回報手動測試通過。階段順序與驗收紀錄見 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
-Phase 28 的唯讀資料健康檢查已實作並通過工程檢查，**等待使用者手動驗收**。探索／戰鬥／主選單的系統面板及初始狀態讀取失敗畫面都有入口；啟動與隔離錯誤樣本見 [Phase 28 測試指南](docs/development/PHASE_28_DATA_DIAGNOSTICS.md)。這一階段只檢查，不備份或修復。
+Phase 28 的唯讀資料健康檢查**已由使用者手動驗收通過**，驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。探索／戰鬥／主選單的系統面板及初始狀態讀取失敗畫面都有入口；啟動與隔離錯誤樣本見 [Phase 28 測試指南](docs/development/PHASE_28_DATA_DIAGNOSTICS.md)。這一階段只檢查，不備份或修復。
 
 後續工作已重新盤點為 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md)，建議實作順序見 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。除已批准的 Phase 28 唯讀診斷外，其餘仍是規劃提案。
 

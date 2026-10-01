@@ -73,7 +73,7 @@ Agent 遇到 unresolved 項目時：
 
 ## 後續工程規劃
 
-- [Phase 28 唯讀資料健康檢查](PHASE_28_DATA_DIAGNOSTICS.md)：工程交付與測試指南，不是新增 Canon；工程檢查通過，等待使用者手動驗收。
+- [Phase 28 唯讀資料健康檢查](PHASE_28_DATA_DIAGNOSTICS.md)：工程交付與測試指南，不是新增 Canon；已由使用者於 2026-10-01 確認手動驗收通過。
 - [Phase 28 外部審查後修正](PHASE_28_REVIEW_FIXES.md)：文件狀態、查詢逾時與無障礙提示的工程紀錄；不新增 Canon，不代替使用者驗收。
 - [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)：工程盤點與排序提案，不是新增 Canon；目前只批准 R01 的唯讀診斷作為 Phase 28。
 - [未定事項與後續承諾](OPEN_QUESTIONS.md) 分別標記已定待實作、待定、後續承諾與範圍候選；其中的實作排序不覆蓋上述權威規則。

@@ -118,4 +118,4 @@ node tests/helpers/phase26-manual-fixture.mjs victory
 
 ## 下一步
 
-Phase 27 已完成使用者驗收。若之後回報本階段問題，先修正該問題。使用者其後批准 Phase 28 唯讀資料健康檢查；目前等待 Phase 28 手動驗收。詳見 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md) 與 [Phase 28 指南](PHASE_28_DATA_DIAGNOSTICS.md)。
+Phase 27 已完成使用者驗收。若之後回報本階段問題，先修正該問題。使用者其後批准並驗收 Phase 28 唯讀資料健康檢查；目前階段與後續工作以 [Implementation Phase Plan](IMPLEMENTATION_PLAN.md) 為準。Phase 28 的交付與驗收紀錄見 [Phase 28 指南](PHASE_28_DATA_DIAGNOSTICS.md)。

@@ -1,6 +1,6 @@
 # 未定事項與後續承諾
 
-更新：2026-10-01。Phase 1–27 已由使用者手動驗收通過。Phase 28 唯讀資料健康檢查已獲批准並完成工程檢查，等待使用者手動驗收；備份與修復尚未開始。後續工作與建議順序見 [Phase 27 之後的工作清單](POST_PHASE_27_ROADMAP.md)。
+更新：2026-10-01。Phase 1–28 已由使用者手動驗收通過；Phase 28 驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。備份與修復尚未開始。後續工作與建議順序見 [Phase 27 之後的工作清單](POST_PHASE_27_ROADMAP.md)。
 
 本文件同時追蹤未定規則、已定但未實作的缺口，以及後續承諾。**出現在清單不代表規則已定案或 phase 已獲批准。** Agent 不得把 Prototype、TEST 數值、自己的偏好或這份工程排序升級為 Canon。
 
@@ -17,7 +17,7 @@
 建議順序：R01–R03；後續機械證據見 R24。
 
 - **後續必做：Save / State Repair System。** 使用 deterministic rules、verified evidence、backup、candidate validation、atomic apply、repair report；LLM 不猜 authoritative identity／resources。
-- **Phase 28 工程已實作、待手動驗收**：目前狀態與三槽存檔逐項唯讀診斷；正常系統面板與初始狀態讀取失敗畫面都有入口。不初始化、不寫入映射、不備份或修復，正常格式不保證能在目前 Run 載入。詳見 [Phase 28](PHASE_28_DATA_DIAGNOSTICS.md)。
+- **Phase 28 已由使用者手動驗收通過**：目前狀態與三槽存檔逐項唯讀診斷；正常系統面板與初始狀態讀取失敗畫面都有入口。不初始化、不寫入映射、不備份或修復，正常格式不保證能在目前 Run 載入。詳見 [Phase 28](PHASE_28_DATA_DIAGNOSTICS.md)。
 - **待定**：允許修復的有限錯誤類型、證據來源、候選差異、拒絕條件、確認／套用入口及備份保存政策。先做唯讀診斷與原始備份，不讓正常 Load 暗中修復。
 - History 修復須證明是目前 lineage，且沒有後續相關 mutation；單獨最新 Settlement HP 不足以重建目前 HP。無足夠證據時保持受阻。
 - **已定限制、待正式資料版本規格**：Phase 26 已接受已知 TEST v1 Save 的明確映射及 v2 完整存讀檔。未知正式角色、MP／屬性／世界／裝備欄位缺值的版本升級政策仍待定，不因新功能重寫原始 Save 或填入 TEST 值。
@@ -154,6 +154,7 @@
 - Phase 26 的勝利／逃跑明確繼續才結算、瀕死穩定 1 HP、死者保留 Character 並移出 active Party、回原探索位置；Game Over 不結算。
 - Active／ended／Game Over 的 Save Format v2 完整存讀檔、已知 TEST v1 映射、持久化探索／戰後 Entry、generation／revision／去重邊界。
 - Phase 25 的瀕死倒數、救助、死亡與詠唱清除；Phase 27 的手機戰鬥界面在該交付範圍內已由使用者驗收。
+- Phase 28 的目前資料與三槽唯讀健康檢查已由使用者驗收；原始備份與修復仍屬後續工作。
 - 工程已接通不代表所有正式玩法完整；例如背包消耗有了，正式藥水治療仍未接入。
 - 詳見 [已批准階段計畫](IMPLEMENTATION_PLAN.md)、[Phase 26 實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)、[Phase 27 驗收紀錄](PHASE_27_MOBILE_COMBAT.md)。
 
