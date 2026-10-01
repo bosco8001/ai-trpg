@@ -127,4 +127,4 @@ node --import tsx tests/helpers/phase28-diagnostics-preview.mjs blocked
 
 ## 下一步
 
-Phase 28 已完成使用者手動驗收。使用者其後逐項確認 [Phase 29 原始備份規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)，尚未開始程式實作；目前階段狀態見 [Implementation Plan](IMPLEMENTATION_PLAN.md)。修復候選與套用另拆，不自動繼續。
+Phase 28 已完成使用者手動驗收。使用者其後逐項確認並要求實作 [Phase 29 原始備份](PHASE_29_RAW_DATA_BACKUP.md)；目前階段狀態見 [Implementation Plan](IMPLEMENTATION_PLAN.md)。修復候選與套用另拆，不自動繼續。

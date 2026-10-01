@@ -24,6 +24,7 @@ import { registerCombatActionRoutes, registerCombatSandbox } from "./combat/rout
 import type { CombatNarrationService } from "./combat/narration.js";
 import { registerGameStateRoute } from "./game-state-route.js";
 import { registerDataDiagnosticsRoute, type DataDiagnosticsReader } from "./data-diagnostics.js";
+import { createMemoryBackupReader, registerRawBackupRoute, RawBackupFailure, type RawBackupReader } from "./raw-data-backup.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -33,6 +34,8 @@ export async function buildApp(options: {
   interpreter?: ActionInterpreter;
   domainSession?: GameStateSession;
   diagnosticsReader?: DataDiagnosticsReader;
+  backupReader?: RawBackupReader;
+  backupMaxBytes?: number;
   storage?: "memory" | "postgres";
   narrator?: ExplorationNarrator;
   saveGameRepository?: SaveGameRepository;
@@ -67,6 +70,11 @@ export async function buildApp(options: {
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
+  registerRawBackupRoute(app, options.backupReader ?? createMemoryBackupReader(createTestGameState().character.id, () => {
+    if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
+      throw new RawBackupFailure("unavailable");
+    return { current: session.readStateForBackup(), slots: saveGameRepository.readAllForBackup() };
+  }), options.backupMaxBytes);
   registerDataDiagnosticsRoute(app, options.diagnosticsReader ?? {
     async readCurrent() {
       if (!session.readStateForDiagnostics) throw new Error("缺少唯讀資料來源。");

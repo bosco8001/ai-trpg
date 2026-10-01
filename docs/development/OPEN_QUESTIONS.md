@@ -1,6 +1,6 @@
 # 未定事項與後續承諾
 
-更新：2026-10-01。Phase 1–28 已由使用者手動驗收通過；Phase 28 驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。Phase 29 原始備份範圍已逐項確認，尚未實作；修復尚未開始。後續工作與建議順序見 [Phase 27 之後的工作清單](POST_PHASE_27_ROADMAP.md)。
+更新：2026-10-01。Phase 1–28 已由使用者手動驗收通過；Phase 28 驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。Phase 29 原始備份已工程交付，等待使用者手動驗收；修復尚未開始。後續工作與建議順序見 [Phase 27 之後的工作清單](POST_PHASE_27_ROADMAP.md)。
 
 本文件同時追蹤未定規則、已定但未實作的缺口，以及後續承諾。**出現在清單不代表規則已定案或 phase 已獲批准。** Agent 不得把 Prototype、TEST 數值、自己的偏好或這份工程排序升級為 Canon。
 
@@ -18,7 +18,7 @@
 
 - **後續必做：Save / State Repair System。** 使用 deterministic rules、verified evidence、backup、candidate validation、atomic apply、repair report；LLM 不猜 authoritative identity／resources。
 - **Phase 28 已由使用者手動驗收通過**：目前狀態與三槽存檔逐項唯讀診斷；正常系統面板與初始狀態讀取失敗畫面都有入口。不初始化、不寫入映射、不備份或修復，正常格式不保證能在目前 Run 載入。詳見 [Phase 28](PHASE_28_DATA_DIAGNOSTICS.md)。
-- **Phase 29 已確認範圍、待實作**：下載目前資料與三槽的完整原始備份，含已保存敘事／識別紀錄。單一 JSON、完整檔案 10 MiB 上限、整次接收 30 秒、手動重試、檔內 SHA-256 與一致快照已確認；備份期間可繼續遊戲，來源不合法仍保留原值，讀取失敗則不提供部分檔案。依瀏覽器下載設定保存，不送給 LLM。詳見 [Phase 29 規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md)。
+- **Phase 29 工程已交付、待手動驗收**：下載目前資料與三槽的完整原始備份，含已保存敘事／識別紀錄。單一 JSON、完整檔案預設 10 MiB 上限、整次接收 30 秒、手動重試、檔內 SHA-256 與一致快照已接通；備份期間可繼續遊戲，來源不合法仍保留原值，讀取失敗則不提供部分檔案。依瀏覽器下載設定保存，不送給 LLM。詳見 [Phase 29 規格](PHASE_29_RAW_DATA_BACKUP_SPEC.md) 與 [測試指南](PHASE_29_RAW_DATA_BACKUP.md)。
 - **待定**：允許修復的有限錯誤類型、證據來源、候選差異、拒絕條件及確認／套用入口；未來自動備份與伺服器留存政策亦未定。不讓正常 Load 暗中修復。
 - **後續待評估**：使用者自訂備份上限 UI；目前只有可調整的工程限制，不在 Phase 29 擴大介面。
 - History 修復須證明是目前 lineage，且沒有後續相關 mutation；單獨最新 Settlement HP 不足以重建目前 HP。無足夠證據時保持受阻。
@@ -156,7 +156,7 @@
 - Phase 26 的勝利／逃跑明確繼續才結算、瀕死穩定 1 HP、死者保留 Character 並移出 active Party、回原探索位置；Game Over 不結算。
 - Active／ended／Game Over 的 Save Format v2 完整存讀檔、已知 TEST v1 映射、持久化探索／戰後 Entry、generation／revision／去重邊界。
 - Phase 25 的瀕死倒數、救助、死亡與詠唱清除；Phase 27 的手機戰鬥界面在該交付範圍內已由使用者驗收。
-- Phase 28 的目前資料與三槽唯讀健康檢查已由使用者驗收；原始備份與修復仍屬後續工作。
+- Phase 28 的目前資料與三槽唯讀健康檢查已由使用者驗收；Phase 29 原始備份已工程交付、待手動驗收，修復仍屬後續工作。
 - 工程已接通不代表所有正式玩法完整；例如背包消耗有了，正式藥水治療仍未接入。
 - 詳見 [已批准階段計畫](IMPLEMENTATION_PLAN.md)、[Phase 26 實作對照](PHASE_26_IMPLEMENTATION_MAPPING.md)、[Phase 27 驗收紀錄](PHASE_27_MOBILE_COMBAT.md)。
 
@@ -171,4 +171,4 @@
 
 遇到待定項，先確認與該小階段直接相關的規則，不一次要求使用者決定整個遊戲。低風險工程細節可合理選擇；TEST／placeholder 必須清楚標示。
 
-排序本身不批准所有後續工作。Phase 28 的唯讀診斷已驗收；使用者其後逐項確認 Phase 29 原始備份範圍，尚未實作。修復候選與套用仍須各自討論並分階段交付；Canon 與未定遊戲規則沒有因診斷或備份而改變。
+排序本身不批准所有後續工作。Phase 28 的唯讀診斷已驗收；使用者其後逐項確認並要求實作 Phase 29 原始備份，目前工程已交付、待手動驗收。修復候選與套用仍須各自討論並分階段交付；Canon 與未定遊戲規則沒有因診斷或備份而改變。

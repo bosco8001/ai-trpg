@@ -13,6 +13,8 @@ import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
 import { createPostgresDiagnosticsPool, createPostgresDiagnosticsReader } from "./postgres-data-diagnostics.js";
 import { createTestGameState } from "./test-game-state.js";
+import { backupMaxBytes } from "./raw-data-backup.js";
+import { createPostgresBackupReader } from "./postgres-raw-data-backup.js";
 import {
   createCombatActionFixtureRoller,
   createPhase22CombatFixtureRoller,
@@ -67,6 +69,10 @@ const pool = storage === "postgres"
 const diagnosticsPool = storage === "postgres"
   ? createPostgresDiagnosticsPool(process.env.DATABASE_URL!)
   : undefined;
+const backupPool = storage === "postgres"
+  ? createPostgresDiagnosticsPool(process.env.DATABASE_URL!)
+  : undefined;
+const rawBackupMaxBytes = backupMaxBytes(process.env.RAW_BACKUP_MAX_BYTES);
 
 const app = await buildApp({
   logger: true,
@@ -86,6 +92,8 @@ const app = await buildApp({
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,
   diagnosticsReader: diagnosticsPool ? createPostgresDiagnosticsReader(diagnosticsPool, createTestGameState().character.id) : undefined,
+  backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id) : undefined,
+  backupMaxBytes: rawBackupMaxBytes,
   storage,
   interpreter: createActionInterpreter(createLanguageModel(
     new FixtureInterpretationAdapter(), { timeoutMs: 1_000 },
@@ -123,6 +131,10 @@ if (diagnosticsPool) {
   app.addHook("onClose", async () => {
     await diagnosticsPool.end();
   });
+}
+if (backupPool) {
+  backupPool.on("error", (error) => app.log.error({ err: error }, "原始備份連線中斷"));
+  app.addHook("onClose", async () => { await backupPool.end(); });
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

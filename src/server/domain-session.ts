@@ -35,6 +35,8 @@ import { settleCombat, phase26, newIdentity } from "../domain/settlement.js";
 import { reserve, append, type NarrativeReservation } from "./history.js";
 import { createTestGameState } from "./test-game-state.js";
 export interface GameStateSession {
+  /** Synchronous memory-only snapshot getter; persisted backups use their own raw reader. */
+  readStateForBackup?(): GameState | undefined;
   /** Pure inspection only: no initialization, migration write or gameplay mutation. */
   readStateForDiagnostics?(): GameState | undefined | Promise<GameState | undefined>;
   settleCombat(input: unknown): Promise<import("../domain/settlement.js").SettlementTransition & {reservation?: import("./history.js").NarrativeReservation}>;
@@ -147,6 +149,7 @@ function methods(read:()=>GameState | Promise<GameState>, boundary:Boundary): Ga
 export function createDomainSession(initialState: GameState) {
   let state = createGameState(initialState);
   return {
+    readStateForBackup: () => state,
     readStateForDiagnostics: () => state,
     ...methods(()=>state,async transition=>{const {result,nextState}=transition(state);if(nextState) state=createGameState(nextState);return result;}),
     getState: () => state,

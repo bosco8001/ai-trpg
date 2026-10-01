@@ -20,6 +20,11 @@ export class InMemorySaveGameRepository implements SaveGameRepository {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
+  /** Used only inside the synchronous backup capture; never hydrate or rebuild records. */
+  readAllForBackup(): readonly StoredSaveSlot[] {
+    return [...this.records.values()];
+  }
+
   async list(): Promise<readonly StoredSaveSlot[]> {
     return [...this.records.values()].sort((a, b) => a.slotId - b.slotId).map(copy);
   }

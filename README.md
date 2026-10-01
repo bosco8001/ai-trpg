@@ -6,9 +6,9 @@ Phase 1–28 已由使用者手動確認；Phase 26 於 2026-09-30、Phase 27／
 
 Phase 28 的唯讀資料健康檢查**已由使用者手動驗收通過**，驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。探索／戰鬥／主選單的系統面板及初始狀態讀取失敗畫面都有入口；啟動與隔離錯誤樣本見 [Phase 28 測試指南](docs/development/PHASE_28_DATA_DIAGNOSTICS.md)。這一階段只檢查，不備份或修復。
 
-Phase 29 的[手動下載原始資料備份規格](docs/development/PHASE_29_RAW_DATA_BACKUP_SPEC.md)已由使用者逐項確認，尚未開始程式實作；完整原始備份、單一 JSON、10 MiB 上限、30 秒等待、手動重試、SHA-256 校驗及備份時繼續遊戲已定案。
+Phase 29 的[手動下載原始資料備份](docs/development/PHASE_29_RAW_DATA_BACKUP.md)已實作並通過工程檢查，**等待使用者手動驗收**；完整原始備份、單一 JSON、預設 10 MiB 上限、30 秒等待、手動重試、SHA-256 校驗及備份時繼續遊戲已接通。已確認行為見 [Phase 29 規格](docs/development/PHASE_29_RAW_DATA_BACKUP_SPEC.md)。
 
-後續工作已重新盤點為 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md)，建議實作順序見 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。Phase 28 已驗收，Phase 29 範圍已確認；其餘後續小項仍是規劃提案。
+後續工作已重新盤點為 [未定事項與後續承諾](docs/development/OPEN_QUESTIONS.md)，建議實作順序見 [Phase 27 之後的工作清單](docs/development/POST_PHASE_27_ROADMAP.md)。Phase 28 已驗收，Phase 29 待手動驗收；其餘後續小項仍是規劃提案。
 
 Phase 3 的 domain 範圍與手動測試步驟見 [Phase 3 文件](docs/development/PHASE_3_DOMAIN.md)。目前各階段實作與手動驗收狀態見下方測試指南及 [Implementation Phase Plan](docs/development/IMPLEMENTATION_PLAN.md)。
 
