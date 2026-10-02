@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import type { RepairSource } from "../shared/repair-preview.js";
 import { boundedJson, RawBackupFailure } from "./raw-data-backup.js";
-import { withPgClient } from "./pg-client-operation.js";
+import { withPgClient, type PgClientErrorReporter } from "./pg-client-operation.js";
 
 export interface RepairRawRecord { readonly capturedAt: string; readonly raw: string | null }
 export interface RepairPreviewReader {
@@ -20,7 +20,8 @@ export function createMemoryRepairReader(characterId: string,
   } };
 }
 /** 每項一條唯讀 SELECT：原始列、時間與大小判定使用同一 statement 快照。 */
-export function createPostgresRepairReader(pool: Pick<Pool, "connect">, characterId: string): RepairPreviewReader {
+export function createPostgresRepairReader(pool: Pick<Pool, "connect">, characterId: string,
+  reportConnectionError?: PgClientErrorReporter): RepairPreviewReader {
   return { storage: "postgres", characterId, async read(source, maxBytes, signal) {
     return withPgClient(pool, signal, () => new RawBackupFailure("unavailable"), async client => {
       const selection = source === "current"
@@ -37,6 +38,6 @@ export function createPostgresRepairReader(pool: Pick<Pool, "connect">, characte
       if (!row) throw new RawBackupFailure("unavailable");
       if (row.too_large) throw new RawBackupFailure("too-large");
       return { capturedAt: row.captured_at, raw: row.raw };
-    });
+    }, reportConnectionError);
   } };
 }

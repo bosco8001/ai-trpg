@@ -1,10 +1,11 @@
 import type { Pool } from "pg";
 import type { RawBackupPayload } from "../shared/raw-data-backup.js";
 import { RawBackupFailure, type RawBackupReader } from "./raw-data-backup.js";
-import { withPgClient } from "./pg-client-operation.js";
+import { withPgClient, type PgClientErrorReporter } from "./pg-client-operation.js";
 
 /** One SELECT gives all four records a single MVCC snapshot, without explicit lock commands or initialization. */
-export function createPostgresBackupReader(pool: Pick<Pool, "connect">, characterId: string): RawBackupReader {
+export function createPostgresBackupReader(pool: Pick<Pool, "connect">, characterId: string,
+  reportConnectionError?: PgClientErrorReporter): RawBackupReader {
   return {
     async capture(maxBytes, signal): Promise<RawBackupPayload> {
       return withPgClient(pool, signal, () => new RawBackupFailure("unavailable"), async client => {
@@ -35,7 +36,7 @@ export function createPostgresBackupReader(pool: Pick<Pool, "connect">, characte
           current: row.records.find(record => record.position === 0)?.raw ?? null,
           slots: ([1, 2, 3] as const).map(slotId => ({ slotId,
             record: row.records!.find(record => record.position === slotId)?.raw ?? null })) };
-      });
+      }, reportConnectionError);
     },
   };
 }

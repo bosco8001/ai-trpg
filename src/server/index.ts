@@ -1,6 +1,7 @@
 import { createSettlementNarrator, settlementFallback } from "./combat/settlement-service.js";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import type { FastifyBaseLogger } from "fastify";
 import { buildApp } from "./app.js";
 import { PostgresGameStateRepository } from "./postgres-game-state-repository.js";
 import { createLanguageModel } from "./llm/language-model.js";
@@ -82,6 +83,11 @@ const repairArchivePool = storage === "postgres" ? createRepairArchivePool(proce
 const repairBackupMaxBytes = repairArchiveLimit(process.env.REPAIR_BACKUP_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES);
 const repairArchiveMaxBytes = repairArchiveLimit(process.env.REPAIR_ARCHIVE_MAX_BYTES, REPAIR_ARCHIVE_MAX_BYTES);
 
+let pgOperationLogger: Pick<FastifyBaseLogger, "error"> | undefined;
+function logPgConnectionError(operation: "raw-backup" | "repair-preview" | "repair-archive", state: "borrowed" | "idle") {
+  pgOperationLogger?.error({ event: "pg_connection_error", operation, state }, "PostgreSQL 備份／預覽連線中斷");
+}
+
 const app = await buildApp({
   logger: true,
   domainSandbox,
@@ -100,10 +106,13 @@ const app = await buildApp({
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,
   diagnosticsReader: diagnosticsPool ? createPostgresDiagnosticsReader(diagnosticsPool, createTestGameState().character.id) : undefined,
-  backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id) : undefined,
+  backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id,
+    () => logPgConnectionError("raw-backup", "borrowed")) : undefined,
   backupMaxBytes: rawBackupMaxBytes,
-  repairPreviewReader: repairPreviewPool ? createPostgresRepairReader(repairPreviewPool, createTestGameState().character.id) : undefined,
-  repairArchive: repairArchivePool ? new PostgresRepairArchive(repairArchivePool, repairBackupMaxBytes, repairArchiveMaxBytes) : undefined,
+  repairPreviewReader: repairPreviewPool ? createPostgresRepairReader(repairPreviewPool, createTestGameState().character.id,
+    () => logPgConnectionError("repair-preview", "borrowed")) : undefined,
+  repairArchive: repairArchivePool ? new PostgresRepairArchive(repairArchivePool, repairBackupMaxBytes, repairArchiveMaxBytes,
+    () => logPgConnectionError("repair-archive", "borrowed")) : undefined,
   repairBackupDirectory: process.env.REPAIR_BACKUP_DIRECTORY,
   repairBackupMaxBytes,
   repairArchiveMaxBytes,
@@ -129,6 +138,7 @@ const app = await buildApp({
     ? fileURLToPath(new URL("../web/", import.meta.url))
     : undefined,
 });
+pgOperationLogger = app.log;
 if (pool) {
   pool.on("error", (error) => {
     app.log.error({ err: error }, "PostgreSQL 閒置連線中斷");
@@ -146,15 +156,15 @@ if (diagnosticsPool) {
   });
 }
 if (backupPool) {
-  backupPool.on("error", (error) => app.log.error({ err: error }, "原始備份連線中斷"));
+  backupPool.on("error", () => logPgConnectionError("raw-backup", "idle"));
   app.addHook("onClose", async () => { await backupPool.end(); });
 }
 if (repairPreviewPool) {
-  repairPreviewPool.on("error", error => app.log.error({ err: error }, "候選預覽連線中斷"));
+  repairPreviewPool.on("error", () => logPgConnectionError("repair-preview", "idle"));
   app.addHook("onClose", async () => { await repairPreviewPool.end(); });
 }
 if (repairArchivePool) {
-  repairArchivePool.on("error", () => app.log.error("修復備份連線中斷"));
+  repairArchivePool.on("error", () => logPgConnectionError("repair-archive", "idle"));
   app.addHook("onClose", async () => { await repairArchivePool.end(); });
 }
 

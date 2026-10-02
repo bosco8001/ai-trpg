@@ -1,7 +1,7 @@
 import pg, { type Pool, type PoolClient } from "pg";
 import { REPAIR_ARCHIVE_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES, REPAIR_PAGE_SIZE, type RepairPreparationSummary } from "../shared/repair-preparation.js";
 import { PreparationFailure, backupSummary, reuseBackup, verifiedBackup, type RepairArchive } from "./repair-archive.js";
-import { withPgClient } from "./pg-client-operation.js";
+import { withPgClient, type PgClientErrorReporter } from "./pg-client-operation.js";
 
 export function createRepairArchivePool(connectionString: string): Pool {
   const url = new URL(connectionString);
@@ -12,9 +12,10 @@ export function createRepairArchivePool(connectionString: string): Pool {
 }
 export class PostgresRepairArchive implements RepairArchive {
   constructor(readonly pool: Pick<Pool, "connect">, readonly maxBytes = REPAIR_BACKUP_MAX_BYTES,
-    readonly capacityBytes = REPAIR_ARCHIVE_MAX_BYTES) {}
+    readonly capacityBytes = REPAIR_ARCHIVE_MAX_BYTES,
+    private readonly reportConnectionError?: PgClientErrorReporter) {}
   private async connected<T>(signal: AbortSignal, work: (client: PoolClient) => Promise<T>): Promise<T> {
-    return withPgClient(this.pool, signal, () => new PreparationFailure("unavailable"), work);
+    return withPgClient(this.pool, signal, () => new PreparationFailure("unavailable"), work, this.reportConnectionError);
   }
   private async read(client: PoolClient, id: string, characterId: string): Promise<string | null> {
     const result = await client.query<{ backup_text: string | null }>(

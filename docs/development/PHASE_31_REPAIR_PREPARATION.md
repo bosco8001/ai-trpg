@@ -309,4 +309,17 @@ I3 斷線無日誌 Low、丟棄健康連線與 BASE 失敗訊息的兩項 Info �
 
 外部回報所有本輪程序已停，三個 DB／角色、叢集及 `/workspace/p31g` 已刪除，沒有連接或改動 5432。舊 `/workspace/p31f-evidence`、`/workspace/i3r-evidence`、`/workspace/p31` 未改；本輪 `/workspace/p31g-evidence`（14M）保留。證據腳本仍指向已刪除的 `/workspace/p31g`，重跑須先重建隔離環境與更新路徑，不把保留腳本視為已可直接執行。
 
+## 探索大字與 I3 安全日誌小修正（2026-10-03，待驗證）
+
+使用者要求處理探索大字溢出及 I3 斷線缺少日誌。基準為 `d9879537c3239f4e679677295a3ab7551218d989`；本次尚未 commit，目標 SHA 待提交後填入。以下是開發代理已寫入本機的實作紀錄，**不是測試通過，也不是使用者接受**。上節各版本的「未修」保留為當輪歷史結果；這兩項目前改為「已實作，待 Grok 驗證」。
+
+- 探索頁：標題列與連線提示允許換行、縮小到容器寬度，狀態與重試文字可以折行；故事標題與模式標籤也允許換列，避免大字時將標題擠成一字一行。只改 CSS，不隱藏橫向溢出、不縮小使用者字體、不限制縮放。
+- I3：共用 PG 操作 helper 新增可選、無錯誤參數的日誌回呼。第一次借出 client error 先丟棄連線，再回報；重複 error 不重複回報。正常歸還、主動取消及業務拒絕不由此回呼記為斷線。同步拋錯或非同步拒絕的日誌回呼不取代原本 unavailable 結果。
+- 三個 PG 入口（原始備份、候選預覽、修復備份）接上啟動程序的 logger。固定欄位為 `event: "pg_connection_error"`、`operation: "raw-backup" | "repair-preview" | "repair-archive"`、`state: "borrowed" | "idle"`；使用 error 等級及固定訊息，不傳入原始 error、SQL、故事、檔案路徑、stack 或連線字串。這三個專用 pool 的閒置斷線也改用相同安全欄位；其他 pool 不在本次範圍。
+- 補充 `tests/pg-client-operation.test.ts`：無敏感錯誤參數、單次回報、三入口接線、取消／正常／業務拒絕不回報、日誌回呼拋錯／拒絕仍安全完成，以及 COMMIT 回應遺失不重送。所有新增及調整案例尚未執行。
+
+本次檔案限於 `src/web/style.css`、`src/server/pg-client-operation.ts`、`src/server/postgres-raw-data-backup.ts`、`src/server/repair-preview-reader.ts`、`src/server/postgres-repair-archive.ts`、`src/server/index.ts`、`tests/pg-client-operation.test.ts` 及本文件。SQL、migration、Memory 鎖、容量與遊戲規則未改；不處理 favicon、存檔焦點待查觀察或既有兩項 Info，不實作 R03 套用。
+
+依 AGENTS.md 第四節，開發代理只閱讀程式與 Git 資訊，未執行 build、typecheck、格式檢查、測試或瀏覽器驗證。Grok 應針對 320／375／430px、100／150／200% 字體及連線／離線狀態核對排版，並以隔離 PG 加真實 TCP 斷線核對日誌、程序生存、單次丟棄、COMMIT 不重送及結果查詢。CSS 模擬仍不等同真機字體與觸控驗收。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。

@@ -320,10 +320,18 @@ h1 {
 
 .exploration-header {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-4);
   align-items: end;
   justify-content: space-between;
   min-width: 0;
+}
+
+.exploration-header > div:first-child {
+  flex: 1 1 18rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .exploration-header__eyebrow,
@@ -358,18 +366,23 @@ h1 {
 
 .connection-brief {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--space-2);
   align-items: center;
   padding-block-end: var(--space-1);
 }
 
 .connection-brief p {
+  flex: 1 1 10rem;
   min-width: 0;
   margin: 0;
   color: var(--text-muted);
   font-size: 0.8125rem;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .connection-brief__marker {
@@ -390,9 +403,13 @@ h1 {
 }
 
 .connection-brief__retry.ui-button {
+  min-width: 0;
+  max-width: 100%;
   min-height: 2.25rem;
   padding: var(--space-1) var(--space-2);
   font-size: 0.8125rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .exploration-panel {
@@ -405,19 +422,27 @@ h1 {
 
 .exploration-panel__heading {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: var(--space-3);
   align-items: start;
   justify-content: space-between;
 }
 
 .exploration-panel__heading h2 {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin-block-end: 0;
   font-size: clamp(1.5rem, 4vw, 2rem);
   line-height: 1.3;
 }
 
 .exploration-panel__mode {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   margin: var(--space-1) 0 0;
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--border-interactive);

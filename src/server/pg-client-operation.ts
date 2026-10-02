@@ -1,8 +1,12 @@
 import type { Pool, PoolClient } from "pg";
 
+/** No error argument: callers must log fixed metadata, never pg's raw error payload. */
+export type PgClientErrorReporter = () => void | Promise<void>;
+
 /** Handle borrowed-client errors separately from pg-pool's idle-client listener. */
 export async function withPgClient<T>(pool: Pick<Pool, "connect">, signal: AbortSignal,
-  unavailable: () => Error, work: (client: PoolClient) => Promise<T>): Promise<T> {
+  unavailable: () => Error, work: (client: PoolClient) => Promise<T>,
+  reportConnectionError?: PgClientErrorReporter): Promise<T> {
   if (signal.aborted) throw unavailable();
   let client: PoolClient;
   try { client = await pool.connect(); }
@@ -18,7 +22,16 @@ export async function withPgClient<T>(pool: Pick<Pool, "connect">, signal: Abort
     rejectStopped(failure);
     release(true);
   };
-  client.on("error", stop);
+  const disconnected = () => {
+    const report = !failure && !signal.aborted;
+    stop();
+    if (report) {
+      // Logging must not delay disposal or turn a safe failure into a crash/rejection.
+      try { void Promise.resolve(reportConnectionError?.()).catch(() => {}); }
+      catch { /* The connection failure still completes with the domain's unavailable error. */ }
+    }
+  };
+  client.on("error", disconnected);
   signal.addEventListener("abort", stop, { once: true });
   try {
     // Both outcomes are observed even when an in-flight query rejects after the error event.
@@ -36,6 +49,6 @@ export async function withPgClient<T>(pool: Pick<Pool, "connect">, signal: Abort
     signal.removeEventListener("abort", stop);
     // release() installs the pool's idle error listener synchronously. Keep ours until then.
     try { release(false); }
-    finally { client.removeListener("error", stop); }
+    finally { client.removeListener("error", disconnected); }
   }
 }
