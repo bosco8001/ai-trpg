@@ -131,4 +131,18 @@ I2 的 JSON／格式／校驗故障、HTTP 503 與 no-store、不洩露原稿及
 
 外部回報隔離 PG port 55426 的三個 DB 與角色已刪除，叢集、`/workspace/pg31r`、副本及 log 已清理，程序已停止，沒有容器；保留 postgresql-17 套件與 `/workspace/node24`。原 repo 停在上述 TARGET 且工作目錄乾淨。本次修正以該完整 SHA 為基準，沒有宣稱包含 `c5a011e`。
 
+## I2 無效 UTF-8 外部複查通過
+
+2026-10-02（Asia/Hong_Kong），使用者轉交 Grok 複查，BASE 為 `a11084c031c6b365566acfe9acf68172cfd14500`，TARGET 為 `883d01f9bac82032a0c91d0403ba15dbf769cefe`。外部環境為 Node v24.21.0、npm 9.2.0、Debian 13。**I2 無效 UTF-8 殘留獨立驗證通過，未發現新缺陷；Phase 31 尚未結案，I3 未處理。** 以下均為外部回報，不是開發代理執行的結果，不代替使用者驗收。
+
+- `npm ci`、typecheck、build 及 BASE 到 TARGET 的差異格式檢查均 exit 0。Memory 測試 378 項，342 通過、0 失敗、36 項 PG 測試略過；略過項不算通過。新建隔離 PG 17.11 執行同套測試，378 項全部通過、0 略過。四個 migration 首次成功，第二次無待執行項目。
+- 有效備份中間兩個位元組改為 `0xFF 0xFE`：BASE 的 archive.get 及 service 查詢／下載／列表拋 TypeError；TARGET 四項均拋 `PreparationFailure("unavailable")`。新增測試放回 BASE 時也因原有 TypeError 失敗，證實涵蓋缺陷路徑。
+- 真實 `index.ts` API 的三個入口均回安全 503、no-store，不洩露原稿、路徑或 stack；失敗下載沒有 Content-Disposition 或部分內容，API 程序測後仍存活。損壞檔測前後 SHA-256 相同。
+- 有效備份下載 200 且位元組完全一致，獨立重算 checksum 與來源指紋正確。不存在 ID 及其他角色紀錄查詢／下載均 404，列表只列配置角色紀錄。
+- I1／I4／I5 本輪依套件回歸通過；I5 永久殘缺案例實際等待 25067 ms。本輪未重跑雙程序鎖故障注入，不把套件結果改寫成新的故障注入證據。
+
+本輪仍未執行／待處理：I3、UI／Playwright、Phase 27–30 動態回歸、PG Phase 31 故障測試、migration 前後舊資料 md5 比對及兩個 Phase 26 restart 腳本。上一輪 Phase 26 腳本的外部通過紀錄仍只代表其當時版本；先前未歸因的六個 503 維持待驗證。TARGET 歷史不包含 `c5a011e`。
+
+外部回報隔離 PG DB 與角色已刪除，叢集及 `/workspace/pg31u`、副本與 log 已清理，API 程序已停止，沒有容器；原 repo 停在上述 TARGET 且工作目錄乾淨。本次只補記此份報告，沒有程式變更、沒有把待驗證項目改寫為通過。使用者另回覆「I3未處理」，維持其待處理狀態，原始問題描述仍待提供。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。
