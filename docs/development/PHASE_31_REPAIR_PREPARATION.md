@@ -167,4 +167,50 @@ Grok 須在隔離環境重做三入口的真實 TCP proxy 故障，包括 Phase 
 
 本機仍無法讀取 `c5a011e`，也沒有可重用的 `pg-client-operation.ts`；本次是當前基準上的修正，沒有宣稱合併該 commit。I3 狀態改為修正已交付、待 Grok 複查，Phase 31 未結案，其他待驗證項目及使用者驗收邊界不變。
 
+## I3 外部工程複查通過，Phase 31 尚未結案
+
+2026-10-02（Asia/Hong_Kong），使用者轉交 Grok 複查，BASE 為 `3233538d89033ab8d4c4866386b7177afdcd2318`，TARGET 為 `9ff93db9d3a24f1202708590d3e75461c34c1e71`。**I3 工程複查通過，沒有 Medium 或以上缺陷；有一項 Low 與兩項 Info 觀察。Phase 31 尚未結案，未獲使用者驗收。** 以下均為外部回報，不是開發代理執行的結果；本次只更新文件。
+
+外部核對 BASE 是 TARGET 祖先，中間一個 commit，只改指定六檔，未改 `index.ts`、route、SQL 或 migration；TARGET 不包含 `c5a011e`，`src` 沒有全域 `uncaughtException`／`unhandledRejection` handler。環境為 Node v24.21.0、npm 9.2.0、PostgreSQL 17.11、Debian 13.7。
+
+| 外部命令／項目 | 回報結果 |
+|---|---|
+| `npm ci`、typecheck、build、BASE 到 TARGET 的差異格式檢查 | 各 exit 0 |
+| `node --import tsx --test tests/pg-client-operation.test.ts` | exit 0；11 項全部通過 |
+| `env -u TEST_DATABASE_URL npm test` | exit 0；389 項，353 通過、0 失敗、36 項 PG 測試略過；略過不算通過 |
+| 全新隔離 PG migration、再次 migration | 四個 migration 成功；第二次無待執行項目 |
+| 隔離 PG 全套測試 | exit 0；389 項全部通過，0 略過 |
+
+I1／I2／I4／I5 本輪依套件回歸通過，I5 永久殘缺案例實際等待 25026 ms；本輪沒有重做 Memory 雙程序故障注入，不把套件通過當成該故障注入的結果。
+
+### 真實 TCP 故障的 BASE／TARGET 對照
+
+外部使用真實 `index.ts`、postgres 模式與最小權限角色，經 TCP proxy（55427）連隔離 PG（55426）。proxy 偵測指定 SQL 後停止轉回應，5 ms 後關閉雙向 socket，不送 ErrorResponse；另安排 COMMIT／INSERT 不轉送的情境。每輪 TARGET proxy 只命中一次。
+
+BASE 五條路徑全部在 20:49 HKT 以 `Unhandled 'error' event / Connection terminated unexpectedly` 結束，exit 1：Phase 31 COMMIT（PID 85294；DB 該 ID 已有一列）、列表（85459）、下載（85761）、Phase 30 current（85502）、Phase 29 `WITH records AS MATERIALIZED`（85554）。**Phase 29 本輪首次取得動態 crash 證據。** 這些是本輪 BASE 的新紀錄，沒有回填舊報告缺失的 PID 對應或 COMMIT 結果。
+
+TARGET 共十一輪故障，程序均存活，後續 `/api/health` 為 200、stderr 為空、遊戲表 md5 未變：
+
+- COMMIT 已送到 PG（PID 85819）：prepare 回安全 503、no-store，沒有 Content-Disposition；之後新連線查同一 ID，查詢／下載均 200。psql 確認一列，下載與 DB 逐位元組相同，獨立重算 SHA-256 與來源指紋正確。INSERT／COMMIT 各一次，沒有自動重送。
+- COMMIT 未送到（86001）及 INSERT 未送到（86055）：回 503，後續查詢 404，DB 零列；文案仍說明不代表已撤銷。
+- 列表（86283）及下載（86333）：回 503、no-store，沒有部分內容，之後再次請求 200。
+- Phase 30 current 與槽 1／2／3（86546／86599／86741／86795）：完整報告 200，只有被切斷的來源為 unavailable，其餘正常，符合逐來源契約。
+- Phase 29（86383）：回 503、no-store，沒有 Content-Disposition；之後重新下載 200。
+
+所有回應沒有洩露 SQL、路徑、stack 或原稿。`pg_terminate_backend` FATAL 對照（PID 87084）中 prepare／list／raw backup 約 0.5 秒回 503，preview 回 200，程序存活。statement timeout 實測約兩秒；archive pool 的 max 2、連線逾時一秒、statement timeout 兩秒及 synchronous_commit on 未退化；容量、ID 衝突及 SQLSTATE 分類程式未改。
+
+### 生命週期證據、測試限制及觀察
+
+真實 pg Pool 配合斷線 proxy 的七個生命週期案例全部通過，零 unhandledRejection，程序存活：無 query 時斷線只 release(true) 一次，後續取得不同 backend；重複 error／error 與 abort 競爭均單次 release；取得連線期間取消不執行 work 並丟棄抵達的連線；遲到 query rejection 被觀察。正常借還五十次 listener 數固定為一，沒有累積，歸還後閒置斷線由 pool 接住。
+
+新 helper／測試放回 BASE 副本、保留三入口舊實作：十一項中四過、七失敗，四個通過項只測 helper。COMMIT 案例直接顯示原有未處理 error；三個入口 error 案例雖失敗，runner 顯示次要的 late query rejection，訊息不夠直接；另三個取得連線失敗案例因錯誤分類不同而失敗，不能當作 crash 證據。**真正 I3 缺陷路徑及修正證據依上述 TCP 對照，不只依套件失敗。**
+
+- **Low，尚未修正：** `pg-client-operation.ts` 的斷線處理完全沒有 log；外部故障輪次查不到 level 50 紀錄。Grok 建議增加不帶敏感資訊的 log callback。本次僅記錄，沒有加入日誌或宣稱已接受此殘留。
+- **Info：** 容量／超限等業務拒絕也 release(true)，會丟棄健康連線；只影響效能，不影響正確性。本次未改。
+- **Info：** 入口測試在 BASE 的失敗訊息不夠直接，限制如上。本次未改測試。
+
+仍待驗證：UI／Playwright、完整 Phase 27–30 動態回歸、migration 舊資料前後 md5 比對、Phase 26 restart 腳本、先前未歸因的六個 503，以及本輪沒有重做的 Memory 雙程序故障注入。上述遊戲表故障前後 md5 不變，不能取代 migration 前後舊資料比對。舊 I3 報告缺失資料維持缺失。
+
+外部回報 API／proxy 已停止，隔離 DB／角色已刪除，`/workspace/i3r` 已清理，沒有動到 5432。保留 `/workspace/i3r-evidence`（每輪 log 與腳本，416K）及 `/workspace/p31`；原 repo 停在上述 TARGET 且工作目錄乾淨。本輪文件更新不代表重跑任何工程驗證。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。
