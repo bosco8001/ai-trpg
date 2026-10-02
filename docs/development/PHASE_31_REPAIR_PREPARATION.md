@@ -108,4 +108,27 @@ payload 保存 `repairId`、`source`、`storage`、`previewVersion: 1`、`rulesV
 
 變更只在 `src/server/file-repair-archive.ts`、`tests/repair-preparation.test.ts` 及本頁。**本次修正與案例尚未執行測試或工程驗證，待 Grok 複查。** `c5a011e` 本機仍不可讀取，沒有宣稱合併該 commit 或完成 I3；I3 原始描述／diff 尚待提供，不能自行猜測問題內容。整體狀態維持待驗證及使用者接受，不開始原子套用。
 
+## I1／I2／I4 複查及 I2 無效 UTF-8 修正
+
+2026-10-02（Asia/Hong_Kong），使用者轉交 Grok 複查，BASE 為 `6e450d5ea4fbdac545211dd97241b26f92707255`，TARGET 為 `a11084c031c6b365566acfe9acf68172cfd14500`。外部環境為 Node v24.21.0、npm 9.2.0、Debian 13。**外部確認 I1／I4 通過，I5 回歸通過；I2 主要情境通過，但無效 UTF-8 仍為 Low 級殘留。I3 尚未修正，Phase 31 未結案，未經使用者驗收。**
+
+| 外部命令／檢查 | 回報結果 |
+|---|---|
+| `npm ci`、`npm run typecheck`、`npm run build` | 各 exit 0 |
+| `env -u TEST_DATABASE_URL npm test` | exit 0；377 項，341 通過、0 失敗、36 項 PG 測試略過，不算通過 |
+| 隔離 PG 17.11 的 `npm test` | exit 0；377 項全數通過，0 略過 |
+| BASE 到 TARGET 的 `git diff --check` | exit 0 |
+| 四個 migration 與再次執行 | 首次成功；第二次無待執行項目 |
+| 兩個 Phase 26 restart 腳本 | 分別使用獨立 DB，均 exit 0、`passed:true` |
+
+以上是 Grok 外部回報，不是開發代理執行的結果。I1 以 BASE／TARGET 的 typecheck 對照確認。I4 靠實際命中鎖釋放窗口的故障注入、雙程序、容量及取消驗證；TARGET 自然壓測 600 個請求沒有 503，BASE 的 300 個請求有 10 個 503，全部歸因於 `lstat` ENOENT。新增 I4 並行測試在 BASE 也通過，不能當作失敗路徑覆蓋證據。I5 的空／殘缺 owner、期限及取消驗證回報通過。
+
+I2 的 JSON／格式／校驗故障、HTTP 503 與 no-store、不洩露原稿及缺失／其他角色紀錄區分已獲外部確認；殘留是 `TextDecoder({fatal:true})` 在無效 UTF-8 拋出 TypeError，使直接呼叫的錯誤類別不一致。HTTP 已回安全 503，但原測試沒有覆蓋此位元組故障。
+
+本次只補 I2 殘留：在 `src/server/file-repair-archive.ts` 的 UTF-8 解碼邊界捕捉失敗，轉成 `PreparationFailure("unavailable")`，仍使用嚴格解碼，不替換、截斷或改寫損壞原稿。`tests/repair-preparation.test.ts` 新增有效備份中間位元組改為 `0xFF 0xFE` 的案例，核對直接 archive 呼叫、查詢／下載／列表錯誤類別、三個 HTTP 入口的安全 503 與 no-store、磁碟損壞內容未變，以及隔離樣本恢復原位元組後可正常下載。變更仍只在該程式、測試及本頁。
+
+**本次 UTF-8 修正及新增案例未執行，待 Grok 複查。** 上一輪無法歸因的六個 503 不能事後補證，維持待驗證。I3、UI／Playwright（含雙入口、焦點、手機、接收期限與大小邊界）、Phase 27–30 動態回歸、PG Phase 31 故障驗證，以及 migration 前後舊資料 md5 比對仍待處理，不以 PG 單元／整合測試通過取代這些項目。
+
+外部回報隔離 PG port 55426 的三個 DB 與角色已刪除，叢集、`/workspace/pg31r`、副本及 log 已清理，程序已停止，沒有容器；保留 postgresql-17 套件與 `/workspace/node24`。原 repo 停在上述 TARGET 且工作目錄乾淨。本次修正以該完整 SHA 為基準，沒有宣稱包含 `c5a011e`。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。

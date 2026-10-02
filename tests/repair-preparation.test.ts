@@ -157,6 +157,29 @@ test("損壞與符號連結不被宣告就緒，不洩露路徑或原稿", async
   const response = await app.inject(`/api/repair-preparations/${request.repairId}/backup`);
   assert.equal(response.statusCode, 503); assert.doesNotMatch(response.body, /phase31-|narrativeLedger|secret/);
 });
+test("I2：無效 UTF-8 統一回 unavailable，不提供原稿、不改寫損壞備份", async t => {
+  const f = await fixture(t), request = await requestFor(f.reader);
+  await f.service.prepare(request, signal());
+  const file = join(f.directory, `${request.repairId}.json`), original = await readFile(file);
+  const corrupt = Buffer.from(original), middle = Math.floor(corrupt.length / 2);
+  corrupt[middle] = 0xff; corrupt[middle + 1] = 0xfe;
+  await writeFile(file, corrupt);
+  await assert.rejects(f.archive.get(request.repairId, f.reader.characterId, signal()), failure("unavailable"));
+  await assert.rejects(f.service.lookup(request.repairId, signal()), failure("unavailable"));
+  await assert.rejects(f.service.download(request.repairId, signal()), failure("unavailable"));
+  await assert.rejects(f.service.list(null, signal()), failure("unavailable"));
+  const app = Fastify(); registerRepairPreparationRoutes(app, f.service); t.after(() => app.close());
+  for (const url of [`/api/repair-preparations/${request.repairId}`, `/api/repair-preparations/${request.repairId}/backup`, "/api/repair-preparations"]) {
+    const response = await app.inject(url);
+    assert.equal(response.statusCode, 503);
+    assert.equal(response.json().code, "unavailable");
+    assert.equal(response.headers["cache-control"], "no-store");
+    assert.doesNotMatch(response.body, /TypeError|TextDecoder|phase31-|narrativeLedger|TEST-character|stack/);
+  }
+  assert.deepEqual(await readFile(file), corrupt);
+  await writeFile(file, original);
+  assert.equal(await f.service.download(request.repairId, signal()), original.toString("utf8"));
+});
 test("回應遺失仍可查詢同份備份，不重送保存；取消前無發布也不冒稱撤銷", async t => {
   const f = await fixture(t), request = await requestFor(f.reader);
   const loseReply: RepairArchive = { get: f.archive.get.bind(f.archive), list: f.archive.list.bind(f.archive),

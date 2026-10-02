@@ -53,7 +53,8 @@ export class FileRepairArchive implements RepairArchive {
       }
       if (size !== stat.size) throw new PreparationFailure("unavailable");
       signal.throwIfAborted();
-      return new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, size));
+      try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, size)); }
+      catch { throw new PreparationFailure("unavailable"); }
     } finally { await handle.close(); }
   }
   async get(id: string, characterId: string, signal: AbortSignal): Promise<string | null> {
