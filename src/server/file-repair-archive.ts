@@ -60,7 +60,9 @@ export class FileRepairArchive implements RepairArchive {
     if (!await this.directoryExists()) return null;
     const text = await this.readFile(id, signal);
     if (text === null) return null;
-    const parsed = parseRepairBackup(text);
+    let parsed: ReturnType<typeof parseRepairBackup>;
+    try { parsed = parseRepairBackup(text); }
+    catch { throw new PreparationFailure("unavailable"); }
     if (sha256(parsed.envelope.payload) !== parsed.envelope.checksum.value || parsed.data.storage !== "memory") throw new PreparationFailure("unavailable");
     if (parsed.data.characterId !== characterId) return null;
     verifiedBackup(text, characterId, id);
@@ -94,7 +96,12 @@ export class FileRepairArchive implements RepairArchive {
         if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
         if (Date.now() >= deadline) throw new PreparationFailure("unavailable");
         // Never steal a live process lock or a lock whose owner cannot be established.
-        const stat = await lstat(lockPath);
+        const stat = await lstat(lockPath).catch(error => {
+          if (absent(error)) return null;
+          throw error;
+        });
+        // The holder may have released its lock after mkdir reported EEXIST.
+        if (stat === null) { await pause(signal); continue; }
         if (!stat.isDirectory() || stat.isSymbolicLink()) throw new PreparationFailure("unavailable");
         const owner = await open(join(lockPath, "owner"), constants.O_RDONLY | constants.O_NOFOLLOW).catch(error => {
           if (absent(error)) return null;

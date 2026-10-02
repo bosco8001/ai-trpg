@@ -60,6 +60,18 @@ test("同 ID 並行只發布一份，來源之後改變仍回同次結果；ID �
   f.mutate(); assert.deepEqual(await f.service.prepare(request, signal()), results[0]);
   await assert.rejects(f.service.prepare({ ...request, candidateFingerprint: "0".repeat(64) }, signal()), failure("conflict"));
 });
+test("I4：不同 ID 並行等待正常釋放的鎖，各自保存且原稿不變", async t => {
+  const f = await fixture(t), request = await requestFor(f.reader), before = JSON.stringify(f.current());
+  const requests = Array.from({ length: 12 }, () => ({ ...request, repairId: randomUUID() }));
+  const results = await Promise.all(requests.map(value => f.service.prepare(value, signal())));
+  assert.deepEqual(results.map(value => value.repairId), requests.map(value => value.repairId));
+  assert.equal((await readdir(f.directory)).filter(name => name.endsWith(".json")).length, requests.length);
+  for (const value of requests) {
+    const backup = verifiedBackup(await f.service.download(value.repairId, signal()), f.reader.characterId, value.repairId);
+    assert.equal(backup.data.raw, before);
+  }
+  assert.equal(JSON.stringify(f.current()), before);
+});
 test("I5：空或殘缺 owner 等待補完整，活程序鎖不被回收，取消不新增備份", async t => {
   for (const initial of ["", '{"pid":']) {
     await t.test(initial === "" ? "空 owner" : "殘缺 owner", async child => {
@@ -132,8 +144,13 @@ test("容量與封裝上限拒絕新增，舊紀錄仍可查詢下載，來源�
 test("損壞與符號連結不被宣告就緒，不洩露路徑或原稿", async t => {
   const f = await fixture(t), request = await requestFor(f.reader); await f.service.prepare(request, signal());
   const file = join(f.directory, `${request.repairId}.json`);
-  const text = await readFile(file, "utf8"); await writeFile(file, text.replace('in-combat', 'outside-combat'));
-  await assert.rejects(f.service.lookup(request.repairId, signal()), failure("unavailable"));
+  const text = await readFile(file, "utf8");
+  for (const corrupt of [text.replace('in-combat', 'outside-combat'), "{", "{}"]) {
+    await writeFile(file, corrupt);
+    await assert.rejects(f.service.lookup(request.repairId, signal()), failure("unavailable"));
+    await assert.rejects(f.service.download(request.repairId, signal()), failure("unavailable"));
+    await assert.rejects(f.service.list(null, signal()), failure("unavailable"));
+  }
   await rm(file); await symlink(join(f.parent, "secret"), file); await writeFile(join(f.parent, "secret"), text);
   await assert.rejects(f.service.lookup(request.repairId, signal()));
   const app = Fastify(); registerRepairPreparationRoutes(app, f.service); t.after(() => app.close());
@@ -160,7 +177,7 @@ test("配置角色與同長度 byte 變動都影響指紋", async t => {
 test("外角色合法槽仍可唯讀預覽，但準備拒絕；同角色舊 Run 可以準備", async t => {
   const f = await fixture(t), seed = createTestGameState();
   const saved = createSaveSnapshot(seed).state;
-  const foreign = { ...saved, activity: "in-combat", character: { ...saved.character, id: "OTHER-character" },
+  const foreign: typeof saved = { ...saved, activity: "in-combat", character: { ...saved.character, id: "OTHER-character" },
     phase26: { ...saved.phase26!, characters: saved.phase26!.characters.map(c => c.characterId === seed.character.id ? { ...c, characterId: "OTHER-character" } : c) } };
   let snapshot: typeof saved = foreign;
   const reader = createMemoryRepairReader(seed.character.id, () => ({ current: undefined,

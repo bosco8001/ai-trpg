@@ -84,4 +84,28 @@ payload 保存 `repairId`、`source`、`storage`、`previewVersion: 1`、`rulesV
 
 使用者回報提到 `c5a011e`，但本次開始時本機不存在此 commit，唯讀遠端查詢也顯示分支仍在 `939d53392df92f34855b35e687fc71e75ffef1d1`。因此本次修正以該完整 SHA 為基準，沒有宣稱包含 `c5a011e` 或 I4 修正；與另一份修正版的整合及 I4 狀態仍須另行核對。
 
+## I5 複查外部回報及 I1／I2／I4 修正交付
+
+2026-10-02（Asia/Hong_Kong），使用者轉交 Grok 的 I5 複查：BASE 為 `939d53392df92f34855b35e687fc71e75ffef1d1`，TARGET 為 `6e450d5ea4fbdac545211dd97241b26f92707255`。外部環境為 Node v24.21.0、npm 9.2.0、Debian 13。**I5 獨立動態驗證全部通過，未發現新缺陷；Phase 31 整體仍為 BLOCKING，未經使用者驗收。** 這些是外部回報，不是開發代理執行的結果。
+
+| 外部命令 | 回報結果 |
+|---|---|
+| `npm ci` | exit 0 |
+| `npm run typecheck` | exit 2；測試資料 TS2322，I1 |
+| `npm run build` | exit 2；被 typecheck 阻擋 |
+| `env -u TEST_DATABASE_URL npm test` | exit 1；376 項，339 通過、I2 一項失敗、36 項 PG 測試略過 |
+| BASE 到 TARGET 的 `git diff --check` | exit 0 |
+
+外部確認兩個新增 I5 測試實際通過，永久殘缺案例等待 25013.9 ms；把新測試放回 BASE 執行時，四個子測試失敗，證實覆蓋原有失敗路徑。兩個真實 Memory API 程序的獨立動態驗證涵蓋命中空 owner 窗口、空／殘缺內容稍後補完整、永久殘缺到期限才拒絕、中途取消、同 ID 去重與完整性，均回報通過。備份 SHA-256／來源指紋正確，遊戲來源前後雜湊相同，活程序鎖沒有被搶走。
+
+自然壓測三輪各 300 個請求，共 23 個 503：17 個歸因於 I4 的 `lstat` ENOENT，另外 6 個因統計 regex 錯誤沒有錯誤路徑，維持待驗證，不歸因於 I4 或 I5。PG、Phase 26 重啟腳本、UI、Playwright、PG 回歸及 I3 均未驗證。外部回報測試程序已停止，`/workspace/i5` 與 log 已刪除，沒有建立 DB 或容器；repo 停在上述 TARGET 且工作目錄乾淨。
+
+本次在 `6e450d5ea4fbdac545211dd97241b26f92707255` 上直接補上可定位的三個問題，保留 I5 修正：
+
+- **I1**：測試中的外角色 snapshot 明確使用原存檔型別，避免 `activity` 推成一般字串。不用型別斷言掩蓋錯誤，不改正式遊戲型別。
+- **I2**：Memory 備份解析／格式失敗轉為 `PreparationFailure("unavailable")`，查詢、下載及列表遵循既有故障契約。加強空／殘缺 JSON、錯誤結構及內容變動案例；不提供損壞原稿。
+- **I4**：只在等待鎖的 `lstat` 遇到 ENOENT 時等待再重試，避免持鎖者正常釋放造成立即拒絕。其他權限／檔案型別錯誤不被吞掉，仍沿用期限與取消機制。新增不同 ID 並行的回歸案例；該案例不保證每次命中競爭窗口，Grok 仍須另做精確故障注入及雙程序驗證。
+
+變更只在 `src/server/file-repair-archive.ts`、`tests/repair-preparation.test.ts` 及本頁。**本次修正與案例尚未執行測試或工程驗證，待 Grok 複查。** `c5a011e` 本機仍不可讀取，沒有宣稱合併該 commit 或完成 I3；I3 原始描述／diff 尚待提供，不能自行猜測問題內容。整體狀態維持待驗證及使用者接受，不開始原子套用。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。
