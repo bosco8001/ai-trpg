@@ -335,7 +335,7 @@ I3 斷線無日誌 Low、丟棄健康連線與 BASE 失敗訊息的兩項 Info �
 - COMMIT 到 PG 後回覆遺失：只送一次、不重送，先 503，再用新連線查到 200／一列，獨立 checksum／指紋及下載與 DB 內容核對正確。COMMIT 未到 PG：503，之後 404／零列。
 - BASE 同七個斷線情境回應相同但沒有 borrowed 日誌；BASE backup／preview idle 紀錄含 stack 與連線參數，TARGET 三個專用 pool 已改固定欄位。這不能擴大宣稱所有 pool 都已安全記錄。
 
-### 探索排版：部分通過，兩項 Low 待補驗
+### `1be416e` 探索排版外部結果（補修前）
 
 CSS 字體模擬：430px／150%／200%、375px／200%、1280px／100%／150%／200% 外部通過；320px／200% 在三種連線狀態仍寬 364px，與 BASE 相同，175% 無溢出。外部更正先前成因：320px 主要是狀態表 `minmax(6rem, auto)` 放大後的最小欄寬，撐大探索 grid；先前直接歸因 header 的說法不準確。
 
@@ -346,10 +346,35 @@ CSS 字體模擬：430px／150%／200%、375px／200%、1280px／100%／150%／2
 - 探索最外層與窄視窗 header／故事 heading 使用 `minmax(0, 1fr)`，面板允許縮小，避免子元素的最小內容寬反向撐大整頁。
 - 狀態表標題欄上限為 `min(6rem, 40%)`，不再以 6rem 作硬下限；標題文字可折行，數值欄保留剩餘空間。
 - 連線提示按內容取得寬度、受容器上限限制，狀態文字移除固定 10rem basis。桌面靠右、窄視窗保持可用整列寬度，僅空間不足才換行。
-- 故事標題的 flex 設定改放在實際的父層標題容器，不放在非 flex item 的 h2。這些補修尚待 Grok 排版驗證，不寫成通過。
+- 故事標題的 flex 設定改放在實際的父層標題容器，不放在非 flex item 的 h2。交付時這些補修待驗證；其後使用者指定本輪 UI 由自己驗收，結果見下節，不改寫為 Grok 執行。
 
 主 pool／diagnostics pool 的閒置 handler 仍記錄原始 err，外部實測含 stack、node_modules 路徑、user／database／host／port，評 Low；測試角色未設密碼，是否包含密碼維持未驗證。這項不在本次 CSS 補修範圍。SQL／業務拒絕丟棄健康連線的 Info、favicon、兩個焦點待查觀察及舊六個 503 均沒有因此解決或接受。
 
 外部本輪 API／proxy／harness 已停，兩個 DB／角色已刪，叢集已停、`/workspace/p31h` 已刪，沒有碰 5432。新證據 `/workspace/p31h-evidence`（29M）保留；其中 `logs/p2-*-main.stdout.log` 含隔離環境原始 error，外部說明無密碼或故事，不能把它當成已去敏的日誌。舊證據未改。這些外部證據開發代理未存取或清理。
 
+## 探索頁補修：使用者手動驗收通過（2026-10-03）
+
+補修提交為 `6df0c60029d3b67520024534bc4e98845bea71d7`。使用者明確指定這輪 UI 驗收由自己執行，按提供的正常字體、大字與斷線操作步驟測試後回覆：「正常字體、320／375／430 大字、斷線提示及按鈕操作全部正常。」
+
+因此這輪探索大字溢出與正常字體連線提示排版補修記錄為**使用者手動驗收通過**。這是使用者回報，不是開發代理或 Grok 的自動化結果，不補寫未提供的量度數字，也不當作真機或讀屏驗收。本輪不再要求 Grok 重做這項 UI 驗收；後續工程驗證政策沒有整體變更。
+
+本次紀錄只更新本文件，沒有再改產品程式；開發代理未執行測試。I3 安全日誌保留 `1be416e` 外部通過的來源與版本；主 pool／diagnostics 日誌 Low、既有 Info 及待查項目仍保留。本次手動通過的範圍是探索頁補修，Phase 31 整體未因而自動結案。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。
+
+## 主 pool／diagnostics 閒置斷線安全日誌補修（2026-10-03）
+
+本次基準為 `6df0c60029d3b67520024534bc4e98845bea71d7`；目標為包含本次補修的提交完整 SHA（待使用者提交後填入）。範圍只限 `src/server/index.ts` 與本文件，保留上一節尚未提交的探索 UI 使用者驗收紀錄。
+
+- 主 pool 與 diagnostics pool 的閒置 `error` handler 改接既有 `logPgConnectionError`，不接收或轉交原始 error；固定 `operation` 分別為 `main`、`diagnostics`，`state` 都是 `idle`。
+- 共用 logger 固定輸出 `event: "pg_connection_error"`、operation、state，使用 error 等級（JSON level 50）。固定訊息改為「PostgreSQL 連線中斷」，適用五個 pool；logger 本身的 time／pid／hostname 等標準欄位不代表 PG 連線參數。
+- 原始 Error、stack、SQL、路徑、故事、連線參數、連線字串及秘密均不傳入這些 handler 的 logger。原始備份、候選預覽、修復備份三個 pool 的 borrowed／idle 接線保留，只有共用固定訊息調整。
+- 既有事件註冊位置、關閉 hook 與連線生命週期保留；不改 SQL、連線設定、查詢、交易或借出 client helper。不新增日誌框架或全域 uncaught handler。
+
+**目前是實作完成、待 Grok Bot 驗證，不能標成 Low 已驗證解決或 Phase 31 已接受。** 開發代理只讀取程式及 Git 資訊，沒有執行 build、typecheck、格式檢查、測試、DB 或瀏覽器驗證；本次沒有新增測試。`1be416e7b15e4459081f26fbe617b76e1bd84db6` 的 I3 七項與 `tests/pg-client-operation.test.ts` 十三項通過仍只引用既有外部結果。
+
+Grok 本輪聚焦真實 `index.ts` 的主／diagnostics 閒置斷線：每次事件各一條 level 50，operation／idle 正確，訊息固定且沒有原始錯誤及敏感資料，程序存活，斷線後各 pool 可借新連線；並確認既有三個 pool 的安全日誌接線沒有退化。應以新隔離 PG 及隔離角色／DB、必要的 TCP proxy 執行，保護既有 5432，不使用真實秘密。先確認連線已歸還且仍在 idle 期限內，再只中斷指定連線；分清 PG ErrorResponse 與沒有 ErrorResponse 的 TCP 中斷，不用手動 emit 取代真實斷線。完整外部審查 prompt 隨本次交付提供。
+
+不重跑已由使用者接受的探索 UI、不重做 migration 或 Memory 鎖全套。SQL／業務拒絕丟棄健康連線的 Info、favicon Info、存檔後與重試後焦點待查觀察、舊六個無法歸因 503，以及真機／讀屏／正式遊玩限制仍保留。先前是否包含密碼仍未驗證，不能宣稱已證實洩漏密碼。
+
+本次補修完成後停在 Phase 31，等 Grok 外部結果及使用者接受；不開始 R03 原子套用。

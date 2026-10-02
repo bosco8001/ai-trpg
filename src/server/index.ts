@@ -84,8 +84,8 @@ const repairBackupMaxBytes = repairArchiveLimit(process.env.REPAIR_BACKUP_MAX_BY
 const repairArchiveMaxBytes = repairArchiveLimit(process.env.REPAIR_ARCHIVE_MAX_BYTES, REPAIR_ARCHIVE_MAX_BYTES);
 
 let pgOperationLogger: Pick<FastifyBaseLogger, "error"> | undefined;
-function logPgConnectionError(operation: "raw-backup" | "repair-preview" | "repair-archive", state: "borrowed" | "idle") {
-  pgOperationLogger?.error({ event: "pg_connection_error", operation, state }, "PostgreSQL 備份／預覽連線中斷");
+function logPgConnectionError(operation: "main" | "diagnostics" | "raw-backup" | "repair-preview" | "repair-archive", state: "borrowed" | "idle") {
+  pgOperationLogger?.error({ event: "pg_connection_error", operation, state }, "PostgreSQL 連線中斷");
 }
 
 const app = await buildApp({
@@ -140,17 +140,13 @@ const app = await buildApp({
 });
 pgOperationLogger = app.log;
 if (pool) {
-  pool.on("error", (error) => {
-    app.log.error({ err: error }, "PostgreSQL 閒置連線中斷");
-  });
+  pool.on("error", () => logPgConnectionError("main", "idle"));
   app.addHook("onClose", async () => {
     await pool.end();
   });
 }
 if (diagnosticsPool) {
-  diagnosticsPool.on("error", (error) => {
-    app.log.error({ err: error }, "資料診斷連線中斷");
-  });
+  diagnosticsPool.on("error", () => logPgConnectionError("diagnostics", "idle"));
   app.addHook("onClose", async () => {
     await diagnosticsPool.end();
   });
