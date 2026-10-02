@@ -364,17 +364,59 @@ CSS 字體模擬：430px／150%／200%、375px／200%、1280px／100%／150%／2
 
 ## 主 pool／diagnostics 閒置斷線安全日誌補修（2026-10-03）
 
-本次基準為 `6df0c60029d3b67520024534bc4e98845bea71d7`；目標為包含本次補修的提交完整 SHA（待使用者提交後填入）。範圍只限 `src/server/index.ts` 與本文件，保留上一節尚未提交的探索 UI 使用者驗收紀錄。
+本次基準為 `6df0c60029d3b67520024534bc4e98845bea71d7`；補修已提交為 `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb`。範圍只限 `src/server/index.ts` 與本文件，上一節探索 UI 使用者驗收紀錄亦已隨該提交保存。
 
 - 主 pool 與 diagnostics pool 的閒置 `error` handler 改接既有 `logPgConnectionError`，不接收或轉交原始 error；固定 `operation` 分別為 `main`、`diagnostics`，`state` 都是 `idle`。
 - 共用 logger 固定輸出 `event: "pg_connection_error"`、operation、state，使用 error 等級（JSON level 50）。固定訊息改為「PostgreSQL 連線中斷」，適用五個 pool；logger 本身的 time／pid／hostname 等標準欄位不代表 PG 連線參數。
 - 原始 Error、stack、SQL、路徑、故事、連線參數、連線字串及秘密均不傳入這些 handler 的 logger。原始備份、候選預覽、修復備份三個 pool 的 borrowed／idle 接線保留，只有共用固定訊息調整。
 - 既有事件註冊位置、關閉 hook 與連線生命週期保留；不改 SQL、連線設定、查詢、交易或借出 client helper。不新增日誌框架或全域 uncaught handler。
 
-**目前是實作完成、待 Grok Bot 驗證，不能標成 Low 已驗證解決或 Phase 31 已接受。** 開發代理只讀取程式及 Git 資訊，沒有執行 build、typecheck、格式檢查、測試、DB 或瀏覽器驗證；本次沒有新增測試。`1be416e7b15e4459081f26fbe617b76e1bd84db6` 的 I3 七項與 `tests/pg-client-operation.test.ts` 十三項通過仍只引用既有外部結果。
+**原交付時為實作完成、待 Grok Bot 驗證；其後 `e2d4620` 的外部工程驗證通過，詳見下節，Phase 31 仍未由使用者接受。** 開發代理只讀取程式及 Git 資訊，沒有執行 build、typecheck、格式檢查、測試、DB 或瀏覽器驗證；本次沒有新增測試。`1be416e7b15e4459081f26fbe617b76e1bd84db6` 的 I3 七項仍只引用既有外部結果；`tests/pg-client-operation.test.ts` 十三項則已由 Grok 在 `e2d4620` 重跑通過，不是開發代理執行。
 
-Grok 本輪聚焦真實 `index.ts` 的主／diagnostics 閒置斷線：每次事件各一條 level 50，operation／idle 正確，訊息固定且沒有原始錯誤及敏感資料，程序存活，斷線後各 pool 可借新連線；並確認既有三個 pool 的安全日誌接線沒有退化。應以新隔離 PG 及隔離角色／DB、必要的 TCP proxy 執行，保護既有 5432，不使用真實秘密。先確認連線已歸還且仍在 idle 期限內，再只中斷指定連線；分清 PG ErrorResponse 與沒有 ErrorResponse 的 TCP 中斷，不用手動 emit 取代真實斷線。完整外部審查 prompt 隨本次交付提供。
+原交付要求 Grok 聚焦真實 `index.ts` 的主／diagnostics 閒置斷線：每次事件各一條 level 50，operation／idle 正確，訊息固定且沒有原始錯誤及敏感資料，程序存活，斷線後各 pool 可借新連線；並確認既有三個 pool 的安全日誌接線沒有退化。只用新隔離 PG 及隔離角色／DB、必要的 TCP proxy，保護既有 5432，不使用真實秘密。先確認連線已歸還且仍在 idle 期限內，再只中斷指定連線；分清 PG ErrorResponse 與沒有 ErrorResponse 的 TCP 中斷，不用手動 emit 取代真實斷線。實際結果見下節。
 
 不重跑已由使用者接受的探索 UI、不重做 migration 或 Memory 鎖全套。SQL／業務拒絕丟棄健康連線的 Info、favicon Info、存檔後與重試後焦點待查觀察、舊六個無法歸因 503，以及真機／讀屏／正式遊玩限制仍保留。先前是否包含密碼仍未驗證，不能宣稱已證實洩漏密碼。
 
-本次補修完成後停在 Phase 31，等 Grok 外部結果及使用者接受；不開始 R03 原子套用。
+本次補修停在 Phase 31；外部工程結果已回報，仍等使用者接受，不開始 R03 原子套用。
+
+## `e2d4620` 安全日誌外部工程審查通過（2026-10-03）
+
+使用者轉交 Grok 的審查：TARGET `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb`、BASE `6df0c60029d3b67520024534bc4e98845bea71d7`。外部確認遠端分支 HEAD 等於 TARGET、BASE 是祖先，只改 `src/server/index.ts` 與本文件；BASE 相對 `1be416e` 只有 CSS 與文件差異。Grok 原報告將 index.ts 計為加四行、刪八行；開發代理本次親自讀取 `git show --stat`，實際為加四行、刪六行，文件依 Git 紀錄更正。**以下故障與測試結果全是外部回報，開發代理沒有重跑。外部未發現本次 diff 引入新缺陷；工程通過不代替使用者驗收，Phase 31 未結案。**
+
+### 環境、命令與故障結果
+
+環境為 Node 24.21.0、npm 9.2.0、Debian 13.7、PG 17.11，新隔離叢集 `127.0.0.1:55426`。使用真實 `index.ts`、`DOMAIN_STORAGE=postgres`，沒有 LLM key。TARGET 的 `npm ci`、`npm run build`（包含 typecheck）、`node --import tsx --test tests/pg-client-operation.test.ts` 及 BASE／TARGET `git diff --check` 均 exit 0；十三項測試全部通過、無略過。BASE 對照 build、migrate、故障與 graceful 腳本亦回報 exit 0；初始化隔離 DB 不當作 migration 全套回歸。
+
+每個案例先等所有連線因 idle timeout 自然關閉，再以單一操作建立連線：main 用 `GET /api/save-slots`，diagnostics 用 `GET /api/data-diagnostics`。外部以 `pg_stat_activity` 的 idle 狀態及 marker 確認目標，proxy 以 BackendKeyData 對應 socket 與 backend pid。隔離角色有合成密碼，DB 名及 application_name 有合成 marker；不使用真實秘密。
+
+| TARGET 案例 | 新開連線／故障關閉 | 斷線紀錄 | 程序、health、再操作 |
+|---|---|---|---|
+| main：`pg_terminate_backend` | 1／1 | 1 條，main／idle | 存活、200、200 且使用新連線 |
+| main：無 ErrorResponse 的 TCP 斷線 | 1／1 | 1 條，main／idle | 存活、200、200 且使用新連線 |
+| diagnostics：`pg_terminate_backend` | 4／1，其餘 3 條仍 idle | 1 條，diagnostics／idle | 存活、200、200 且使用新連線 |
+| diagnostics：TCP 斷線 | 4／1，其餘 3 條仍 idle | 1 條，diagnostics／idle | 存活、200、200 且使用新連線 |
+
+外部七項檢查全部通過：每次事件只一條、level 50、operation／state 正確、固定 msg 與欄位、沒有原始錯誤及被檢查的敏感資料、程序存活及新連線成功、正常操作零斷線紀錄。日誌均在 stdout，stderr 零位元組；欄位只有 `event, operation, state, msg, level, time, pid, hostname`，msg 為「PostgreSQL 連線中斷」。合成密碼、app marker、DB 名、`phase26_test`、55427、127.0.0.1、`postgres://`、err、stack、node_modules、路徑及 SQL 在 error 紀錄均零次；hostname 是程序 logger 欄位，並非 PG host。
+
+graceful SIGINT 時 TARGET 有十一條 idle 連線，十九毫秒內正常 Terminate、exit 0；BASE 為十六毫秒、exit 0。沒有未處理例外或拒絕，既有 onClose、接線、SQL、連線參數、交易、helper 與 UI 未改。
+
+BASE 的同四個案例各一條 level 50 舊 `{err}` 日誌，沒有 event／operation，含 stack、node_modules 路徑、PG 錯誤細節與 connectionParameters 的 user／database／host／port／application_name。TARGET 在這些案例已無上述內容，**主／diagnostics 閒置原始 err 的 Low 記錄為在 TARGET 外部實測已解決**。BASE 合成密碼亦零次，只能代表本輪 pg 版本與 SCRAM 設定，不能宣稱密碼曾洩漏或所有版本永遠安全。
+
+### 三個專用 pool 抽查與兩項 Info
+
+raw-backup、repair-preview、repair-archive 各測一次 idle `pg_terminate_backend` 與一次 borrowed TCP 斷線。每次各一條，operation／state 正確、固定新 msg；raw-backup 與 repair-archive 回 503，repair-preview 整份 200、只有 current unavailable。之後均能用新連線成功操作。BASE 回應相同、只有 msg 用舊字眼，外部判定沒有退化。`1be416e` 的 I3 七項仍只引用，不能將本次抽查擴大為重跑全部舊案例。
+
+1. **文件提交狀態字眼，Info：本次文件更正，開發代理已依使用者本次指示親自核對。** 將「完整 SHA 待提交後填入」及「尚未提交的探索 UI 驗收紀錄」改為已隨 `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb` 保存；只改本文件。
+2. **進行中 query 收到 FATAL ErrorResponse 沒有斷線日誌，Info：待查、未修。** 外部鎖住 save_slots，呼叫 `GET /api/raw-data-backup`，終止等待鎖的 backend；TARGET 與 BASE 都安全回 503，但沒有斷線日誌。外部指出這項觀察自 `1be416e` 已存在、不屬本次 diff。推斷為 pg 將錯誤交給進行中的 query，未觸發 client error event，而 helper 依此 event 記錄；**尚未逐行核對 pg 原始碼，不能將推斷寫成已證實原因**。位置為 TARGET 的 `src/server/pg-client-operation.ts` 第 25–34 行。本次不修改 helper，也不宣稱所有 PG 斷線都有日誌。
+
+### 引用、未測與證據清理
+
+本輪工程結果不改寫探索 UI 在 `6df0c60029d3b67520024534bc4e98845bea71d7` 的使用者手動接受紀錄。健康連線被 SQL／業務拒絕丟棄的 Info、favicon、存檔後與重試後焦點待查觀察、舊六個無法歸因 503 仍保留。main 借出中斷線、真手機、讀屏及正式遊玩未測；密碼相關檢查只代表上述版本與設定。外部沒有回報受阻，沒有修改檔案或 commit／push。
+
+外部證據在 `/workspace/p31i-evidence/`（248K）：`logs/TARGET-driver.log`、`logs/BASE-driver.log`；遮去 marker 的 `logs/TARGET-error-records-by-case.jsonl`、`logs/BASE-error-records-by-case.jsonl`；`logs/TARGET-server.*.log`；`json/TARGET-run.json`、`json/BASE-run.json`、`json/*-graceful.json`；`logs/*-proxy.log` 及 `scripts/`。`logs/BASE-server.stdout.log` 未遮、含合成 marker 及原始 err，外部回報沒有密碼，不能當作已去敏日誌。開發代理未存取這些外部路徑。
+
+外部回報 server／proxy 已停、兩個 DB／角色已 drop、叢集已停、`/workspace/p31i` 已刪除，5432 沒有碰過，clone 乾淨、舊證據未改。本輪證據目錄保留且不含合成密碼。Phase 31 仍待使用者明確接受，不開始 R03 原子套用。
+
+### 本次文件由開發代理親自核對（2026-10-03）
+
+使用者明確指示「這次你commit和親自驗收」，本次文件更新改由開發代理核對及提交，不將這次指示延伸成後續測試政策的永久變更。開發代理對照使用者轉交的 Grok 報告、`e2d4620` 已提交文件、index.ts 日誌接線及 Git 版本／差異，確認結果來源、版本、已測／引用／未測與待查事項；更正上述行數及兩處提交狀態字眼。文件差異檢查 `git diff --check` exit 0，本次文件核對通過。沒有重新執行 build、十三項測試或真實 PG 故障，也沒有存取外部證據目錄；這些仍維持 Grok 外部結果。只提交本文件，Phase 31 整體是否接受仍由使用者決定。
