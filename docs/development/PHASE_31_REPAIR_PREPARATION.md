@@ -270,10 +270,10 @@ TARGET 共十一輪故障，程序均存活，後續 `/api/health` 為 200、std
 ### 五項補缺結果
 
 1. **Memory 第三項：本輪通過。** 原缺口是同角色舊 Run／其他世界合法存檔可準備，而其他角色拒絕。真實 Memory API 存檔會重建合法快照、沒有預載入口，既有 helper 也沒有舊 Run／其他世界樣本。外部另建隔離程序，以 TARGET 的 `buildApp()` 執行真實 Memory 路由，先經 PUT 建立三槽，再於測試程序內部注入舊紀錄，未改產品程式。舊 Run、舊 Run 加其他世界、同 Run 換世界均 ready；其他角色回 409 及身分不符提示。四份下載逐位元組核對，checksum／來源指紋吻合；樣本的允許修復差異只涉及 activity，備份操作前後遊戲與三槽 hash 不變，沒有觸發 Load、Reset 或額外 PUT。0755 備份目錄正確回 503；只改 `phase26.worldId` 的不完整世界變更正確受阻。
-2. **PG Phase 30 UI：本輪通過，候選情境仍只引用。** 腳本未改，換用三槽皆空的新隔離 DB 以符合原腳本前提。過期提示、取消／收起正常；503、合約錯誤、資料過大時各只發一次請求；320／375／430px 無溢出，外部回報三入口的四來源結果 4／4 identical。repair 表始終零列；DB 計數由 `0|0|0` 到 `1|2|0` 的變化來自遊戲操作。本輪空槽 UI 沒有涵蓋有候選情境，該部分仍引用舊證據；前輪腳本至第 23 行才逾時，不是完全未執行。
+2. **PG Phase 30 UI：本輪通過，候選情境仍只引用。** 腳本未改，換用三槽皆空的新隔離 DB 以符合原腳本前提。過期提示、取消／收起正常；503、合約錯誤、資料過大時各只發一次請求；320／375／430px 無溢出。外部其後更正：戰鬥、結果頁、主選單的入口檢查中有四行顯示 `identical: true`，不能推定為三入口各四來源全部一致。repair 表始終零列；DB 計數由 `0|0|0` 到 `1|2|0` 的變化來自遊戲操作。本輪空槽 UI 沒有涵蓋有候選情境，該部分仍引用舊證據；前輪腳本至第 23 行才逾時，不是完全未執行。
 3. **其他世界 migration：本輪通過。** 樣本包含 current、其他角色且其他世界的 game_states 列；槽一為同角色舊 Run 加其他世界（時間 `.654321`），槽二其他角色（`.123456`），槽三含大數字的 v1 舊格式（`.000001`）。migration 前後 game_states 兩列 md5 前綴 `5f6c5739…`、save_slots 三列 `cd3668e2…`、舊結構 `3b5c3645…` 均未變，微秒時間與大數字保留；上述只有外部提供的前綴，不補寫完整雜湊。新表／pgmigrations 第四列分開判斷，pg_dump 差異只有新表，重跑無待執行項目。
 4. **404：本輪確認為 favicon，Info。** 首次載入時瀏覽器請求 `GET /favicon.ico`；index.html 沒有 icon link，也沒有 public 目錄。Vite preview 與正式靜態站有該 404，Phase 31 helper 因 SPA fallback 不出現。只增加 console 訊息，不影響功能；證據為 `logs/netlog-404.jsonl`。同期 500／連線重設是 results 腳本注入，不能列為產品缺陷。本次沒有修 favicon。
-5. **探索大字排版：已完整記錄，Low，未修。** CSS 字體放大模擬在 320px／200% 時頁面寬 364px，由 `.exploration-header` 撐闊；375px 的 100／150／200% 均無溢出；430px／150% 為 460px、斷線時 518px，430px／200% 為 612px、斷線時 690px，由 `.connection-brief` 撐闊。連線提示及重試被推出畫面，故事標題被壓窄。外部分析涉及 style.css 的 header 橫排 flex（321–327）、connection-brief 的 flex:none（359–365）、狀態 nowrap（367–373）及 ≤25rem 才直排（1001–1009），對應 ExplorationPage.tsx（270–280）；行號均指本輪 TARGET。重現為 430×932、html font-size 150／200%，另截斷 health 模擬斷線，量度 scrollWidth 與 innerWidth。可見位置 touch tap 或 Enter 仍可開系統面板；舊稱完全無法點擊是座標錯誤，不成立。這是探索頁既有 Low，非 Phase 31 新缺陷，也不代表真手機系統字體效果。
+5. **探索大字排版：當輪記錄為 Low，未修。** CSS 字體放大模擬在 320px／200% 時頁面寬 364px，當輪曾歸因 `.exploration-header`，其後 `1be416e` 外部複查更正為狀態表最小欄寬，詳見末節；375px 當輪回報的 100／150／200% 均無溢出；430px／150% 為 460px、斷線時 518px，430px／200% 為 612px、斷線時 690px，由 `.connection-brief` 撐闊。連線提示及重試被推出畫面，故事標題被壓窄。外部分析涉及 style.css 的 header 橫排 flex（321–327）、connection-brief 的 flex:none（359–365）、狀態 nowrap（367–373）及 ≤25rem 才直排（1001–1009），對應 ExplorationPage.tsx（270–280）；行號均指當輪 TARGET。重現為 430×932、html font-size 150／200%，另截斷 health 模擬斷線，量度 scrollWidth 與 innerWidth。可見位置 touch tap 或 Enter 仍可開系統面板；舊稱完全無法點擊是座標錯誤，不成立。這是探索頁既有 Low，非 Phase 31 新缺陷，也不代表真手機系統字體效果。
 
 ### 版本與案例證據矩陣
 
@@ -309,17 +309,47 @@ I3 斷線無日誌 Low、丟棄健康連線與 BASE 失敗訊息的兩項 Info �
 
 外部回報所有本輪程序已停，三個 DB／角色、叢集及 `/workspace/p31g` 已刪除，沒有連接或改動 5432。舊 `/workspace/p31f-evidence`、`/workspace/i3r-evidence`、`/workspace/p31` 未改；本輪 `/workspace/p31g-evidence`（14M）保留。證據腳本仍指向已刪除的 `/workspace/p31g`，重跑須先重建隔離環境與更新路徑，不把保留腳本視為已可直接執行。
 
-## 探索大字與 I3 安全日誌小修正（2026-10-03，待驗證）
+## 探索大字與 I3 安全日誌原實作（2026-10-03）
 
-使用者要求處理探索大字溢出及 I3 斷線缺少日誌。基準為 `d9879537c3239f4e679677295a3ab7551218d989`；本次尚未 commit，目標 SHA 待提交後填入。以下是開發代理已寫入本機的實作紀錄，**不是測試通過，也不是使用者接受**。上節各版本的「未修」保留為當輪歷史結果；這兩項目前改為「已實作，待 Grok 驗證」。
+使用者要求處理探索大字溢出及 I3 斷線缺少日誌。原實作基準為 `d9879537c3239f4e679677295a3ab7551218d989`，已提交為 `1be416e7b15e4459081f26fbe617b76e1bd84db6`。以下保留該次實作說明；Grok 的後續結果見下節。**I3 安全日誌外部驗證通過；探索排版只有部分情境通過，不能宣告全面修好，也不等同使用者接受。**
 
 - 探索頁：標題列與連線提示允許換行、縮小到容器寬度，狀態與重試文字可以折行；故事標題與模式標籤也允許換列，避免大字時將標題擠成一字一行。只改 CSS，不隱藏橫向溢出、不縮小使用者字體、不限制縮放。
 - I3：共用 PG 操作 helper 新增可選、無錯誤參數的日誌回呼。第一次借出 client error 先丟棄連線，再回報；重複 error 不重複回報。正常歸還、主動取消及業務拒絕不由此回呼記為斷線。同步拋錯或非同步拒絕的日誌回呼不取代原本 unavailable 結果。
 - 三個 PG 入口（原始備份、候選預覽、修復備份）接上啟動程序的 logger。固定欄位為 `event: "pg_connection_error"`、`operation: "raw-backup" | "repair-preview" | "repair-archive"`、`state: "borrowed" | "idle"`；使用 error 等級及固定訊息，不傳入原始 error、SQL、故事、檔案路徑、stack 或連線字串。這三個專用 pool 的閒置斷線也改用相同安全欄位；其他 pool 不在本次範圍。
-- 補充 `tests/pg-client-operation.test.ts`：無敏感錯誤參數、單次回報、三入口接線、取消／正常／業務拒絕不回報、日誌回呼拋錯／拒絕仍安全完成，以及 COMMIT 回應遺失不重送。所有新增及調整案例尚未執行。
+- 補充 `tests/pg-client-operation.test.ts`：無敏感錯誤參數、單次回報、三入口接線、取消／正常／業務拒絕不回報、日誌回呼拋錯／拒絕仍安全完成，以及 COMMIT 回應遺失不重送。開發代理交付時未執行；其後 Grok 在 `1be416e` 執行十三項全部通過，詳見下節。
 
 本次檔案限於 `src/web/style.css`、`src/server/pg-client-operation.ts`、`src/server/postgres-raw-data-backup.ts`、`src/server/repair-preview-reader.ts`、`src/server/postgres-repair-archive.ts`、`src/server/index.ts`、`tests/pg-client-operation.test.ts` 及本文件。SQL、migration、Memory 鎖、容量與遊戲規則未改；不處理 favicon、存檔焦點待查觀察或既有兩項 Info，不實作 R03 套用。
 
-依 AGENTS.md 第四節，開發代理只閱讀程式與 Git 資訊，未執行 build、typecheck、格式檢查、測試或瀏覽器驗證。Grok 應針對 320／375／430px、100／150／200% 字體及連線／離線狀態核對排版，並以隔離 PG 加真實 TCP 斷線核對日誌、程序生存、單次丟棄、COMMIT 不重送及結果查詢。CSS 模擬仍不等同真機字體與觸控驗收。
+依 AGENTS.md 第四節，開發代理只閱讀程式與 Git 資訊，未執行 build、typecheck、格式檢查、測試或瀏覽器驗證。原交付要求 Grok 核對字體排版與隔離 PG 故障，結果如下。CSS 模擬仍不等同真機字體與觸控驗收。
+
+## `1be416e` 外部複查與探索排版補修（2026-10-03）
+
+使用者轉交 Grok 審查 TARGET `1be416e7b15e4459081f26fbe617b76e1bd84db6`、BASE `d9879537c3239f4e679677295a3ab7551218d989` 的結果。外部確認遠端 TARGET、祖先關係及八個檔案範圍。環境為 Node 24.21.0、npm 9.2.0、Debian 13.7、PG 17.11、Chrome 154、Playwright 1.63.0。`npm ci`、typecheck、build、BASE／TARGET 差異格式檢查均 exit 0；`tests/pg-client-operation.test.ts` 十三項全過、無略過。以下均為外部回報，開發代理沒有重跑。
+
+### I3 安全日誌：七項外部通過
+
+- 真實 `index.ts` 經隔離 PG／TCP proxy 無 ErrorResponse 斷線後仍存活，health 均 200。Phase 29 回 503 `backup-unavailable`；Phase 30 整份 200、只有 current unavailable；Phase 31 查詢／列表／下載回 503 unavailable、no-store。
+- stdout 有 level 50 固定紀錄，stderr 零位元組。欄位只有 `event, hostname, level, msg, operation, pid, state, time`；raw-backup 一條、repair-preview 一條、repair-archive 五條，均 borrowed。逐 pool 的閒置斷線另有 idle 紀錄。重複 error 只回報一次的情況由 harness 驗證，不假定為同一條真連線的證據。
+- 三個專用 pool 的 borrowed／idle 紀錄沒有原始 error、SQL、stack、路徑、連線資料或故事。正常借還、409／404／400、四次取消、statement timeout 及 507 都零條此類斷線紀錄。
+- 原樣 import TARGET 的外部 harness 驗證同步 throw、非同步／延遲 reject 的回呼都保持 unavailable，release 一次、沒有 unhandled rejection；三十次借還後 listener 仍一個。
+- COMMIT 到 PG 後回覆遺失：只送一次、不重送，先 503，再用新連線查到 200／一列，獨立 checksum／指紋及下載與 DB 內容核對正確。COMMIT 未到 PG：503，之後 404／零列。
+- BASE 同七個斷線情境回應相同但沒有 borrowed 日誌；BASE backup／preview idle 紀錄含 stack 與連線參數，TARGET 三個專用 pool 已改固定欄位。這不能擴大宣稱所有 pool 都已安全記錄。
+
+### 探索排版：部分通過，兩項 Low 待補驗
+
+CSS 字體模擬：430px／150%／200%、375px／200%、1280px／100%／150%／200% 外部通過；320px／200% 在三種連線狀態仍寬 364px，與 BASE 相同，175% 無溢出。外部更正先前成因：320px 主要是狀態表 `minmax(6rem, auto)` 放大後的最小欄寬，撐大探索 grid；先前直接歸因 header 的說法不準確。
+
+另有新 Low：100% 字體下連線狀態與重試固定分兩行，桌面偏左，375px header 增高三十像素。外部分析為 status 的 `flex: 1 1 10rem` 與外層寬度共同導致過早換行。觸控及 Tab／Enter 的按鈕操作正常、每次一個 health 請求；Enter 重試後焦點為 BODY 尚未深入查，不直接定為缺陷。真 Chrome 縮放另測通過，不能替代 CSS 字體模擬；真手機未執行。
+
+本次補修以 `1be416e7b15e4459081f26fbe617b76e1bd84db6` 為基準，只改 `src/web/style.css` 與本文件，目標以包含這兩檔補修的提交完整 SHA 為準：
+
+- 探索最外層與窄視窗 header／故事 heading 使用 `minmax(0, 1fr)`，面板允許縮小，避免子元素的最小內容寬反向撐大整頁。
+- 狀態表標題欄上限為 `min(6rem, 40%)`，不再以 6rem 作硬下限；標題文字可折行，數值欄保留剩餘空間。
+- 連線提示按內容取得寬度、受容器上限限制，狀態文字移除固定 10rem basis。桌面靠右、窄視窗保持可用整列寬度，僅空間不足才換行。
+- 故事標題的 flex 設定改放在實際的父層標題容器，不放在非 flex item 的 h2。這些補修尚待 Grok 排版驗證，不寫成通過。
+
+主 pool／diagnostics pool 的閒置 handler 仍記錄原始 err，外部實測含 stack、node_modules 路徑、user／database／host／port，評 Low；測試角色未設密碼，是否包含密碼維持未驗證。這項不在本次 CSS 補修範圍。SQL／業務拒絕丟棄健康連線的 Info、favicon、兩個焦點待查觀察及舊六個 503 均沒有因此解決或接受。
+
+外部本輪 API／proxy／harness 已停，兩個 DB／角色已刪，叢集已停、`/workspace/p31h` 已刪，沒有碰 5432。新證據 `/workspace/p31h-evidence`（29M）保留；其中 `logs/p2-*-main.stdout.log` 含隔離環境原始 error，外部說明無密碼或故事，不能把它當成已去敏的日誌。舊證據未改。這些外部證據開發代理未存取或清理。
 
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。

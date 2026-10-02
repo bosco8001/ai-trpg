@@ -312,6 +312,7 @@ h1 {
 
 .exploration-shell__inner {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   width: min(100%, 64rem);
   min-width: 0;
@@ -369,14 +370,16 @@ h1 {
   flex: 0 1 auto;
   flex-wrap: wrap;
   min-width: 0;
+  width: max-content;
   max-width: 100%;
+  margin-inline-start: auto;
   gap: var(--space-2);
   align-items: center;
   padding-block-end: var(--space-1);
 }
 
 .connection-brief p {
-  flex: 1 1 10rem;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   color: var(--text-muted);
@@ -413,6 +416,7 @@ h1 {
 }
 
 .exploration-panel {
+  min-width: 0;
   padding: var(--space-4);
 }
 
@@ -430,12 +434,18 @@ h1 {
 }
 
 .exploration-panel__heading h2 {
-  flex: 1 1 12rem;
   min-width: 0;
   overflow-wrap: anywhere;
   margin-block-end: 0;
   font-size: clamp(1.5rem, 4vw, 2rem);
   line-height: 1.3;
+}
+
+.exploration-panel__heading > div:first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .exploration-panel__mode {
@@ -549,11 +559,11 @@ h1 {
 
 .exploration-state dl > div {
   display: grid;
-  grid-template-columns: minmax(6rem, auto) minmax(0, 1fr);
+  grid-template-columns: minmax(0, min(6rem, 40%)) minmax(0, 1fr);
   gap: var(--space-3);
 }
 
-.exploration-state dt { color: var(--text-muted); }
+.exploration-state dt { min-width: 0; color: var(--text-muted); overflow-wrap: anywhere; }
 .exploration-state dd { margin: 0; overflow-wrap: anywhere; }
 
 .narrative-entry[data-source="system"] .narrative-entry__label::before {
@@ -1027,9 +1037,12 @@ h1 {
   .exploration-header,
   .exploration-panel__heading {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .connection-brief {
+    width: auto;
+    margin-inline-start: 0;
     justify-content: space-between;
   }
 
