@@ -227,7 +227,7 @@ TARGET 共十一輪故障，程序均存活，後續 `/api/health` 為 200、std
 | `phase26-restart-check` | exit 0、`passed:true`；重啟三次，combatId 與 history 保留 |
 | `phase26-casting-restart-check` | exit 0、`passed:true`；重啟三次，MP 一直為 18，沒有退還 |
 
-**migration 舊資料比對：外部回報通過，樣本仍有缺口。** 在全新 DB 先套用前三個 migration，建立 current 與三槽樣本，包含微秒保存時間、其他角色及含大數字的 v1 舊格式。Phase 31 migration 前後，`game_states` 兩列、`save_slots` 三列及舊表結構 md5 未變；新增備份表與 migration 追蹤紀錄分開判斷，再執行 migration 無待執行項目。樣本沒有「其他世界」，該情境不能列為通過。這是 migration 前後的新證據，與較早故障前後遊戲表 md5 不變分開記錄。
+**migration 舊資料比對：`771e7de` 外部回報通過，當輪樣本未含其他世界。** 在全新 DB 先套用前三個 migration，建立 current 與三槽樣本，包含微秒保存時間、其他角色及含大數字的 v1 舊格式。Phase 31 migration 前後，`game_states` 兩列、`save_slots` 三列及舊表結構 md5 未變；新增備份表與 migration 追蹤紀錄分開判斷，再執行 migration 無待執行項目。其他世界情境其後在 `77125f4` 補驗通過，詳見下節；不能回填成 `771e7de` 當輪已涵蓋。這些 migration 前後證據與較早故障前後遊戲表 md5 不變分開記錄。
 
 ### 使用者已回覆的手動項目
 
@@ -242,21 +242,71 @@ TARGET 共十一輪故障，程序均存活，後續 `/api/health` 為 200、std
 
 使用者最初看不到保存入口，開發代理讀取當時頁面及檔案發現載入的舊前端產物沒有 Phase 31 備份面板；交由使用者重新 build／啟動後，使用者提供截圖確認保存按鈕出現。之後的手動結果不等同真實手機觸控、手機下載或正式遊玩驗收。
 
-### 未執行、待補證據及既有觀察
+### 前輪缺口與最新補驗狀態
 
-- 外部列明「第 3 項的 Memory 部分」未驗證，但本次轉交摘要沒有逐案例名稱；待補對應矩陣，不能猜測它指全部 Memory、某個 UI 案例或雙程序故障。
-- PG 的 Phase 30 UI 腳本未執行；migration 的其他世界樣本未涵蓋。
+- 前輪「第 3 項的 Memory 部分」指同角色舊 Run／其他世界可準備、其他角色拒絕；已在 `77125f4` 補驗通過，不是全部 Memory 或雙程序故障未測。
+- 前輪 PG Phase 30 UI 腳本曾執行至第 23 行逾時，不能寫成完全未執行；在 `77125f4` 換用符合腳本空槽前提的新隔離 DB 後通過。本輪未涵蓋 PG UI 有候選的情境，相關證據仍引用舊輪。migration 其他世界樣本也在 `77125f4` 補驗通過。
 - 沒有真實手機或真實 LLM；真手機觸控／下載、背景切換／離線及手機讀屏仍未驗收。Phase 31 備份本身不呼叫 LLM；正常遊玩與敘事體驗另由使用者確認。
-- 本次轉交摘要未逐項附 UI／Playwright、完整 Phase 27–30 動態回歸及 Memory 雙程序故障結果。外部整體結論保留為「可執行案例均通過」；個別覆蓋範圍待案例矩陣／證據核對，不能將未明列的項目全部改成 PASS 或未執行。
+- 前輪摘要未逐項附案例矩陣，其後 `77125f4` 回報已補齊：UI／Playwright、Phase 27–30 動態回歸及 Memory 雙程序故障的既有證據標示引用 `771e7de`，只有本輪實際補驗項目標為 `77125f4` 通過；詳見下節。
 - 舊六個未歸因的 503 維持資料缺失，不能以本輪結果回填舊原因。
-- 有一個 404 資源錯誤，路徑／原因未確認；只能記為待查證，不能認定是 favicon。
-- 外部提到探索畫面的 Info／Low 觀察，屬 Phase 31 以外；摘要未附問題描述、檔案／行號或重現步驟，待補資料，不猜測內容或擴大修正範圍。
+- 原先待查的 404 已在 `77125f4` 確認為 `GET /favicon.ico`，評為 Info，不影響功能，尚未修正。
+- 探索頁觀察已在 `77125f4` 完整記錄為 Low：放大字造成橫向溢出；屬 Phase 31 以外，未修正。系統面板仍能以可見位置觸控或鍵盤 Enter 開啟，不能寫成完全無法操作。
 - I3 斷線日誌缺失 Low、健康連線被業務拒絕丟棄及 BASE 測試訊息的兩項 Info，本輪沒有修正或使用者接受的回報，維持原狀。
 
-本輪引用而未重跑的既有結果：`9ff93db9d3a24f1202708590d3e75461c34c1e71` 的 I3 TCP 故障及 helper 11／11，以及 `771e7de3d5e4facfd08f883f261026582dd43bc1` 的文件審查。不改寫成新的故障注入結果。
+本輪引用而未重跑的既有結果：`9ff93db9d3a24f1202708590d3e75461c34c1e71` 的 I3 TCP 故障及 `tests/pg-client-operation.test.ts` 11／11，以及 `771e7de3d5e4facfd08f883f261026582dd43bc1` 的文件審查。原稱「helper 11／11」來自外部報告用詞錯誤，這十一項是上述測試檔，不是 UI helper。不改寫成新的故障注入結果。
 
 後續真機／正常遊玩驗收，依外部建議確認 320–430 寬及最大系統字體、探索／戰鬥／結果／繼續中的備份操作、背景切換或離線後識別碼保留與手動查詢、手機下載及重啟取回，以及 VoiceOver／TalkBack 或外接鍵盤。**正常遊玩可以依規則更新進度；驗收重點是備份操作沒有額外改寫進度或三槽，不要求整輪遊玩狀態完全不變。**
 
 外部回報本輪程序均已停止，七個隔離 DB 及角色已刪除，叢集與 `/workspace/p31f` 已清理，沒有動到 5432；原 repo 在 TARGET 且乾淨。保留 `/workspace/p31f-evidence`（29M，log、JSON、migration、sec7、截圖及腳本）、`/workspace/i3r-evidence`、`/workspace/p31`。`/tmp/phase31-0Gg7bC` 是本輪之前的殘留，外部沒有刪除；開發代理未存取或清理這些外部路徑。
+
+## 文件更正、五項補缺結果與證據矩陣
+
+使用者轉交 Grok 對 `77125f4fae372e121a4a8aa5770099c9f8a79837` 的文件核對與補缺回報，BASE 為 `771e7de3d5e4facfd08f883f261026582dd43bc1`；外部確認遠端 HEAD 等於 TARGET、BASE 是祖先、只改本頁，產品程式相同，差異格式檢查 exit 0。**本輪沒有新產品缺陷；文件的十一項測試名稱誤標已在本次更正。這是外部工程審查，不是使用者驗收；Phase 31 未結案。**
+
+外部環境與前輪相同（Node v24.21.0、npm 9.2.0、Debian 13.7、PG 17.11、Chrome 154、Playwright 1.63.0），使用新隔離叢集 `127.0.0.1:55426`、DB 前綴 `ai_trpg_phase26_p31g_`，沒有 LLM key。`npm ci`、build、三個 migration 步驟、Memory 第三項 A／B、PG `p30-ui.mjs`、放大字與 404 量度腳本均 exit 0。本輪未重跑 typecheck、`npm test`、restart 或雙程序故障，不把前輪結果改寫成本輪執行。
+
+為捕捉 404 順帶執行的 Phase 27 interact／p27-extra 均 exit 1；外部歸因於共用同一 Memory API 導致初始狀態不符合腳本前提，該兩次執行不當作有效回歸結果，也不算通過。較早的有效 Phase 27 證據仍只標引用，不能用這兩次無效執行替代。
+
+### 五項補缺結果
+
+1. **Memory 第三項：本輪通過。** 原缺口是同角色舊 Run／其他世界合法存檔可準備，而其他角色拒絕。真實 Memory API 存檔會重建合法快照、沒有預載入口，既有 helper 也沒有舊 Run／其他世界樣本。外部另建隔離程序，以 TARGET 的 `buildApp()` 執行真實 Memory 路由，先經 PUT 建立三槽，再於測試程序內部注入舊紀錄，未改產品程式。舊 Run、舊 Run 加其他世界、同 Run 換世界均 ready；其他角色回 409 及身分不符提示。四份下載逐位元組核對，checksum／來源指紋吻合；樣本的允許修復差異只涉及 activity，備份操作前後遊戲與三槽 hash 不變，沒有觸發 Load、Reset 或額外 PUT。0755 備份目錄正確回 503；只改 `phase26.worldId` 的不完整世界變更正確受阻。
+2. **PG Phase 30 UI：本輪通過，候選情境仍只引用。** 腳本未改，換用三槽皆空的新隔離 DB 以符合原腳本前提。過期提示、取消／收起正常；503、合約錯誤、資料過大時各只發一次請求；320／375／430px 無溢出，外部回報三入口的四來源結果 4／4 identical。repair 表始終零列；DB 計數由 `0|0|0` 到 `1|2|0` 的變化來自遊戲操作。本輪空槽 UI 沒有涵蓋有候選情境，該部分仍引用舊證據；前輪腳本至第 23 行才逾時，不是完全未執行。
+3. **其他世界 migration：本輪通過。** 樣本包含 current、其他角色且其他世界的 game_states 列；槽一為同角色舊 Run 加其他世界（時間 `.654321`），槽二其他角色（`.123456`），槽三含大數字的 v1 舊格式（`.000001`）。migration 前後 game_states 兩列 md5 前綴 `5f6c5739…`、save_slots 三列 `cd3668e2…`、舊結構 `3b5c3645…` 均未變，微秒時間與大數字保留；上述只有外部提供的前綴，不補寫完整雜湊。新表／pgmigrations 第四列分開判斷，pg_dump 差異只有新表，重跑無待執行項目。
+4. **404：本輪確認為 favicon，Info。** 首次載入時瀏覽器請求 `GET /favicon.ico`；index.html 沒有 icon link，也沒有 public 目錄。Vite preview 與正式靜態站有該 404，Phase 31 helper 因 SPA fallback 不出現。只增加 console 訊息，不影響功能；證據為 `logs/netlog-404.jsonl`。同期 500／連線重設是 results 腳本注入，不能列為產品缺陷。本次沒有修 favicon。
+5. **探索大字排版：已完整記錄，Low，未修。** CSS 字體放大模擬在 320px／200% 時頁面寬 364px，由 `.exploration-header` 撐闊；375px 的 100／150／200% 均無溢出；430px／150% 為 460px、斷線時 518px，430px／200% 為 612px、斷線時 690px，由 `.connection-brief` 撐闊。連線提示及重試被推出畫面，故事標題被壓窄。外部分析涉及 style.css 的 header 橫排 flex（321–327）、connection-brief 的 flex:none（359–365）、狀態 nowrap（367–373）及 ≤25rem 才直排（1001–1009），對應 ExplorationPage.tsx（270–280）；行號均指本輪 TARGET。重現為 430×932、html font-size 150／200%，另截斷 health 模擬斷線，量度 scrollWidth 與 innerWidth。可見位置 touch tap 或 Enter 仍可開系統面板；舊稱完全無法點擊是座標錯誤，不成立。這是探索頁既有 Low，非 Phase 31 新缺陷，也不代表真手機系統字體效果。
+
+### 版本與案例證據矩陣
+
+下表 `E` 為外部 `/workspace/p31f-evidence`（`771e7de3d5e4facfd08f883f261026582dd43bc1`）。「引用」表示在該版本通過、本輪未重跑；產品碼相同也不改標為本輪通過。這些路徑是 Grok 保留的外部證據，開發代理未自行存取或執行。
+
+| 範圍 | 本輪狀態／證據 |
+|---|---|
+| Phase 31 UI 1：雙入口、預覽、準備入口、收起／重取 | 引用 E 的 `logs/ui-p31-normal.log`、`ui-p31-mode-state-failure.log`、`shots/11,12,21` |
+| UI 2：合法來源與外角色／受阻／過期／偽造／版本拒絕 | 引用 `ui-p31-ui2-b.log`、`shots/05`；六次拒絕 POST 沒有新增紀錄 |
+| UI 3：同角色舊 Run／其他世界、其他角色拒絕 | PG 引用 `json/real-postgres-A.json`；Memory 本輪 `77125f4` 通過 |
+| UI 4：連點／切換／收起再返回 | 引用 `ui-p31-mode-delayed.log`、`ui-p31-ui2-switch.log`；各只一次 POST |
+| UI 5：遺失回應／取消／逾時、200／404／503 文案 | 引用 `ui-p31-mode-lost-response.log`、`ui-p31-mode-timeout.log`、`shots/06–09` |
+| UI 6：滿三十秒、慢標頭／慢 body | 引用 `ui-p31-slow.log`、`faultproxy.log`、`shots/20` |
+| UI 7：64 KiB／32 MiB 前端上限 | 引用 `ui-p31-limits.log`；不另推定摘要未列的子案例 |
+| UI 8：列表／分頁／下載／重啟及獨立校驗 | 引用 `ui-p31-ui2-restart.log`、`json/restart-*`、`shots/22,23` |
+| UI 9：來源改變後拒絕舊候選及保留備份 | 引用 `shots/03,24`；409、二十四份備份保留 |
+| UI 10：320／375／430px、長 ID、200%、鍵盤／焦點／aria-live | 引用 `ui-p31-ui2-layout2.log`、`shots/30–36`；真機未測 |
+| 真實 PG API＋前端的 Phase 31 流程 | 引用 `json/real-postgres-A/B.json`、`shots/40–42` |
+| Phase 27／28／29、Phase 30 helper／Memory UI／PG API | 引用 E 的 `logs/p27-*`、`p28*`、`p29*`、`p30-modes.log`、`p30-pg-app-preview.log`、`pg-p282930.log`、`shots/p27`、`shots/p29` |
+| Phase 30 PG UI | 本輪通過；空槽前提，有候選 UI 本輪未測、仍只引用 |
+| Memory 雙程序並行／容量 | 引用 `E/sec7/two-process.json`、`boundary-stress.json`；同 ID 去重、不同 ID、差一 byte 回 507 |
+| I4／I5 故障及 BASE 對照 | 引用 `E/sec7/natural.json`（I4 自然命中 169 次）、`i45.json`（I4／I5 注入與 abort）、`base-*/` |
+| 大小／期限、備份不改來源 | 引用；本輪另確認 Memory hash 與 PG 列數未變 |
+| 其他世界 migration | 本輪通過，詳見五項補缺 |
+| npm test、typecheck、Phase 26 restart | 引用前輪結果，本輪未執行 |
+| 真機／手機下載／讀屏 | 未執行 |
+
+### 剩餘限制與清理
+
+本輪另觀察存檔後焦點跳到「跳至故事紀錄」連結，Memory／PG 均出現，尚未深入定位，維持待查觀察，不能直接定為產品缺陷。不要與使用者已通過的備份查詢焦點混為同一操作。
+
+I3 斷線無日誌 Low、丟棄健康連線與 BASE 失敗訊息的兩項 Info 均未修、未接受；favicon Info 與探索大字 Low 也未修。舊六個 503 維持無法歸因。真機、手機下載／讀屏、正式遊玩驗收仍待使用者確認；PG 有候選 UI、套件、restart、雙程序故障本輪未重跑，只保留各自舊版本引用。字體放大只有 CSS 模擬，不能當真手機結果。
+
+外部回報所有本輪程序已停，三個 DB／角色、叢集及 `/workspace/p31g` 已刪除，沒有連接或改動 5432。舊 `/workspace/p31f-evidence`、`/workspace/i3r-evidence`、`/workspace/p31` 未改；本輪 `/workspace/p31g-evidence`（14M）保留。證據腳本仍指向已刪除的 `/workspace/p31g`，重跑須先重建隔離環境與更新路徑，不把保留腳本視為已可直接執行。
 
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。
