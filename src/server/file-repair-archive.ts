@@ -104,7 +104,13 @@ export class FileRepairArchive implements RepairArchive {
           try {
             if ((await owner.stat()).size > 1024) throw new PreparationFailure("unavailable");
             const originalOwner = await owner.readFile("utf8");
-            const info: unknown = JSON.parse(originalOwner);
+            let info: unknown = null;
+            try { info = JSON.parse(originalOwner); }
+            catch (error) {
+              if (!(error instanceof SyntaxError)) throw error;
+              // The owner may still be being written. Unknown ownership only waits;
+              // the existing deadline/abort governs refusal, never lock recovery.
+            }
             if (info !== null && typeof info === "object" && "pid" in info && "host" in info
               && info.host === hostname() && typeof info.pid === "number" && Number.isInteger(info.pid) && info.pid > 0) {
               try { process.kill(info.pid, 0); }

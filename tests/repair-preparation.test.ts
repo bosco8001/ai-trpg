@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 import { randomUUID, createHash } from "node:crypto";
-import { mkdtemp, readFile, writeFile, readdir, rm, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, writeFile, readdir, rm, symlink } from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import Fastify from "fastify";
 import { createElement } from "react";
@@ -58,6 +59,46 @@ test("同 ID 並行只發布一份，來源之後改變仍回同次結果；ID �
   assert.equal((await readdir(f.directory)).filter(n => n.endsWith(".json")).length, 1);
   f.mutate(); assert.deepEqual(await f.service.prepare(request, signal()), results[0]);
   await assert.rejects(f.service.prepare({ ...request, candidateFingerprint: "0".repeat(64) }, signal()), failure("conflict"));
+});
+test("I5：空或殘缺 owner 等待補完整，活程序鎖不被回收，取消不新增備份", async t => {
+  for (const initial of ["", '{"pid":']) {
+    await t.test(initial === "" ? "空 owner" : "殘缺 owner", async child => {
+      const f = await fixture(child), request = await requestFor(f.reader);
+      const lockPath = join(f.directory, ".write-lock"), ownerPath = join(lockPath, "owner");
+      await mkdir(lockPath, { recursive: true, mode: 0o700 });
+      await writeFile(ownerPath, initial, { mode: 0o600 });
+      const controller = new AbortController();
+      const completion = f.service.prepare(request, controller.signal).then(
+        value => ({ status: "ready" as const, value }), error => ({ status: "failed" as const, error }));
+      const observe = () => Promise.race([completion, delay(150).then(() => ({ status: "waiting" as const }))]);
+      try {
+        assert.equal((await observe()).status, "waiting", "不完整 owner 不應即時失敗");
+        assert.equal(await readFile(ownerPath, "utf8"), initial, "不能改寫不明擁有者的鎖");
+        const owner = JSON.stringify({ pid: process.pid, host: hostname(), token: randomUUID() });
+        await writeFile(ownerPath, owner);
+        assert.equal((await observe()).status, "waiting", "owner 補完整後仍不能搶活程序的鎖");
+        controller.abort();
+        assert.equal((await completion).status, "failed");
+        assert.equal(await readFile(ownerPath, "utf8"), owner, "取消不能刪除其他擁有者的鎖");
+        assert.equal((await readdir(f.directory)).filter(n => n.endsWith(".json")).length, 0);
+      } finally { controller.abort(); await completion; }
+    });
+  }
+});
+test("I5：永久殘缺 owner 到原有 25 秒期限才拒絕，保留鎖及舊備份", async t => {
+  const f = await fixture(t), request = await requestFor(f.reader);
+  await f.service.prepare(request, signal());
+  const originalBackup = await f.service.download(request.repairId, signal());
+  const lockPath = join(f.directory, ".write-lock"), ownerPath = join(lockPath, "owner");
+  await mkdir(lockPath, { mode: 0o700 });
+  const partial = '{"pid":';
+  await writeFile(ownerPath, partial, { mode: 0o600 });
+  const started = Date.now();
+  await assert.rejects(f.service.prepare({ ...request, repairId: randomUUID() }, signal()), failure("unavailable"));
+  assert.ok(Date.now() - started >= 25_000, "不能因 JSON 解析失敗提早拒絕");
+  assert.equal(await readFile(ownerPath, "utf8"), partial);
+  assert.equal(await f.service.download(request.repairId, signal()), originalBackup);
+  assert.equal((await readdir(f.directory)).filter(n => n.endsWith(".json")).length, 1);
 });
 test("重新建立服務可取回舊 Memory 備份，但同一原稿也不是新程序授權", async t => {
   const f = await fixture(t), request = await requestFor(f.reader);
