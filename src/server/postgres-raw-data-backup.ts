@@ -1,18 +1,13 @@
 import type { Pool } from "pg";
 import type { RawBackupPayload } from "../shared/raw-data-backup.js";
 import { RawBackupFailure, type RawBackupReader } from "./raw-data-backup.js";
+import { withPgClient } from "./pg-client-operation.js";
 
 /** One SELECT gives all four records a single MVCC snapshot, without explicit lock commands or initialization. */
 export function createPostgresBackupReader(pool: Pick<Pool, "connect">, characterId: string): RawBackupReader {
   return {
     async capture(maxBytes, signal): Promise<RawBackupPayload> {
-      signal.throwIfAborted();
-      const client = await pool.connect();
-      let released = false;
-      const discard = () => { if (!released) { released = true; client.release(true); } };
-      signal.addEventListener("abort", discard, { once: true });
-      try {
-        signal.throwIfAborted();
+      return withPgClient(pool, signal, () => new RawBackupFailure("unavailable"), async client => {
         const result = await client.query<{
           raw_bytes: string; captured_at: string;
           records: { position: number; raw: string }[] | null;
@@ -40,10 +35,7 @@ export function createPostgresBackupReader(pool: Pick<Pool, "connect">, characte
           current: row.records.find(record => record.position === 0)?.raw ?? null,
           slots: ([1, 2, 3] as const).map(slotId => ({ slotId,
             record: row.records!.find(record => record.position === slotId)?.raw ?? null })) };
-      } finally {
-        signal.removeEventListener("abort", discard);
-        if (!released) { released = true; client.release(); }
-      }
+      });
     },
   };
 }

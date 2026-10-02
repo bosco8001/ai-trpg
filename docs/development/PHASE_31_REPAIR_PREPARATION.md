@@ -145,4 +145,26 @@ I2 的 JSON／格式／校驗故障、HTTP 503 與 no-store、不洩露原稿及
 
 外部回報隔離 PG DB 與角色已刪除，叢集及 `/workspace/pg31u`、副本與 log 已清理，API 程序已停止，沒有容器；原 repo 停在上述 TARGET 且工作目錄乾淨。本次只補記此份報告，沒有程式變更、沒有把待驗證項目改寫為通過。使用者另回覆「I3未處理」，維持其待處理狀態，原始問題描述仍待提供。
 
+## I3 原始回報及借出 PG client 的錯誤處理
+
+2026-10-02（Asia/Hong_Kong），使用者轉交 Grok 對文件 commit `3233538d89033ab8d4c4866386b7177afdcd2318` 的審查：相對 `883d01f9bac82032a0c91d0403ba15dbf769cefe` 只改本頁，內容核對無問題，差異格式檢查 exit 0；本輪未執行 build、DB 或 UI。這是外部文件審查，不代表 Phase 31 驗收。
+
+同份回報重建 I3 原始問題（Medium-High）：在 `939d53392df92f34855b35e687fc71e75ffef1d1`，借出中的 PG client 遇到沒有 ErrorResponse 的斷線，會發出未被接住的 `error` 事件，使 API 程序結束。pool 層 listener 只處理閒置連線，不能代替借出期間的處理。外部回報 Phase 31 備份操作及 Phase 30 reader 曾動態重現；Phase 29 reader 僅依相同程式模式推論，沒有動態重現證據。三處到文件 TARGET 仍未改動。
+
+外部重現使用隔離 PG 17（55426）與 TCP proxy（55427）：偵測指定 SQL，轉送至 PG、丟棄回應，5 ms 後關閉雙向 socket，不發 ErrorResponse。曾使用 `COMMIT`、`SELECT repair_id FROM` 與 `row_to_json` 標記。保存的 log 記錄 PID 359387／360871 以 `Unhandled 'error' event`、`Connection terminated unexpectedly` 結束；`pg_terminate_backend` 發送 FATAL 的對照組則約 501 ms 回 503，程序存活。個別 PID 對應哪個 SQL、crash 時 COMMIT 是否保存、部分輸出與完整啟動命令沒有保留，不能補寫確定結果。
+
+本次以 `3233538d89033ab8d4c4866386b7177afdcd2318` 為基準處理 I3：
+
+- 新增 `src/server/pg-client-operation.ts`，取得連線後為本次操作掛 client `error` 及 abort listener；斷線／取消時，以呼叫端的安全 unavailable 錯誤結束等待，並且只 `release(true)` 一次。仍觀察稍後才結束／拒絕的操作 promise，避免遲到結果變成成功或未處理 rejection。
+- 正常歸還先由 pg-pool 接管閒置錯誤，再移除本次 listener；不移除 pool 或其他既有 listener。取得連線期間取消時，連線抵達後丟棄，不開始資料操作。取得連線失敗轉為 unavailable；原有容量／超限等業務拒絕不改類別。
+- `postgres-repair-archive.ts`、`repair-preview-reader.ts`、`postgres-raw-data-backup.ts` 三處使用同一處理。沒有更動 SQL、交易／容量／指紋／版本規則、migration、池的上限或 timeout 設定，也不改一般遊戲連線。
+- Phase 31 準備／查詢／下載故障與 Phase 29 下載仍由既有 API 回安全 503。Phase 30 保留四來源各自 unavailable 的預覽契約，能回完整報告時仍為 200，不因 I3 改成全部失敗或改寫來源。
+- COMMIT 回應遺失只表示結果無法確認，不宣稱撤銷成功，不重送 INSERT／COMMIT；使用者仍用原識別碼手動查詢持久紀錄。
+
+新增 `tests/pg-client-operation.test.ts`，以實際 pg Client 的 EventEmitter 配合隔離的模擬 pool／query，涵蓋三個入口的借出錯誤、取得連線失敗、正常 listener 交接、無 active query 時斷線、重複 error／取消競爭、遲到 query rejection、取得連線期間取消、既有業務拒絕及 COMMIT 結果未知後以新連線查 ID。這些是程序內事件案例，不是實際 TCP／PG 故障證據。**新增測試及本次修正均未執行，待 Grok 驗證。**
+
+Grok 須在隔離環境重做三入口的真實 TCP proxy 故障，包括 Phase 29 原先只推論的情況；記錄每輪 SQL 標記、PID、完整命令、HTTP／reader 結果及程序存活，核對 COMMIT 後持久紀錄實際有／無的兩種結果、無重送、後續查詢、單次 release、遲到事件、取消與連線回收。錯誤不能洩露故事／SQL／連線資訊；原遊戲資料與三槽須保持不變。套件通過不能取代這些動態證據。
+
+本機仍無法讀取 `c5a011e`，也沒有可重用的 `pg-client-operation.ts`；本次是當前基準上的修正，沒有宣稱合併該 commit。I3 狀態改為修正已交付、待 Grok 複查，Phase 31 未結案，其他待驗證項目及使用者驗收邊界不變。
+
 完成後停在 Phase 31，等使用者明確接受才討論 R03 原子套用的下一個小階段。
