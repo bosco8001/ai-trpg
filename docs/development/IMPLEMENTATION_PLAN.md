@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–31 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過，Phase 30 於同日確認「R02通過」，Phase 31 於 2026-10-03 回覆「Phase 31通過」。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。R03 第一階段於 2026-10-02 批准為 Phase 31，持久備份與準備已交付並接受；原子套用的完整契約仍待確認，尚未實作。
+Phase 1–31 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過，Phase 30 於同日確認「R02通過」，Phase 31 於 2026-10-03 回覆「Phase 31通過」。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。R03 第一階段於 2026-10-02 批准為 Phase 31，持久備份與準備已交付並接受；第二階段 [完整契約](R03_SECOND_STAGE_PROPOSAL.md) 已於 2026-10-04 批准，依使用者選定順序待文件工程審查後實作，尚未實作或驗收。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -371,7 +371,7 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 ## R03 規格討論
 
-使用者已要求進入 R03，十項選擇見 [討論紀錄](R03_REPAIR_APPLY_DISCUSSION.md)。2026-10-02 回覆「A，同意實作，實作後幫我push」，批准第一階段完整範圍，並授權本次實作後 commit／push。套用階段的完整寫入契約仍待確認，尚未實作。
+使用者已要求進入 R03，十項選擇見 [討論紀錄](R03_REPAIR_APPLY_DISCUSSION.md)。2026-10-02 回覆「A，同意實作，實作後幫我push」，批准第一階段完整範圍，並授權該次實作後 commit／push。當時套用階段未批准；其後於 2026-10-04 另行批准 [第二階段完整寫入契約](R03_SECOND_STAGE_PROPOSAL.md)，待文件工程審查後實作，尚未實作或驗收，沒有延伸該次 Git 授權。
 
 ## Phase 31 規格確認與交付紀錄
 
