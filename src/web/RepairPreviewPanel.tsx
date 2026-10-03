@@ -36,7 +36,7 @@ export function RepairPreviewReportView({ report, stale = [] }: { report: Repair
     </ul>
   </>;
 }
-export function RepairPreviewPanel({ currentState }: { currentState?: AuthoritativeGameStateResponse["state"] }) {
+export function RepairPreviewPanel({ currentState, onApplied }: { currentState?: AuthoritativeGameStateResponse["state"]; onApplied?: () => Promise<unknown> }) {
   const id = useId(), request = useRef<AbortController | null>(null), live = useRef(true);
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
   const [report, setReport] = useState<RepairPreviewReport | null>(null), [stale, setStale] = useState<RepairSource[]>([]);
@@ -83,7 +83,7 @@ export function RepairPreviewPanel({ currentState }: { currentState?: Authoritat
     {open ? <div id={id} className="data-health__report" aria-busy={busy}>
       <h3>修復候選預覽</h3>
       <p>只檢查活動標記與玩家 MP 相容欄位；不補缺值、不更改權威資源、不寫入資料，也不送給 AI。</p>
-      <p>結果只代表擷取時刻。其他分頁或程序的變動未必即時可見；未來套用必須重新核對完整來源。</p>
+      <p>結果只代表擷取時刻。其他分頁或程序的變動未必即時可見；套用時必須重新核對完整來源。</p>
       <p role="status" aria-live="polite" aria-atomic="true">{feedback}{report && stale.length ? " 有來源結果已過期，請手動重新預覽。" : ""}</p>
       {error ? <p role="alert">{error}</p> : null}
       {report ? <RepairPreviewReportView report={report} stale={stale} /> : null}
@@ -92,6 +92,6 @@ export function RepairPreviewPanel({ currentState }: { currentState?: Authoritat
         <Button variant="secondary" aria-disabled={!busy} onClick={() => { if (request.current) cancel(); }}>取消候選預覽</Button>
       </div>
     </div> : null}
-    <RepairPreparationPanel report={open ? report : null} stale={stale} />
+    <RepairPreparationPanel report={open ? report : null} stale={stale} onApplied={onApplied} />
   </section>;
 }

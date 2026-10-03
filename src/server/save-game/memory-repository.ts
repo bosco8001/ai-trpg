@@ -1,4 +1,5 @@
 import { createGameState, gameStateContents } from "../../domain/game.js";
+import { randomUUID } from "node:crypto";
 import type { SaveSlotId } from "../../shared/save-game.js";
 import type {
   CurrentStateReader,
@@ -14,6 +15,17 @@ function copy(record: StoredSaveSlot): StoredSaveSlot {
 
 export class InMemorySaveGameRepository implements SaveGameRepository {
   private readonly records = new Map<SaveSlotId, StoredSaveSlot>();
+  private readonly repairGuards = new Map<SaveSlotId, string>();
+
+  readRepairGuard(slotId: SaveSlotId): string | null { return this.repairGuards.get(slotId) ?? null; }
+  repairRaw<T>(slotId: SaveSlotId, transition: (raw: StoredSaveSlot | undefined, guard: string | null) => { result: T; next?: StoredSaveSlot }): T {
+    const result = transition(this.records.get(slotId), this.readRepairGuard(slotId));
+    if (result.next) {
+      this.records.set(slotId, copy(result.next));
+      this.repairGuards.set(slotId, randomUUID());
+    }
+    return result.result;
+  }
 
   constructor(
     private readonly readCurrentState: CurrentStateReader,
@@ -49,6 +61,7 @@ export class InMemorySaveGameRepository implements SaveGameRepository {
       savedAt: this.now().toISOString(),
     };
     this.records.set(slotId, record);
+    this.repairGuards.set(slotId, randomUUID());
     return copy(record);
   }
 }

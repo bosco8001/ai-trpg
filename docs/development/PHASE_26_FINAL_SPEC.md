@@ -119,6 +119,8 @@ callback的generation檢查、dedupe與History append共用原子邊界，並與
 不同generation/run：discarded，不保存、不顯示、不發布fallback。
 取消request只是優化，不能取代檢查。
 
+2026-10-04 已批准的 [R03 第二階段](R03_SECOND_STAGE_PROPOSAL.md) 另將成功的目前資料修復列為同步點：revision 加 1、換新 generation，保留已保存 History、身分帳與 allocator；callback 與修復共用同一來源提交邊界。這是工程修復的延伸；槽修復不影響目前 generation，實作與階段驗收見 [Phase 32](PHASE_32_REPAIR_APPLICATION.md)。
+
 Frontend分開處理state與history：
 - 舊revision state不可覆蓋已知新state。
 - 有效舊事件敘事可插入History，但不切回舊場景或覆蓋目前主要敘事。
@@ -296,4 +298,3 @@ Current enemy final facts只描述本Combat，不讓AI推斷Escape後永久死�
 - legacy migration有/無evidence，原Save保留；TEST ownership與Reset隔離。
 - 結果頁Continue in-flight、blocking recovery、375px、keyboard/focus/reduced motion。
 工程自動檢查與使用者手動確認分開記錄；目前兩者尚未執行。
-

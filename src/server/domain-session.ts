@@ -34,7 +34,11 @@ import {
 import { settleCombat, phase26, newIdentity } from "../domain/settlement.js";
 import { reserve, append, type NarrativeReservation } from "./history.js";
 import { createTestGameState } from "./test-game-state.js";
+import { randomUUID } from "node:crypto";
 export interface GameStateSession {
+  readRepairGuard?(): string;
+  /** Synchronous raw check/replacement; never initializes or calls Load. */
+  repairRaw?<T>(transition: (raw: GameState, guard: string) => { result: T; nextState?: GameState }): T;
   /** Synchronous memory-only snapshot getter; persisted backups use their own raw reader. */
   readStateForBackup?(): GameState | undefined;
   /** Pure inspection only: no initialization, migration write or gameplay mutation. */
@@ -148,100 +152,111 @@ function methods(read:()=>GameState | Promise<GameState>, boundary:Boundary): Ga
 }
 export function createDomainSession(initialState: GameState) {
   let state = createGameState(initialState);
+  let repairGuard = randomUUID();
+  function committed(next: GameState) {
+    repairGuard = randomUUID();
+    return next;
+  }
   return {
+    readRepairGuard: () => repairGuard,
+    repairRaw<T>(transition: (raw: GameState, guard: string) => { result: T; nextState?: GameState }): T {
+      const next = transition(state, repairGuard);
+      if (next.nextState) state = committed(next.nextState);
+      return next.result;
+    },
     readStateForBackup: () => state,
     readStateForDiagnostics: () => state,
-    ...methods(()=>state,async transition=>{const {result,nextState}=transition(state);if(nextState) state=createGameState(nextState);return result;}),
+    ...methods(()=>state,async transition=>{const {result,nextState}=transition(state);if(nextState) state=committed(createGameState(nextState));return result;}),
     getState: () => state,
-    applyCombatDamage(input: unknown) { const result = applyCombatDamage(state, input); if (result.ok) state = result.state; return result; },
-    processDyingTurn(input: unknown) { const result = processDyingTurn(state, input); if (result.ok) state = result.state; return result; },
-    rescueCombatant(input: unknown) { const result = rescueCombatant(state, input); if (result.ok) state = result.state; return result; },
+    applyCombatDamage(input: unknown) { const result = applyCombatDamage(state, input); if (result.ok) state = committed(result.state); return result; },
+    processDyingTurn(input: unknown) { const result = processDyingTurn(state, input); if (result.ok) state = committed(result.state); return result; },
+    rescueCombatant(input: unknown) { const result = rescueCombatant(state, input); if (result.ok) state = committed(result.state); return result; },
     partyOptions: () => getCombatPartyOptions(state),
     setCompanionTacticPreference(input: unknown) {
       const result = setCompanionTacticPreferenceTransition(state, input);
-      if (result.ok && result.state.revision !== state.revision) state = result.state;
+      if (result.ok && result.state.revision !== state.revision) state = committed(result.state);
       return result;
     },
     actCompanion(input: unknown, roller: DiceRoller) {
       const result = resolveCompanionTurn(state, input, roller);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     execute(input: unknown) {
       const result = applyCommand(state, input);
       if (!result.ok) return result;
       const reserved = result.effect.type !== 'equipped-skills-updated' && result.state.phase26 ? reserve(result.state,'exploration') : {state:result.state,reservation:undefined};
-      state=reserved.state;
+      state=committed(reserved.state);
       return {...result,state:reserved.state,reservation:reserved.reservation};
     },
     replaceContents(expectedRevision: unknown, contents: unknown) {
       const result = replaceGameStateContents(state, expectedRevision, contents);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     startCombat(input: unknown, participants: readonly CombatParticipantSeed[], roller: DiceRoller, context?: import("../domain/combat.js").CombatStartContext) {
       const result = startCombatTransition(state, input, participants, roller,context);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     advanceCombat(input: unknown) {
       const result = advanceCombatTurn(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     normalAttackOptions: () => getCurrentNormalAttackOptions(state),
     normalAttack(input: unknown, roller: DiceRoller) {
       const result = resolveNormalAttack(state, input, roller);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     physicalSkillOptions: () => getCurrentPhysicalSkillOptions(state),
     usePhysicalSkill(input: unknown, roller: DiceRoller) {
       const result = usePhysicalSkill(state, input, roller);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     startCasting(input: unknown) {
       const result = startCasting(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     continueCasting(input: unknown) {
       const result = continueCasting(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     cancelCasting(input: unknown) {
       const result = cancelCasting(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     dragonBreathOptions: () => getCurrentDragonBreathOptions(state),
     useDragonBreath(input: unknown, roller: DiceRoller) {
       const result = useDragonBreath(state, input, roller);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     rowMoveOptions: () => getCurrentRowMoveOptions(state),
     moveRow(input: unknown) {
       const result = moveCombatRow(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     combatItemOptions: () => getCurrentCombatItemOptions(state),
     useCombatItem(input: unknown) {
       const result = useCombatItemTransition(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     defend(input: unknown) {
       const result = defendCombatTurn(state, input);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
     run(input: unknown, roller: DiceRoller) {
       const result = runFromCombat(state, input, roller);
-      if (result.ok) state = result.state;
+      if (result.ok) state = committed(result.state);
       return result;
     },
   };

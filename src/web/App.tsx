@@ -98,7 +98,7 @@ export function App() {
               <Button loading={!stateError} loadingLabel="正在讀取……" disabled={!stateError} onClick={retryAll}>重新嘗試</Button>
               <DataHealthPanel />
               <RawDataBackupPanel />
-              <RepairPreviewPanel />
+              <RepairPreviewPanel onApplied={retryAuthoritativeState} />
             </Panel>
           </div>
         </main>

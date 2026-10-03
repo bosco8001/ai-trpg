@@ -18,6 +18,7 @@ import { backupMaxBytes } from "./raw-data-backup.js";
 import { createPostgresBackupReader } from "./postgres-raw-data-backup.js";
 import { createPostgresRepairReader } from "./repair-preview-reader.js";
 import { createRepairArchivePool, PostgresRepairArchive } from "./postgres-repair-archive.js";
+import { PostgresRepairApplication } from "./postgres-repair-application.js";
 import { repairArchiveLimit } from "./repair-archive.js";
 import { REPAIR_ARCHIVE_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES } from "../shared/repair-preparation.js";
 import {
@@ -82,6 +83,10 @@ const repairPreviewPool = storage === "postgres" ? createPostgresDiagnosticsPool
 const repairArchivePool = storage === "postgres" ? createRepairArchivePool(process.env.DATABASE_URL!) : undefined;
 const repairBackupMaxBytes = repairArchiveLimit(process.env.REPAIR_BACKUP_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES);
 const repairArchiveMaxBytes = repairArchiveLimit(process.env.REPAIR_ARCHIVE_MAX_BYTES, REPAIR_ARCHIVE_MAX_BYTES);
+const repairReader = repairPreviewPool ? createPostgresRepairReader(repairPreviewPool, createTestGameState().character.id,
+  () => logPgConnectionError("repair-preview", "borrowed")) : undefined;
+const repairArchive = repairArchivePool ? new PostgresRepairArchive(repairArchivePool, repairBackupMaxBytes, repairArchiveMaxBytes,
+  () => logPgConnectionError("repair-archive", "borrowed")) : undefined;
 
 let pgOperationLogger: Pick<FastifyBaseLogger, "error"> | undefined;
 function logPgConnectionError(operation: "main" | "diagnostics" | "raw-backup" | "repair-preview" | "repair-archive", state: "borrowed" | "idle") {
@@ -109,9 +114,9 @@ const app = await buildApp({
   backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id,
     () => logPgConnectionError("raw-backup", "borrowed")) : undefined,
   backupMaxBytes: rawBackupMaxBytes,
-  repairPreviewReader: repairPreviewPool ? createPostgresRepairReader(repairPreviewPool, createTestGameState().character.id,
-    () => logPgConnectionError("repair-preview", "borrowed")) : undefined,
-  repairArchive: repairArchivePool ? new PostgresRepairArchive(repairArchivePool, repairBackupMaxBytes, repairArchiveMaxBytes,
+  repairPreviewReader: repairReader,
+  repairArchive,
+  repairApplicationBackend: repairReader && repairArchive ? new PostgresRepairApplication(repairReader, repairArchive,
     () => logPgConnectionError("repair-archive", "borrowed")) : undefined,
   repairBackupDirectory: process.env.REPAIR_BACKUP_DIRECTORY,
   repairBackupMaxBytes,

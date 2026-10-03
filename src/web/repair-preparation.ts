@@ -5,7 +5,7 @@ import { PREPARATION_MESSAGES, REPAIR_BACKUP_MAX_BYTES, isPreparationPage, isPre
 export class PreparationClientFailure extends Error {
   constructor(message: string, readonly code = "unavailable") { super(message); }
 }
-async function receive(response: Response, signal: AbortSignal, limit: number): Promise<string> {
+export async function receive(response: Response, signal: AbortSignal, limit: number): Promise<string> {
   const length = response.headers.get("Content-Length");
   if (!response.body || !response.headers.get("Content-Type")?.startsWith("application/json") || !length
     || !/^[1-9]\d*$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > limit) {

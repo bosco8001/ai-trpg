@@ -30,6 +30,11 @@ import { registerRepairPreviewRoute } from "./repair-preview.js";
 import { createRepairPreparationService, registerRepairPreparationRoutes } from "./repair-preparation.js";
 import { FileRepairArchive } from "./file-repair-archive.js";
 import { PreparationFailure, type RepairArchive } from "./repair-archive.js";
+import { randomUUID } from "node:crypto";
+import type { RepairApplicationBackend } from "./repair-application-backend.js";
+import { MemoryRepairApplication } from "./memory-repair-application.js";
+import { registerRepairApplicationRoutes } from "./repair-application-routes.js";
+import { ApplicationFailure } from "./repair-application-core.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -43,6 +48,7 @@ export async function buildApp(options: {
   backupMaxBytes?: number;
   repairPreviewReader?: RepairPreviewReader;
   repairArchive?: RepairArchive;
+  repairApplicationBackend?: RepairApplicationBackend;
   repairBackupDirectory?: string;
   repairBackupMaxBytes?: number;
   repairArchiveMaxBytes?: number;
@@ -80,10 +86,15 @@ export async function buildApp(options: {
   );
 
   registerGameStateRoute(app, session, storage, combatSandboxEnabled);
+  const repairRuntimeId = randomUUID();
   const repairReader = options.repairPreviewReader ?? createMemoryRepairReader(createTestGameState().character.id, () => {
     if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
       throw new RawBackupFailure("unavailable");
     return { current: session.readStateForBackup(), slots: saveGameRepository.readAllForBackup() };
+  }, () => new Date(), source => {
+    const guard = source === "current" ? session.readRepairGuard?.()
+      : saveGameRepository instanceof InMemorySaveGameRepository ? saveGameRepository.readRepairGuard(source) : null;
+    return guard ? `${repairRuntimeId}:${guard}` : null;
   });
   registerRepairPreviewRoute(app, repairReader);
   const unavailableArchive: RepairArchive = {
@@ -94,7 +105,16 @@ export async function buildApp(options: {
   const archive = options.repairArchive ?? (storage === "memory"
     ? new FileRepairArchive(options.repairBackupDirectory ?? ".repair-backups", options.repairBackupMaxBytes, options.repairArchiveMaxBytes)
     : unavailableArchive);
-  registerRepairPreparationRoutes(app, createRepairPreparationService(repairReader, archive, options.repairBackupMaxBytes), options.repairBackupMaxBytes);
+  const unavailableApplication: RepairApplicationBackend = {
+    async bind() {}, async lookup() { throw new ApplicationFailure("unavailable"); },
+    async apply() { throw new ApplicationFailure("unavailable"); }, async download() { throw new ApplicationFailure("unavailable"); },
+  };
+  const applications = options.repairApplicationBackend ?? (storage === "memory" && archive instanceof FileRepairArchive
+    && saveGameRepository instanceof InMemorySaveGameRepository
+    ? new MemoryRepairApplication(repairReader, archive, session, saveGameRepository, repairRuntimeId) : unavailableApplication);
+  registerRepairPreparationRoutes(app, createRepairPreparationService(repairReader, archive, options.repairBackupMaxBytes,
+    repairRuntimeId, () => new Date(), (backup, source, signal) => applications.bind(backup, source, signal)), options.repairBackupMaxBytes);
+  registerRepairApplicationRoutes(app, applications);
   registerRawBackupRoute(app, options.backupReader ?? createMemoryBackupReader(createTestGameState().character.id, () => {
     if (storage !== "memory" || !session.readStateForBackup || !(saveGameRepository instanceof InMemorySaveGameRepository))
       throw new RawBackupFailure("unavailable");

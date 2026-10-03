@@ -236,7 +236,7 @@ test("前端完整校驗下載，內容變動拒絕；準備回應遺失不自�
   await assert.rejects(loadPreparationBackup(result, signal(), async () => response(text.replace("in-combat", "outside-combat"))));
   let calls = 0; await assert.rejects(prepareRepair(request, signal(), async () => { calls++; throw new Error("lost"); })); assert.equal(calls, 1);
   const html = renderToStaticMarkup(createElement(RepairPreparationSummaryView, { record: { ...result, sameRuntime: false }, stale: true }));
-  assert.match(html, /尚未套用/); assert.match(html, /舊 Memory/); assert.match(html, /原稿/); assert.doesNotMatch(html, /套用按鈕/);
+  assert.match(html, /修復前備份已保存/); assert.match(html, /備份時的修復候選/); assert.match(html, /舊 Memory/); assert.match(html, /原稿/); assert.doesNotMatch(html, /套用按鈕/);
 });
 
 const pgOptions = { skip: !process.env.TEST_DATABASE_URL && "需提供隔離 TEST_DATABASE_URL。" };

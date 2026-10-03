@@ -5,6 +5,7 @@ import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import { parseRepairBackup, repairIdValid, REPAIR_BACKUP_MAX_BYTES, REPAIR_ARCHIVE_MAX_BYTES, REPAIR_PAGE_SIZE, type RepairPreparationSummary } from "../shared/repair-preparation.js";
 import { PreparationFailure, backupSummary, reuseBackup, sha256, verifiedBackup, type RepairArchive } from "./repair-archive.js";
+import { REPAIR_REPORT_MAX_BYTES } from "../shared/repair-application.js";
 
 const absent = (e: unknown) => (e as NodeJS.ErrnoException)?.code === "ENOENT";
 async function syncDirectory(path: string) {
@@ -25,6 +26,77 @@ export class FileRepairArchive implements RepairArchive {
   readonly directory: string;
   constructor(directory: string, readonly maxBytes = REPAIR_BACKUP_MAX_BYTES, readonly capacityBytes = REPAIR_ARCHIVE_MAX_BYTES) {
     this.directory = resolve(directory);
+  }
+  /** Shared quota/publication lock for backup, certificate, start and report files. */
+  async withWriteLock<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+    signal.throwIfAborted();
+    const first = await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    if (!await this.directoryExists()) throw new PreparationFailure("unavailable");
+    if (first) {
+      let path = this.directory;
+      while (true) { await syncDirectory(path); if (path === dirname(first)) break; path = dirname(path); }
+    }
+    const unlock = await this.lock(signal);
+    try { return await work(); } finally { await unlock(); }
+  }
+  async usedBytes(): Promise<bigint> {
+    let used = 0n;
+    for (const name of await readdir(this.directory)) {
+      if (name === ".write-lock") continue;
+      const stat = await lstat(join(this.directory, name));
+      if (!stat.isFile() || stat.isSymbolicLink()) throw new PreparationFailure("unavailable");
+      used += BigInt(stat.size);
+      if (/^[a-f0-9-]{36}\.started$/.test(name)) {
+        const report = await lstat(join(this.directory, name.replace(/\.started$/, ".report"))).catch(error => {
+          if (absent(error)) return null; throw error;
+        });
+        if (report && (!report.isFile() || report.isSymbolicLink())) throw new PreparationFailure("unavailable");
+        used += BigInt(Math.max(0, REPAIR_REPORT_MAX_BYTES - (report?.size ?? 0)));
+      }
+    }
+    return used;
+  }
+  private auxiliaryName(id: string, kind: "guard" | "started" | "report") {
+    if (!repairIdValid(id)) throw new PreparationFailure("invalid-request");
+    return join(this.directory, `${id}.${kind}`);
+  }
+  async readAuxiliary(id: string, kind: "guard" | "started" | "report", signal: AbortSignal): Promise<string | null> {
+    signal.throwIfAborted();
+    if (!await this.directoryExists()) return null;
+    const handle = await open(this.auxiliaryName(id, kind), constants.O_RDONLY | constants.O_NOFOLLOW).catch(error => {
+      if (absent(error)) return null; throw error;
+    });
+    if (!handle) return null;
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size < 1 || stat.size > REPAIR_REPORT_MAX_BYTES) throw new PreparationFailure("unavailable");
+      const bytes = Buffer.alloc(stat.size + 1);
+      let size = 0;
+      while (size < bytes.length) {
+        signal.throwIfAborted();
+        const chunk = await handle.read(bytes, size, bytes.length - size, size);
+        if (!chunk.bytesRead) break;
+        size += chunk.bytesRead;
+      }
+      if (size !== stat.size) throw new PreparationFailure("unavailable");
+      await syncDirectory(this.directory);
+      signal.throwIfAborted();
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, size));
+    } finally { await handle.close(); }
+  }
+  /** Caller must hold withWriteLock and arrange quota before publication. */
+  async publishAuxiliary(id: string, kind: "guard" | "started" | "report", text: string, signal: AbortSignal) {
+    if (Buffer.byteLength(text) > REPAIR_REPORT_MAX_BYTES) throw new PreparationFailure("too-large");
+    const destination = this.auxiliaryName(id, kind), temporary = join(this.directory, `${id}-${randomUUID()}.tmp`);
+    try {
+      const file = await open(temporary, "wx", 0o600);
+      try { await file.writeFile(text, "utf8"); await file.sync(); } finally { await file.close(); }
+      signal.throwIfAborted();
+      await link(temporary, destination);
+      await syncDirectory(this.directory);
+      await unlink(temporary); await syncDirectory(this.directory);
+      if (await this.readAuxiliary(id, kind, signal) !== text) throw new PreparationFailure("unavailable");
+    } finally { await unlink(temporary).catch(() => {}); }
   }
   private async directoryExists(): Promise<boolean> {
     try {
@@ -171,13 +243,7 @@ export class FileRepairArchive implements RepairArchive {
       const old = await this.get(data.repairId, characterId, signal);
       if (old !== null) return reuseBackup(old, text, characterId);
       if (await this.readFile(data.repairId, signal) !== null) throw new PreparationFailure("conflict");
-      let used = 0n;
-      for (const name of await readdir(this.directory)) {
-        if (name === ".write-lock") continue;
-        const stat = await lstat(join(this.directory, name));
-        if (!stat.isFile() || stat.isSymbolicLink()) throw new PreparationFailure("unavailable");
-        used += BigInt(stat.size);
-      }
+      const used = await this.usedBytes();
       // Reserve bounded lock metadata as well as the entire new envelope; no automatic cleanup.
       if (used + BigInt(Buffer.byteLength(text)) + 4096n > BigInt(this.capacityBytes)) throw new PreparationFailure("capacity");
       signal.throwIfAborted();

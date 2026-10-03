@@ -5,6 +5,9 @@ import { repairIdValid, type RepairPreparationPage, type RepairPreparationSummar
 import { listPreparations, loadPreparationBackup, lookupPreparation, prepareRepair, PreparationClientFailure } from "./repair-preparation.js";
 import { downloadRawBackup } from "./raw-data-backup.js";
 import { Button } from "./ui/Button.js";
+import type { RepairApplication } from "../shared/repair-application.js";
+import { lookupApplication } from "./repair-application.js";
+import { RepairApplicationPanel } from "./RepairApplicationPanel.js";
 
 const pendingKey = "ai-trpg.repair-preparation-id";
 const knownKey = "ai-trpg.repair-preparation-ids";
@@ -29,21 +32,23 @@ const valueName = (value: number | string) => value === "in-combat" ? "戰鬥中
 
 export function RepairPreparationSummaryView({ record, stale = false }: { record: RepairPreparationSummary; stale?: boolean }) {
   return <>
-    <h4>{sourceName(record.source)}：備份就緒，尚未套用</h4>
+    <h4>{sourceName(record.source)}：修復前備份已保存</h4>
     <p>修復識別碼：<code>{record.repairId}</code></p>
     <p>擷取時間：{new Date(record.capturedAt).toLocaleString("zh-Hant", { hour12: false })}；備份只代表這個時刻。</p>
-    {record.changes.map(change => <p key={change.path}><code>{change.path}</code>：{valueName(change.before)} → {valueName(change.after)}（建議，尚未套用）。</p>)}
-    {stale ? <p>來源已有變動或候選已過期；備份仍保留，未來套用必須重新核對。</p> : null}
-    {!record.sameRuntime ? <p>這是舊 Memory 程序的備份，只供查詢與下載；未來須重新預覽及準備。</p> : null}
+    {record.changes.map(change => <p key={change.path}><code>{change.path}</code>：{valueName(change.before)} → {valueName(change.after)}（備份時的修復候選）。</p>)}
+    {stale ? <p>來源已有變動或候選已過期；備份仍保留，新套用須重新預覽及準備。</p> : null}
+    {!record.sameRuntime ? <p>這是舊 Memory 程序的備份，可查詢歷史結果與下載；新套用須重新預覽及準備。</p> : null}
+    <p>備份 SHA-256：<code>{record.backupChecksum}</code>。</p>
     <p>完整備份：{record.backupBytes.toLocaleString("zh-Hant")} bytes。原稿包含已保存故事，請妥善保管下載檔案。</p>
   </>;
 }
-export function RepairPreparationPanel({ report, stale }: { report: RepairPreviewReport | null; stale: readonly RepairSource[] }) {
+export function RepairPreparationPanel({ report, stale, onApplied }: { report: RepairPreviewReport | null; stale: readonly RepairSource[]; onApplied?: () => Promise<unknown> }) {
   const id = useId(), live = useRef(true), request = useRef<AbortController | null>(null);
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [feedback, setFeedback] = useState(""), [error, setError] = useState("");
   const [repairId, setRepairId] = useState(rememberedId), [uncertain, setUncertain] = useState(rememberedUncertain);
   const [knownIds, setKnownIds] = useState(rememberedIds);
   const [record, setRecord] = useState<RepairPreparationSummary | null>(null), [page, setPage] = useState<RepairPreparationPage | null>(null);
+  const [application, setApplication] = useState<RepairApplication | null>(null);
   useEffect(() => { live.current = true; return () => { live.current = false; request.current?.abort(); request.current = null; }; }, []);
   function cancel() {
     request.current?.abort(); request.current = null; setBusy(false); setError("");
@@ -70,22 +75,30 @@ export function RepairPreparationPanel({ report, stale }: { report: RepairPrevie
   }
   function prepare(result: RepairResult) {
     if (request.current || uncertain || !report || stale.includes(result.source) || result.status !== "candidate" || !result.fingerprint || !result.candidateFingerprint) return;
-    const newId = crypto.randomUUID(); rememberId(newId); setRepairId(newId); setUncertain(true); setRecord(null);
+    const newId = crypto.randomUUID(); rememberId(newId); setRepairId(newId); setUncertain(true); setRecord(null); setApplication(null);
     setKnownIds(old => {
       const ids = old.includes(newId) ? old : [newId, ...old];
       try { window.localStorage.setItem(knownKey, JSON.stringify(ids)); } catch { /* Keep visible IDs in this page. */ }
       return ids;
     });
-    void run("正在保存並驗證完整原稿，你可以繼續遊戲……", signal => prepareRepair({ repairId: newId, source: result.source,
-      storage: report.storage, previewVersion: 1, rulesVersion: 1, fingerprint: result.fingerprint!, candidateFingerprint: result.candidateFingerprint! }, signal), next => {
-      setRecord(next); setUncertain(false); confirmId(newId); setFeedback("備份就緒，尚未套用。遊戲資料沒有被修復或改寫。");
+    void run("正在保存並驗證完整原稿，你可以繼續遊戲……", async signal => {
+      const prepared = await prepareRepair({ repairId: newId, source: result.source,
+        storage: report.storage, previewVersion: 1, rulesVersion: 1, fingerprint: result.fingerprint!, candidateFingerprint: result.candidateFingerprint! }, signal);
+      const result = await lookupApplication(newId, signal).catch(() => null);
+      return { prepared, result };
+    }, next => {
+      setRecord(next.prepared); setApplication(next.result); setUncertain(false); confirmId(newId); setFeedback("完整備份已保存。請核對差異，再於原頁面確認套用。");
     });
   }
   function lookup() {
     if (request.current || !repairIdValid(repairId)) return;
     const selectedId = repairId; rememberId(selectedId);
-    void run("正在查詢本次備份紀錄……", signal => lookupPreparation(selectedId, signal), next => {
-      setRecord(next); setUncertain(false); confirmId(selectedId); setFeedback("已確認備份就緒，尚未套用。");
+    void run("正在查詢本次備份與套用紀錄……", async signal => {
+      const prepared = await lookupPreparation(selectedId, signal);
+      const result = await lookupApplication(selectedId, signal).catch(() => null);
+      return { prepared, result };
+    }, next => {
+      setRecord(next.prepared); setApplication(next.result); setUncertain(false); confirmId(selectedId); setFeedback("已讀取備份；套用狀態請看下方結果。");
     });
   }
   function list(cursor: string | null) {
@@ -95,7 +108,7 @@ export function RepairPreparationPanel({ report, stale }: { report: RepairPrevie
   }
   function download(selected: RepairPreparationSummary) {
     void run("正在讀取並校驗完整備份……", signal => loadPreparationBackup(selected, signal), next => {
-      downloadRawBackup(next.text, next.filename); setFeedback("已發起下載，請確認下載檔案。尚未套用任何修復。");
+      downloadRawBackup(next.text, next.filename); setFeedback("已發起原稿下載，請確認下載檔案。");
     });
   }
   function isStale(selected: RepairPreparationSummary) {
@@ -108,7 +121,7 @@ export function RepairPreparationPanel({ report, stale }: { report: RepairPrevie
     }}>{open ? "收起修復前備份與紀錄" : "修復前備份與紀錄"}</Button>
     {open ? <div id={id} className="data-health__report" aria-busy={busy}>
       <h3>修復前備份與紀錄</h3>
-      <p>先從有效候選保存一份完整原稿。備份全部保留；本階段只有查詢與下載，尚未開放套用。</p>
+      <p>先從有效候選保存完整原稿，再核對單一來源並二次確認。備份與已確認的結果保留，可依識別碼查詢及下載。</p>
       <p role="status" aria-live="polite" aria-atomic="true">{feedback}</p>
       {error ? <p role="alert">{error}</p> : null}
       {report?.results.filter(r => r.status === "candidate").map(result => <div key={result.source} className="repair-preparation__candidate">
@@ -120,12 +133,12 @@ export function RepairPreparationPanel({ report, stale }: { report: RepairPrevie
       {knownIds.length ? <details><summary>本瀏覽器記錄的修復識別碼</summary>
         <p>只保存識別碼；完整備份由伺服器保留。瀏覽器停用儲存時，請自行記下識別碼。</p>
         <ul>{knownIds.map(known => <li key={known}><Button variant="secondary" aria-disabled={busy} onClick={() => {
-          if (request.current) return; setRepairId(known); setRecord(null);
+          if (request.current) return; setRepairId(known); setRecord(null); setApplication(null);
         }}>選取 {known}</Button></li>)}</ul>
       </details> : null}
       <label htmlFor={`${id}-lookup`}>修復識別碼</label>
       <input id={`${id}-lookup`} className="repair-preparation__id" value={repairId} readOnly={busy} maxLength={36} autoComplete="off" spellCheck={false}
-        onChange={event => { setRepairId(event.target.value); setRecord(null); }} />
+        onChange={event => { setRepairId(event.target.value); setRecord(null); setApplication(null); }} />
       <div className="raw-backup__controls">
         <Button variant="secondary" aria-disabled={busy || !repairIdValid(repairId)} onClick={lookup}>查詢這次結果</Button>
         <Button variant="secondary" aria-disabled={busy} onClick={() => { if (!request.current) list(null); }}>讀取備份紀錄</Button>
@@ -136,11 +149,13 @@ export function RepairPreparationPanel({ report, stale }: { report: RepairPrevie
         }}>保留識別碼，結束本次等待</Button> : null}
       </div>
       {record ? <article className="data-health__item"><RepairPreparationSummaryView record={record} stale={isStale(record)} />
-        <Button variant="secondary" aria-disabled={busy} onClick={() => download(record)}>下載這份完整備份</Button></article> : null}
+        <Button variant="secondary" aria-disabled={busy} onClick={() => download(record)}>下載這份完整備份</Button>
+        <RepairApplicationPanel key={record.repairId} record={record} initial={application} stale={isStale(record)} onApplied={onApplied} /></article> : null}
       {page ? <>
         <ul className="data-health__results">{page.records.map(item => <li key={item.repairId} className="data-health__item">
           <RepairPreparationSummaryView record={item} stale={isStale(item)} />
           <Button variant="secondary" aria-disabled={busy} onClick={() => download(item)}>下載這份完整備份</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => { setRepairId(item.repairId); setRecord(item); setApplication(null); }}>選取這份套用紀錄</Button>
         </li>)}</ul>
         {page.nextCursor ? <Button variant="secondary" aria-disabled={busy} onClick={() => { if (!request.current) list(page.nextCursor); }}>下一頁備份紀錄</Button> : null}
       </> : null}

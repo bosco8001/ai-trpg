@@ -9,7 +9,8 @@ import { RawBackupFailure, boundedJson } from "./raw-data-backup.js";
 import { PreparationFailure, backupSummary, makeRepairBackup, preparationBinding, verifiedBackup, type RepairArchive } from "./repair-archive.js";
 
 export function createRepairPreparationService(reader: RepairPreviewReader, archive: RepairArchive,
-  maxBytes = REPAIR_BACKUP_MAX_BYTES, runtimeId = randomUUID(), now: () => Date = () => new Date()) {
+  maxBytes = REPAIR_BACKUP_MAX_BYTES, runtimeId = randomUUID(), now: () => Date = () => new Date(),
+  onPrepared?: (backup: string, source: import("./repair-preview-reader.js").RepairRawRecord, signal: AbortSignal) => Promise<void>) {
   const characterId = reader.characterId;
   return {
     async prepare(request: RepairPreparationRequest, signal: AbortSignal) {
@@ -20,7 +21,8 @@ export function createRepairPreparationService(reader: RepairPreviewReader, arch
         if (preparationBinding(data, characterId) !== preparationBinding(request, characterId)) throw new PreparationFailure("conflict");
         return backupSummary(old, characterId, runtimeId);
       }
-      const record = await reader.read(request.source, REPAIR_MAX_SOURCE_BYTES, signal);
+      const record = reader.readGuarded ? await reader.readGuarded(request.source, REPAIR_MAX_SOURCE_BYTES, signal)
+        : await reader.read(request.source, REPAIR_MAX_SOURCE_BYTES, signal);
       signal.throwIfAborted();
       if (record.raw !== null && Buffer.byteLength(record.raw) > REPAIR_MAX_SOURCE_BYTES) throw new PreparationFailure("too-large");
       const result = analyzeRepairRecord(reader, request.source, record);
@@ -38,6 +40,10 @@ export function createRepairPreparationService(reader: RepairPreviewReader, arch
         changes: result.changes, raw: record.raw }, maxBytes);
       signal.throwIfAborted();
       const saved = await archive.put(text, characterId, signal);
+      signal.throwIfAborted();
+      // A concurrent publisher may have won this ID with an earlier capture.
+      // Never attach a later guard to that earlier immutable backup (including ABA).
+      if (saved === text) await onPrepared?.(saved, record, signal);
       signal.throwIfAborted();
       return backupSummary(saved, characterId, runtimeId);
     },

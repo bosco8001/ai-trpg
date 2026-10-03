@@ -3,6 +3,15 @@ import { REPAIR_ARCHIVE_MAX_BYTES, REPAIR_BACKUP_MAX_BYTES, REPAIR_PAGE_SIZE, ty
 import { PreparationFailure, backupSummary, reuseBackup, verifiedBackup, type RepairArchive } from "./repair-archive.js";
 import { withPgClient, type PgClientErrorReporter } from "./pg-client-operation.js";
 
+export async function repairArchiveUsedBytes(client: PoolClient): Promise<bigint> {
+  const used = await client.query<{ used: string }>(`SELECT (
+    (SELECT COALESCE(sum(octet_length(backup_text) + octet_length(character_id) + 16),0) FROM repair_preparations)
+    + (SELECT COALESCE(sum(octet_length(certificate_text) + octet_length(character_id) + 16
+      + COALESCE(octet_length(owner_token::text),0) + COALESCE(octet_length(started_at),0)
+      + COALESCE(octet_length(report_text),0) + reserved_bytes),0) FROM repair_applications))::text AS used`);
+  return BigInt(used.rows[0]!.used);
+}
+
 export function createRepairArchivePool(connectionString: string): Pool {
   const url = new URL(connectionString);
   const options = url.searchParams.get("options") || process.env.PGOPTIONS || "";
@@ -59,8 +68,8 @@ export class PostgresRepairArchive implements RepairArchive {
       signal.throwIfAborted();
       const old = await this.read(client, data.repairId, characterId);
       if (old !== null) { const reused = reuseBackup(old, text, characterId); await client.query("COMMIT"); return reused; }
-      const used = await client.query<{ used: string }>("SELECT COALESCE(sum(octet_length(backup_text) + octet_length(character_id) + 16),0)::text AS used FROM repair_preparations");
-      if (BigInt(used.rows[0]!.used) + BigInt(Buffer.byteLength(text) + Buffer.byteLength(characterId) + 16) > BigInt(this.capacityBytes)) throw new PreparationFailure("capacity");
+      const used = await repairArchiveUsedBytes(client);
+      if (used + BigInt(Buffer.byteLength(text) + Buffer.byteLength(characterId) + 16) > BigInt(this.capacityBytes)) throw new PreparationFailure("capacity");
       signal.throwIfAborted();
       try { await client.query("INSERT INTO repair_preparations (repair_id,character_id,backup_text) VALUES ($1,$2,$3)", [data.repairId, characterId, text]); }
       catch (error) { if ((error as { code?: string }).code === "23505") throw new PreparationFailure("conflict"); throw error; }
