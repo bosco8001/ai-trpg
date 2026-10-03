@@ -371,17 +371,17 @@ CSS 字體模擬：430px／150%／200%、375px／200%、1280px／100%／150%／2
 - 原始 Error、stack、SQL、路徑、故事、連線參數、連線字串及秘密均不傳入這些 handler 的 logger。原始備份、候選預覽、修復備份三個 pool 的 borrowed／idle 接線保留，只有共用固定訊息調整。
 - 既有事件註冊位置、關閉 hook 與連線生命週期保留；不改 SQL、連線設定、查詢、交易或借出 client helper。不新增日誌框架或全域 uncaught handler。
 
-**原交付時為實作完成、待 Grok Bot 驗證；其後 `e2d4620` 的外部工程驗證通過，詳見下節，Phase 31 仍未由使用者接受。** 開發代理只讀取程式及 Git 資訊，沒有執行 build、typecheck、格式檢查、測試、DB 或瀏覽器驗證；本次沒有新增測試。`1be416e7b15e4459081f26fbe617b76e1bd84db6` 的 I3 七項仍只引用既有外部結果；`tests/pg-client-operation.test.ts` 十三項則已由 Grok 在 `e2d4620` 重跑通過，不是開發代理執行。
+**原交付時為實作完成、待 Grok Bot 驗證；其後 `e2d4620` 的外部工程驗證通過，詳見下節，Phase 31 當時仍未由使用者接受；後續整體通過見驗收紀錄。** 開發代理只讀取程式及 Git 資訊，沒有執行 build、typecheck、格式檢查、測試、DB 或瀏覽器驗證；本次沒有新增測試。`1be416e7b15e4459081f26fbe617b76e1bd84db6` 的 I3 七項仍只引用既有外部結果；`tests/pg-client-operation.test.ts` 十三項則已由 Grok 在 `e2d4620` 重跑通過，不是開發代理執行。
 
 原交付要求 Grok 聚焦真實 `index.ts` 的主／diagnostics 閒置斷線：每次事件各一條 level 50，operation／idle 正確，訊息固定且沒有原始錯誤及敏感資料，程序存活，斷線後各 pool 可借新連線；並確認既有三個 pool 的安全日誌接線沒有退化。只用新隔離 PG 及隔離角色／DB、必要的 TCP proxy，保護既有 5432，不使用真實秘密。先確認連線已歸還且仍在 idle 期限內，再只中斷指定連線；分清 PG ErrorResponse 與沒有 ErrorResponse 的 TCP 中斷，不用手動 emit 取代真實斷線。實際結果見下節。
 
 不重跑已由使用者接受的探索 UI、不重做 migration 或 Memory 鎖全套。SQL／業務拒絕丟棄健康連線的 Info、favicon Info、存檔後與重試後焦點待查觀察、舊六個無法歸因 503，以及真機／讀屏／正式遊玩限制仍保留。先前是否包含密碼仍未驗證，不能宣稱已證實洩漏密碼。
 
-本次補修停在 Phase 31；外部工程結果已回報，仍等使用者接受，不開始 R03 原子套用。
+本次補修當時停在 Phase 31；外部工程結果已回報，當時仍等使用者接受；其後已整體通過，仍未開始 R03 原子套用。
 
 ## `e2d4620` 安全日誌外部工程審查通過（2026-10-03）
 
-使用者轉交 Grok 的審查：TARGET `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb`、BASE `6df0c60029d3b67520024534bc4e98845bea71d7`。外部確認遠端分支 HEAD 等於 TARGET、BASE 是祖先，只改 `src/server/index.ts` 與本文件；BASE 相對 `1be416e` 只有 CSS 與文件差異。Grok 原報告將 index.ts 計為加四行、刪八行；開發代理本次親自讀取 `git show --stat`，實際為加四行、刪六行，文件依 Git 紀錄更正。**以下故障與測試結果全是外部回報，開發代理沒有重跑。外部未發現本次 diff 引入新缺陷；工程通過不代替使用者驗收，Phase 31 未結案。**
+使用者轉交 Grok 的審查：TARGET `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb`、BASE `6df0c60029d3b67520024534bc4e98845bea71d7`。外部確認遠端分支 HEAD 等於 TARGET、BASE 是祖先，只改 `src/server/index.ts` 與本文件；BASE 相對 `1be416e` 只有 CSS 與文件差異。index.ts 為加四行、刪八行，Grok 原報告正確；開發代理先前誤讀 `git show --stat` 圖示而改成刪六行，現依完整 BASE／TARGET 的 `git diff --numstat` 還原。本文件為加二十七行、刪兩行，兩檔合計加三十一行、刪十行。**以下故障與測試結果全是外部回報，開發代理沒有重跑。外部未發現本次 diff 引入新缺陷；工程通過不代替使用者驗收，Phase 31 當時未結案；其後已由使用者整體接受。**
 
 ### 環境、命令與故障結果
 
@@ -407,7 +407,7 @@ BASE 的同四個案例各一條 level 50 舊 `{err}` 日誌，沒有 event／op
 raw-backup、repair-preview、repair-archive 各測一次 idle `pg_terminate_backend` 與一次 borrowed TCP 斷線。每次各一條，operation／state 正確、固定新 msg；raw-backup 與 repair-archive 回 503，repair-preview 整份 200、只有 current unavailable。之後均能用新連線成功操作。BASE 回應相同、只有 msg 用舊字眼，外部判定沒有退化。`1be416e` 的 I3 七項仍只引用，不能將本次抽查擴大為重跑全部舊案例。
 
 1. **文件提交狀態字眼，Info：本次文件更正，開發代理已依使用者本次指示親自核對。** 將「完整 SHA 待提交後填入」及「尚未提交的探索 UI 驗收紀錄」改為已隨 `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb` 保存；只改本文件。
-2. **進行中 query 收到 FATAL ErrorResponse 沒有斷線日誌，Info：待查、未修。** 外部鎖住 save_slots，呼叫 `GET /api/raw-data-backup`，終止等待鎖的 backend；TARGET 與 BASE 都安全回 503，但沒有斷線日誌。外部指出這項觀察自 `1be416e` 已存在、不屬本次 diff。推斷為 pg 將錯誤交給進行中的 query，未觸發 client error event，而 helper 依此 event 記錄；**尚未逐行核對 pg 原始碼，不能將推斷寫成已證實原因**。位置為 TARGET 的 `src/server/pg-client-operation.ts` 第 25–34 行。本次不修改 helper，也不宣稱所有 PG 斷線都有日誌。
+2. **進行中 query 收到 FATAL ErrorResponse 沒有斷線日誌，Info：待查、未修。** 外部鎖住 save_slots，呼叫 `GET /api/raw-data-backup`，終止等待鎖的 backend；TARGET `e2d4620` 與 BASE `6df0c60` 都安全回 503，但沒有斷線日誌。外部只在這兩個版本實測；因 helper 自 `1be416e` 起未改而推斷該版本可能已有相同現象，**未在 `1be416e` 實測，不能寫成該版本已證實存在**。在 BASE 亦實測到此現象，因此不是本次 diff 新增。另一項原因推斷為 pg 將錯誤交給進行中的 query，未觸發 client error event，而 helper 依此 event 記錄；**尚未逐行核對 pg 原始碼，不能將推斷寫成已證實原因**。位置為 TARGET 的 `src/server/pg-client-operation.ts` 第 25–34 行。本次不修改 helper，也不宣稱所有 PG 斷線都有日誌。
 
 ### 引用、未測與證據清理
 
@@ -415,11 +415,11 @@ raw-backup、repair-preview、repair-archive 各測一次 idle `pg_terminate_bac
 
 外部證據在 `/workspace/p31i-evidence/`（248K）：`logs/TARGET-driver.log`、`logs/BASE-driver.log`；遮去 marker 的 `logs/TARGET-error-records-by-case.jsonl`、`logs/BASE-error-records-by-case.jsonl`；`logs/TARGET-server.*.log`；`json/TARGET-run.json`、`json/BASE-run.json`、`json/*-graceful.json`；`logs/*-proxy.log` 及 `scripts/`。`logs/BASE-server.stdout.log` 未遮、含合成 marker 及原始 err，外部回報沒有密碼，不能當作已去敏日誌。開發代理未存取這些外部路徑。
 
-外部回報 server／proxy 已停、兩個 DB／角色已 drop、叢集已停、`/workspace/p31i` 已刪除，5432 沒有碰過，clone 乾淨、舊證據未改。本輪證據目錄保留且不含合成密碼。Phase 31 仍待使用者明確接受，不開始 R03 原子套用。
+外部回報 server／proxy 已停、兩個 DB／角色已 drop、叢集已停、`/workspace/p31i` 已刪除，5432 沒有碰過，clone 乾淨、舊證據未改。本輪證據目錄保留且不含合成密碼。Phase 31 當時仍待使用者明確接受；其後已通過，沒有開始 R03 原子套用。
 
 ### 本次文件由開發代理親自核對（2026-10-03）
 
-使用者明確指示「這次你commit和親自驗收」，本次文件更新改由開發代理核對及提交，不將這次指示延伸成後續測試政策的永久變更。開發代理對照使用者轉交的 Grok 報告、`e2d4620` 已提交文件、index.ts 日誌接線及 Git 版本／差異，確認結果來源、版本、已測／引用／未測與待查事項；更正上述行數及兩處提交狀態字眼。文件差異檢查 `git diff --check` exit 0，本次文件核對通過。沒有重新執行 build、十三項測試或真實 PG 故障，也沒有存取外部證據目錄；這些仍維持 Grok 外部結果。只提交本文件，Phase 31 整體是否接受仍由使用者決定。
+使用者當時明確指示「這次你commit和親自驗收」，該次文件更新改由開發代理核對及提交，不將這次指示延伸成後續測試政策的永久變更。開發代理對照使用者轉交的 Grok 報告、`e2d4620` 已提交文件、index.ts 日誌接線及 Git 版本／差異，核對結果來源、版本、已測／引用／未測與待查事項，並更正兩處提交狀態字眼；但誤讀行數造成錯誤更正，後續修正見 2026-10-04 紀錄。當時 `git diff --check` exit 0 並記為文件核對通過；差異格式通過不能代替內容準確性。沒有重新執行 build、十三項測試或真實 PG 故障，也沒有存取外部證據目錄；這些仍維持 Grok 外部結果。該次只提交本文件，Phase 31 整體當時仍由使用者決定是否接受；其後已明確通過。
 
 ## Phase 31 使用者驗收通過（2026-10-03）
 
@@ -432,3 +432,13 @@ raw-backup、repair-preview、repair-archive 各測一次 idle `pg_terminate_bac
 FATAL ErrorResponse 日誌 Info（原因仍為推斷）、SQL／業務拒絕丟棄健康連線的 Info、favicon、兩項焦點待查觀察、舊六個無法歸因 503 及歷史測試訊息 Info 均繼續追蹤。真手機、讀屏、正式遊玩與主 pool 借出中斷線的未測限制，以及密碼檢查只涵蓋本輪版本／設定的限制，不因階段通過而改標已驗證或已解決。
 
 下一個邏輯小項是討論 R03 第二階段的原子套用完整契約；競爭守衛、崩潰／重啟語義及持久結果報告仍待確認。Phase 31 通過不自動批准套用實作，沒有開始下一階段。
+
+## `17002e7` 外部文件核對與補正（2026-10-04）
+
+使用者轉交 Grok 的文件審查：TARGET `17002e75253a3c0b1de7cd78ee7ee0266049694e`、BASE `861285030dd8e9dabdff2e21649807073cbe450b`。外部確認遠端 HEAD 等於 TARGET、祖先關係、只有七份已列的文件變更，`git diff --check` exit 0；目前驗收狀態、來源與版本、未測限制及套用邊界的逐項核對全部通過。其餘六份文件未發現錯誤；本頁有一項 Low 與兩項 Info，已在本次文件補正：
+
+- Low：還原 index.ts 加四行、刪八行；開發代理讀取 `git diff --numstat 6df0c60029d3b67520024534bc4e98845bea71d7 e2d4620f8334cf649cf05612b8ebbf2d541c9aeb`，Git 資訊為本文件 27／2、index.ts 4／8，承認並移除先前錯誤更正。
+- Info A：FATAL 無日誌只在 `6df0c60`／`e2d4620` 實測；`1be416e` 僅由 helper 未改推斷，未實測，原因亦仍為推斷。
+- Info B：上述歷史未接受／未結案段落加上「當時」與後續已通過的指引，避免直接跳讀時誤認目前狀態。
+
+本輪 Grok 只核對文件，沒有跑 build 或測試、沒有改檔案、沒有重新裁定使用者驗收；外部回報 clone 乾淨、沒有建立工作目錄、舊證據未改。開發代理本次也只改本頁並讀取 Git 資訊，沒有執行新工程驗證。本次補正待 Grok 文件複查，不改 Phase 31 已由使用者於 2026-10-03 通過的結論，不處理 FATAL 日誌的程式缺口，不開始 R03 套用。
