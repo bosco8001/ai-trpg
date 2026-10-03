@@ -1,6 +1,6 @@
 # 已批准的 Implementation Phase Plan
 
-Phase 1–30 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過，Phase 30 於同日確認「R02通過」。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。R03 第一階段於 2026-10-02 批准為 Phase 31，持久備份與準備已交付，待 Grok Bot 驗證及使用者接受；原子套用尚未實作。
+Phase 1–31 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過，Phase 30 於同日確認「R02通過」，Phase 31 於 2026-10-03 回覆「Phase 31通過」。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。R03 第一階段於 2026-10-02 批准為 Phase 31，持久備份與準備已交付並接受；原子套用的完整契約仍待確認，尚未實作。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
 
@@ -37,11 +37,11 @@ Phase 1–30 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／
 | 28 | 唯讀目前狀態／三槽存檔健康檢查 |
 | 29 | 手動下載目前資料／三槽的完整原始備份（已由使用者手動驗收通過） |
 | 30 | 活動標記／MP 相容欄位的完整修復候選與唯讀預覽（已由使用者確認驗收通過） |
-| 31 | 持久修復前備份、準備識別碼、查詢與下載（待 Grok Bot 驗證及使用者接受） |
+| 31 | 持久修復前備份、準備識別碼、查詢與下載（已由使用者確認驗收通過） |
 
 每個階段開始前先解釋範圍與測試方式，依 [AGENTS 第 4 節](../../AGENTS.md#4-測試交由-grok-bot階段驗收由使用者決定) 將測試與工程驗證交給 Grok Bot，再由使用者確認階段是否接受才繼續。Phase 3 先以記憶體檢查 domain，Phase 4 才驗證重啟後仍能載入。Responsive 從 Phase 2 建立；persistence 從 Phase 4 貫穿後續功能。以下歷史工程紀錄保留其實際來源。
 
-2026-10-01 的後續盤點見 [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)，未定規則與承諾見 [OPEN_QUESTIONS](OPEN_QUESTIONS.md)。R01–R39 是工作索引，不是 phase 編號；R01 的唯讀診斷作為 Phase 28 已驗收，原始備份另拆為 Phase 29 並已驗收。R02 作為 Phase 30 已驗收；R03 第一階段作為 Phase 31 待驗證與接受，其餘小項未自動獲批准。
+2026-10-01 的後續盤點見 [Phase 27 之後的工作清單與建議順序](POST_PHASE_27_ROADMAP.md)，未定規則與承諾見 [OPEN_QUESTIONS](OPEN_QUESTIONS.md)。R01–R39 是工作索引，不是 phase 編號；R01 的唯讀診斷作為 Phase 28 已驗收，原始備份另拆為 Phase 29 並已驗收。R02 作為 Phase 30 已驗收；R03 第一階段作為 Phase 31 已驗收，其餘小項未自動獲批准。
 
 Canonical documents 與 `OPEN_QUESTIONS.md` 是設計來源。未定規則不自行定案，暫時測試資料與設定必須標記。這份工程計畫不新增正式世界觀或遊戲規則。
 
@@ -379,4 +379,6 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 實作新增版本化備份契約、兩種持久 archive、準備／查詢／列表／下載 API、新備份表 migration、正常及讀取失敗入口、待執行測試及隔離 helper。完整格式、故障語義及變更範圍見 [Phase 31 工程交付](PHASE_31_REPAIR_PREPARATION.md)。沒有 domain、一般 Save／Load 或 LLM 改動。
 
-**待 Grok Bot 工程驗證；開發代理沒有執行測試或驗證命令。Phase 31 待使用者接受。** 不沿用歷史測試數字作為本次結果，不開始 R03 原子套用階段。
+原交付時待 Grok Bot 工程驗證及使用者接受；後續外部報告、同階段修正與文件核對各自保留來源及版本，見 [Phase 31 工程交付](PHASE_31_REPAIR_PREPARATION.md)。不沿用歷史測試數字作為新執行結果。
+
+**Phase 31 已由使用者於 2026-10-03（Asia/Hong_Kong）明確回覆「Phase 31通過」。** 回報時本地 HEAD 為 `861285030dd8e9dabdff2e21649807073cbe450b`，包含 `e2d4620f8334cf649cf05612b8ebbf2d541c9aeb` 安全日誌補修與外部審查紀錄；使用者未另指定測試 SHA 或逐項環境，不補寫未提供的結果，不代表分支合併或推送。既有 Info、待查觀察與未測限制繼續保留。R03 第二階段須另行確認完整原子套用契約，尚未批准實作，沒有開始。
