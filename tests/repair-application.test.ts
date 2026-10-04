@@ -187,7 +187,12 @@ async function backupOnlyBytes(reader: RepairPreviewReader, request: RepairApply
 async function checkCapacityResponse(t: TestContext, reader: RepairPreviewReader, request: RepairApplyRequest,
   preparation: ReturnType<typeof createRepairPreparationService>, backend: MemoryRepairApplication | PostgresRepairApplication,
   saved: boolean) {
-  const before = await reader.read(request.source, sourceLimit, signal());
+  const capture = () => Promise.all((["current", 1, 2, 3] as const).map(async source => {
+    const record = reader.readGuarded ? await reader.readGuarded(source, sourceLimit, signal())
+      : await reader.read(source, sourceLimit, signal());
+    return { source, raw: record.raw, sourceGuard: record.sourceGuard };
+  }));
+  const before = await capture();
   const app = Fastify(); registerRepairPreparationRoutes(app, preparation); t.after(() => app.close());
   const response = await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) });
   assert.equal(response.statusCode, 507);
@@ -210,8 +215,9 @@ async function checkCapacityResponse(t: TestContext, reader: RepairPreviewReader
     assert.equal((await backend.lookup(request.repairId, signal())).status, "ineligible");
     assert.equal((await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) })).statusCode, 200);
     assert.equal((await backend.lookup(request.repairId, signal())).status, "ineligible");
+    assert.equal(await preparation.download(request.repairId, signal()), download.body);
   }
-  assert.equal((await reader.read(request.source, sourceLimit, signal())).raw, before.raw);
+  assert.deepEqual(await capture(), before);
 }
 test("Memory 真容量：備份前與資格階段 507 提示分開，同 ID 不補資格，新 ID 可準備", async t => {
   const f = await memoryFixture(t), now = new Date("2026-10-04T00:00:00.000Z"), request = await requestFor(f.reader);
@@ -221,8 +227,10 @@ test("Memory 真容量：備份前與資格階段 507 提示分開，同 ID 不�
   const backend = new MemoryRepairApplication(f.reader, archive, f.session, f.slots, f.runtimeId);
   const prepare = createRepairPreparationService(f.reader, archive, undefined, f.runtimeId, () => now, backend.bind.bind(backend));
   await checkCapacityResponse(t, f.reader, request, prepare, backend, true);
+  const backup = await prepare.download(request.repairId, signal());
   await f.prepare.prepare(preparationRequest(request), signal());
   assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
+  assert.equal(await f.prepare.download(request.repairId, signal()), backup);
   const fresh = await requestFor(f.reader); await f.prepare.prepare(preparationRequest(fresh), signal());
   assert.equal((await f.backend.lookup(fresh.repairId, signal())).status, "ready");
   assert.equal(f.session.getState().revision, 0);
@@ -269,12 +277,15 @@ test("PG 真容量：備份前與資格階段 507 提示分開，同 ID 不補�
   const f = await postgresFixture(t), now = new Date("2026-10-04T00:00:00.000Z"), request = await requestFor(f.reader);
   const full = new PostgresRepairArchive(f.writer, undefined, 1);
   await checkCapacityResponse(t, f.reader, request, createRepairPreparationService(f.reader, full), f.backend, false);
-  const capacity = await backupOnlyBytes(f.reader, request, "", now) + Buffer.byteLength(f.reader.characterId) + 16;
+  const runtimeId = randomUUID();
+  const capacity = await backupOnlyBytes(f.reader, request, runtimeId, now) + Buffer.byteLength(f.reader.characterId) + 16;
   const archive = new PostgresRepairArchive(f.writer, undefined, capacity), backend = new PostgresRepairApplication(f.reader, archive);
-  const prepare = createRepairPreparationService(f.reader, archive, undefined, "", () => now, backend.bind.bind(backend));
+  const prepare = createRepairPreparationService(f.reader, archive, undefined, runtimeId, () => now, backend.bind.bind(backend));
   await checkCapacityResponse(t, f.reader, request, prepare, backend, true);
+  const backup = await prepare.download(request.repairId, signal());
   await f.prepare.prepare(preparationRequest(request), signal());
   assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
+  assert.equal(await f.prepare.download(request.repairId, signal()), backup);
   const fresh = await requestFor(f.reader); await f.prepare.prepare(preparationRequest(fresh), signal());
   assert.equal((await f.backend.lookup(fresh.repairId, signal())).status, "ready");
   assert.equal(Number((await f.writer.query("SELECT revision FROM game_states WHERE character_id='TEST-character'")).rows[0].revision), 0);

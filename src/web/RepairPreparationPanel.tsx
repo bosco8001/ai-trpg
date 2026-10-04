@@ -129,7 +129,7 @@ export function RepairPreparationPanel({ report, stale, onApplied }: { report: R
         <Button variant="secondary" aria-disabled={busy || uncertain || stale.includes(result.source)} onClick={() => prepare(result)}>保存{sourceName(result.source)}的修復前備份</Button>
       </div>)}
       {!report ? <p>要建立備份，請先取得有效修復候選；查詢與下載不需要遊戲資料成功載入。</p> : null}
-      {uncertain ? <p>前一次結果尚未確認。請先查詢識別碼；停止等待不等於撤銷保存。</p> : null}
+      {uncertain ? <p>請先用識別碼手動查詢備份及套用資格；停止等待不等於撤銷保存。</p> : null}
       {knownIds.length ? <details><summary>本瀏覽器記錄的修復識別碼</summary>
         <p>只保存識別碼；完整備份由伺服器保留。瀏覽器停用儲存時，請自行記下識別碼。</p>
         <ul>{knownIds.map(known => <li key={known}><Button variant="secondary" aria-disabled={busy} onClick={() => {
