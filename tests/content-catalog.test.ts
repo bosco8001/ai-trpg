@@ -1,0 +1,75 @@
+// 尚未由開發代理執行；交指定 AI TRPG Architecture Critic 驗證。
+import assert from "node:assert/strict";
+import test from "node:test";
+import Fastify from "fastify";
+import { createOfficialContentCatalog, ContentCatalogFailure, registerContentCatalogRoutes } from "../src/server/content-catalog.js";
+import { OFFICIAL_RACES_V1 } from "../src/server/content/races-v1.js";
+import { CONTENT_KINDS, isOfficialContentCatalog } from "../src/shared/content-catalog.js";
+import { createDomainSession } from "../src/server/domain-session.js";
+import { createTestGameState } from "../src/server/test-game-state.js";
+import { buildApp } from "../src/server/app.js";
+
+test("五種族已定數值與 Canon 一致，資質和資格不混合", () => {
+  const { catalog } = createOfficialContentCatalog();
+  assert.deepEqual(catalog.races.map(r => [r.id, r.name, r.freeAttributePoints,
+    Object.values(r.attributeModifiers), Object.values(r.aptitudePercent), r.aptitudeReveal]), [
+    ["race.human", "人類", 2, [0, 0, 0, 0, 0, 0], [20, 65, 14, 1], "unspecified"],
+    ["race.elf", "精靈", 0, [-1, 0, -2, 1, 2, 0], [0, 0, 70, 30], "after-creation"],
+    ["race.dwarf", "矮人", 0, [1, -1, 2, 0, 0, -2], [0, 100, 0, 0], "unspecified"],
+    ["race.orc", "獸人", 0, [0, 2, 0, -3, 2, -1], [85, 14, 1, 0], "unspecified"],
+    ["race.dragonborn", "龍裔", 0, [2, 0, 2, 1, 0, 0], [0, 65, 30, 5], "after-creation"],
+  ]);
+  assert.doesNotMatch(JSON.stringify(catalog), /castingEligibility|directCasting|代行者級|TEST-/);
+});
+test("未知、TEST、錯誤種類及不支援版本沒有預設回退", () => {
+  const service = createOfficialContentCatalog();
+  assert.equal(service.resolve("race", "race.human", 1).name, "人類");
+  for (const kind of CONTENT_KINDS) for (const id of ["TEST-character", "TEST-skill-1", "TEST-combat-consumable", "__proto__", "constructor", "race.missing"])
+    assert.throws(() => service.resolve(kind, id, 1), (e: unknown) => e instanceof ContentCatalogFailure && e.code === "unknown-content");
+  assert.throws(() => service.resolve("class", "race.human", 1), ContentCatalogFailure);
+  assert.throws(() => service.resolve("race", "race.human", 2), (e: unknown) => e instanceof ContentCatalogFailure && e.code === "unsupported-version");
+});
+test("非法名冊整份拒絕，不接受重複 ID、額外欄位或非法機率", () => {
+  const variants = [
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[1]!.id = v.races[0]!.id; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.id = "TEST-human"; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.aptitudePercent.low = 21; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.attributeModifiers.strength = NaN; },
+    (v: typeof OFFICIAL_RACES_V1) => { Object.assign(v.races[0]!, { directCasting: true }); },
+    (v: typeof OFFICIAL_RACES_V1) => { v.catalogVersion = 2; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.namespace = "test"; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races.pop(); },
+  ];
+  for (const change of variants) {
+    const value = structuredClone(OFFICIAL_RACES_V1); change(value);
+    assert.equal(isOfficialContentCatalog(value), false);
+    assert.throws(() => createOfficialContentCatalog(value));
+  }
+});
+test("名冊不可變，原始輸入與呼叫者不能改已載入內容", () => {
+  const input = structuredClone(OFFICIAL_RACES_V1), service = createOfficialContentCatalog(input);
+  input.races[0]!.name = "未核准名稱";
+  assert.equal(service.resolve("race", "race.human", 1).name, "人類");
+  assert.throws(() => Object.assign(service.catalog.races[0]!.attributeModifiers, { strength: 999 }));
+  assert.throws(() => Object.assign(service.catalog.races[0]!.aptitudePercent, { low: 100 }));
+});
+test("HTTP：嚴格唯讀查詢、安全固定錯誤、不改既有遊戲狀態", async t => {
+  const app = Fastify(); registerContentCatalogRoutes(app); t.after(() => app.close());
+  const response = await app.inject("/api/content-catalog");
+  assert.equal(response.statusCode, 200); assert.equal(isOfficialContentCatalog(response.json()), true);
+  assert.equal(response.headers["cache-control"], "no-store");
+  const good = await app.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=1");
+  assert.equal(good.statusCode, 200); assert.equal(good.json().definition.name, "人類");
+  for (const url of ["/api/content-catalog?extra=1", "/api/content-catalog/resolve?kind=race&id=race.human",
+    "/api/content-catalog/resolve?kind=race&id=race.human&version=1&extra=1",
+    "/api/content-catalog/resolve?kind=race&id=race.human&version=1&version=2"])
+    assert.equal((await app.inject(url)).statusCode, 400);
+  const unknown = await app.inject("/api/content-catalog/resolve?kind=skill&id=TEST-skill-1&version=1");
+  assert.equal(unknown.statusCode, 404); assert.equal(unknown.json().code, "unknown-content");
+  assert.doesNotMatch(unknown.body, /TEST-skill-1|stack|node_modules/);
+  assert.equal((await app.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=2")).statusCode, 409);
+  const session = createDomainSession(createTestGameState()), before = structuredClone(session.getState());
+  const gameApp = await buildApp({ domainSession: session }); t.after(() => gameApp.close());
+  await gameApp.inject("/api/content-catalog"); await gameApp.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=1");
+  assert.deepEqual(session.getState(), before);
+});

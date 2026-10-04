@@ -35,6 +35,7 @@ import type { RepairApplicationBackend } from "./repair-application-backend.js";
 import { MemoryRepairApplication } from "./memory-repair-application.js";
 import { registerRepairApplicationRoutes } from "./repair-application-routes.js";
 import { ApplicationFailure } from "./repair-application-core.js";
+import { registerContentCatalogRoutes } from "./content-catalog.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -68,6 +69,7 @@ export async function buildApp(options: {
   combatStartContext?: import("../domain/combat.js").CombatStartContext;
 } = {}) {
   const app = Fastify({ logger: options.logger ?? false });
+  registerContentCatalogRoutes(app);
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
   const session = options.domainSession ?? (options.domainRepository
     ? createPersistedDomainSession(options.domainRepository, createTestGameState())
