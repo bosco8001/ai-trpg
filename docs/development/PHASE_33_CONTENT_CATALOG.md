@@ -1,6 +1,6 @@
 # Phase 33：正式內容名冊第一步
 
-2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正 `940e1f3` 已獲外部工程 PASS；使用者已回報新版文案及五族數值正常，並選定緊湊資料卡排版。正式排版整合待新一輪 bot 驗證及使用者接受。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
+2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正 `940e1f3` 已獲外部工程 PASS；使用者已回報新版文案及五族數值正常，並選定緊湊資料卡排版。正式排版 `cd4cbb4` 外部工程 FAIL（Low D1：小螢幕大字數值溢格）；同切片自適應欄數補修待複驗及使用者接受。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
 
 Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mobile-ui`。首版整體 BASE：`8f5c0334c2dbab10d2c519c3118af44c383c5a1e`；補修 BASE：`641b82f1686d24991e0d1da4ba9095b629995dcc`；版本 1 已複驗 TARGET：`8792e15843fbfe02d9f035db27e9ef5e5d784b4a`；版本 2 已複驗 TARGET：`940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`（BASE 為前述版本 1 TARGET）。本次外部結果紀錄的後續文件變更，不是該測試 TARGET 的一部分。
 
@@ -260,7 +260,7 @@ git push origin codex/phase27-mobile-ui
 git rev-parse HEAD
 ```
 
-完整送驗 prompt（待取得可讀遠端 TARGET 後主動送交指定 bot）：
+完整送驗 prompt 範本（保留交付當時 TARGET 待填文字；實際送出時已填 `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`，送達紀錄見下）：
 
 ```text
 請以 AI TRPG Architecture Critic 驗證 Phase 33 第一個切片的緊湊資料卡排版補修，回報工程 PASS/FAIL，不代替使用者最終驗收。
@@ -279,4 +279,69 @@ TARGET: 待本次限定六檔 commit／push 後填入完整 SHA
 檢查新增 CSS 不影響診斷／備份／修復，沿用正式入口及隔離資料做必要回歸；戰鬥／主選單 UI 若 production 受阻明示，不寫成 production PASS。主張仍與 940e1f3 不同時須列準確來源，不將 Phase32 UI 引用變成今輪真做。bar 使用實際機率，1%仍有文字證據，不加入新數值或隱藏零屬性。
 既有 Info 保留：UI 文案自動化測試缺口、小數加成案例缺口、來源原物件未凍結、陣列非索引屬性、±12 界限語意、access log query、favicon、抽屜關閉掣捲走可 Esc。真手機／讀屏／正式遊玩未測及 production 模式限制保留。選定 prototype 與手動數值正常，不等同整階段接受。
 回報工程 PASS/FAIL、缺陷嚴重度／精確行號／重現／影響、完整命令結果、逐項實測／引用／推斷／未測／受阻、清理與新證據。不修改專案、不 commit/push、不啟動下一切片、不代替使用者驗收。
+```
+
+
+## 緊湊排版已提交及送達（2026-10-05，送達當時結果待回覆）
+
+依使用者「接受，交給grok驗收吧」授權，限定六檔已 commit／push 為 `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`，BASE `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`；遠端既有分支完整 SHA 已讀回吻合。2026-10-05 00:00:21（Asia/Hong_Kong）經 Grok Bot Control 送達指定 AI TRPG Architecture Critic，讀回新 outgoing 的完整 BASE／TARGET／要求且 composer 清空，確認只送一次。工程結果待回覆，Codex 沒有執行 build／測試／UI 驗證，也沒有沿用舊版 PASS。使用者已選定並接受這次排版交付；正式整合操作仍依回報與階段邊界核對，尚未展開下一切片。此送達紀錄為 TARGET 之後的未提交純文字，不是被測 diff 的一部分。
+
+
+## 緊湊排版外部工程 FAIL 與 D1 同切片補修（2026-10-05，待複驗）
+
+來源：AI TRPG Architecture Critic，2026-10-05 00:15:55／00:16:01／00:16:03（Asia/Hong_Kong），Codex 經 Grok Bot Control 直接讀取。BASE `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`、TARGET `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`。外部核對遠端、祖先與限定六檔；資料／Canon／內容版本 2／server／API／Save／state／DB／LLM／fetch 未改，新 CSS 限 content-catalog。工程結論 **FAIL**，一項新 Low D1；其餘項目通過不抵銷整體 FAIL，不代替使用者階段驗收。
+
+外部環境：Node 24.21.0、npm 9.2.0、Debian 13.7、新隔離 PG 17.11（55426）、Chrome 154、Playwright 1.63.0。
+
+| 外部本輪命令 | exit | 結果 |
+|---|---:|---|
+| `npm ci` | 0 | 成功 |
+| `npm run build` | 0 | 成功 |
+| `node --import tsx --test tests/content-catalog.test.ts` | 0 | 6／6 通過 |
+| `env -u TEST_DATABASE_URL npm test` | 0 | 371 通過、41 略過，共 412 |
+| `DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_test npx node-pg-migrate up` | 0 | 成功 |
+| `TEST_DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_test npm test` | 0 | 414／414 通過 |
+| `git diff --check BASE TARGET` | 0 | 本節完整 SHA |
+
+略過不算通過。全部為外部執行，開發代理未在本機執行或重跑。
+
+**D1 Low（本次新增）**：`style.css` 當時 L2281–2303 固定三欄、1.25rem 數字與 nowrap，L2339 小容器規則僅縮 padding；顯示來源在 `ContentCatalogPanel.tsx` L52–60。production 探索頁 → 系統 → 名冊，320px 並將 html 字體設 200%；精靈力量 −1 溢到敏捷 0，視覺上像 −10，感知 +2／魅力 0 像 +20，體質 −2 超出卡片。bot 以 Range 量測 30 組值：320px／175% 已溢格，320px／200% 與360px／200% 失敗；375–430px／200% 正常；320px 頁面 zoom 200% 同樣失敗。沒有橫向捲動，因此 scrollWidth 不能證明數字沒有重疊。資料與 DOM 數字正確，但低視力使用者可能看錯加成；BASE 長句在同設定可讀。
+
+**其餘外部真做**：30 個加成與 Canon／BASE 相同，零值、正負號、人類自由兩點、資質百分比與分布條比例正確，1% 仍有文字；版本 2、共通說明／每卡短註記與施法資格文案正確。一般字體 320／375／430／768／1280／1920 無頁面溢出，375px／200% 正常；對比度皆至少 4.5。dl／dt／dd 與裝飾 aria-hidden 為 DOM 結構檢查，不是讀屏實測。五個 anchor 跳轉正確／有焦點／Esc 正常，零請求與 revision 不變；重開更新 id，沒有殘留或重複。開啟／刷新各一 GET、閒置無請求；13 種錯誤皆固定錯誤；GET 零 SQL、state／三槽前後一致。診斷／備份／修復預覽與 BASE 逐元素比較差異為零。戰鬥／主選單只在非 production 模式回歸，production 受阻。
+
+**新增 Info 保留**：探索抽屜約 22.4rem，六欄不會出現；只有非 production 主選單 1280px 以上達到六欄。每次 anchor 會增加瀏覽器 history，關閉後 hash 留在 URL，但不觸發遊戲操作。本輪只修 D1，沒有處理這兩項 Info。既有 UI 文案／小數加成測試缺口、來源物件未凍結、陣列非索引屬性、±12 語意、access log query、favicon、抽屜關閉掣捲走等仍保留。
+
+真做：全部命令／diff／production UI／BASE 對照／非 production 回歸。引用：bot 本輪報告列為無。推斷：多個名冊不撞 id 來自 React useId，實際每頁只有一個名冊。未測：真手機、真讀屏器、正式遊玩；系統大字只用 CSS 模擬。受阻：production 戰鬥／主選單入口。外部清理：服務停、三個 DB／role 已 drop、cluster 停、`/workspace/p33d` 刪除；5432、clone、舊證據未變；新證據 `/workspace/p33d-evidence` 共 104 檔。bot 未改檔或 commit／push；Codex 未本機核驗該證據目錄。
+
+**D1 補修設計，尚未驗證**：只改 `style.css` 的兩處屬性網格欄數定義。採 auto-fit 與隨文字縮放的 3.5rem 最小格寬；一般區最多三欄、寬容器最多六欄，空間不足自動減為兩欄或一欄，min(100%, …) 使極窄容器可採單欄。數字仍 1.25rem、緊湊內距及 nowrap；沒有縮小使用者的大字、切掉字、隱藏零值或拆開正負號。數值／markup／其他面板與既有讀取行為不變。複驗須逐項量測標籤／數字文字範圍不超出各格或與相鄰格交疊，不只看 scrollWidth；320／360／375／430 × 100／125／150／175／200% 字體及真頁面 zoom 200%，並驗正常字體外觀仍緊湊、寬版六欄。
+
+本次為既有六檔提交與送驗授權內的同切片缺陷補修，實際只改 `style.css` 與四份 Phase 33 文件，不擴大檔案範圍。文件包含上次送達與本輪外部 FAIL 紀錄；保留前次 PASS 的版本界線。本次沒有新增測試或自行執行 build／typecheck／lint／測試／UI 驗證，等待指定 bot 複驗。下一切片未開始。
+
+限定五檔提交與複驗指令（前次六檔授權範圍內；實際送出時填入新 TARGET，尚未送達）：
+
+```sh
+git add -- src/web/style.css docs/development/PHASE_33_CONTENT_CATALOG.md docs/development/CANONICAL_MANIFEST.md docs/development/OPEN_QUESTIONS.md docs/development/IMPLEMENTATION_PLAN.md
+git diff --cached --name-only
+git commit -m "fix: reflow race attributes for enlarged text"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+```
+
+完整 D1 複驗 prompt 範本：
+
+```text
+請以 AI TRPG Architecture Critic 複驗 Phase 33 緊湊資料卡 Low D1 同切片補修，回報工程 PASS/FAIL，不代替使用者最終驗收。
+操作者 Codex。Repository: https://github.com/bosco8001/ai-trpg
+Branch: codex/phase27-mobile-ui
+BASE: cd4cbb4294e80c0f06ba4838c98aeb1af94242f0
+TARGET: 待本次限定五檔 commit／push 後填入完整 SHA
+本次在使用者已批准六檔實作／commit／push／送驗範圍內修正回報的 D1，實際只改 src/web/style.css 與四份 docs/development 文件 PHASE_33_CONTENT_CATALOG、CANONICAL_MANIFEST、OPEN_QUESTIONS、IMPLEMENTATION_PLAN。文件含上次送達與本輪外部 FAIL／Info／命令紀錄，不含原有 AGENTS／Phase31。先核對完整 SHA、遠端／祖先、限定五檔範圍與必要文件 AGENTS／Manifest／OQ／Phase33／Character §5／Race §2–7。
+上輪 cd4cbb4 工程 FAIL：320px／200% 字體與頁面 zoom 數字溢入鄰格（−1／0 像 −10），320／175% 開始溢格、360／200% 失敗；scrollWidth 無溢出不能證明 Range 文字不交疊。其餘項目通過不抵銷 FAIL。請保留原始結論與來源，不重判成舊版 PASS。
+補修只變兩處 CSS 屬性網格：auto-fit＋minmax＋min(100%, max(3.5rem, 每格三分之一或六分之一可用寬度))。最小格寬隨字體放大，普通最多三欄／容器至少40rem最多六欄，空間不足減兩欄或一欄。1.25rem 數字、緊湊內距、nowrap、所有零值與正負號保持，不裁切、不縮掉使用者大字、不改資料／schema1／內容版本2／Canon／markup／server／API／state／Save／DB／LLM／fetch。Codex 沒有跑 build/typecheck/lint/測試/UI；未新增測試，補修待你實測。
+新隔離 checkout npm ci、npm run build、node --import tsx --test tests/content-catalog.test.ts、env -u TEST_DATABASE_URL npm test；隔離 PG 先 migrate，再 TEST_DATABASE_URL=<隔離URL> npm test；git diff --check BASE TARGET。完整實際命令／環境／exit code／pass／skip，skip 不算 PASS，不碰正常 DB／5432／舊證據，舊 414/414 不算本輪真做。
+D1 必須用正式 dist NODE_ENV=production 正常探索→系統→名冊重現：320／360／375／430 × html字體100／125／150／175／200%，以及320頁面zoom200%。全部五族30個數值，用Range量字與格子邊界／相鄰格，保留精靈 −1／0、+2／0、−2 證據，標籤／數字均不得溢出或交疊，不只看scrollWidth。格子不足自動減欄，數值完整且仍可讀，不能把字藏掉或讓正負號分開。對照 BASE 同設定失敗、新版通過；若能做 CSS 還原則證明還原固定三欄會失敗，列證據。
+正常字體320/375/430與桌面768/1280/1920必要回歸，三欄緊湊與寬容器六欄符合實際可達模式；不要把探索抽屜寫成已出現六欄。六欄縮放邊界亦驗30值不溢格；兩欄／一欄閾值取實際容器尺寸記錄。對比、dl／dt／dd、aria-hidden、200%放大不影響共通註記／分布文字／按鈕。數值與 Canon／BASE 相同，沒有改資質機率或施法資格。若有可用 Safari/WebKit 引擎，可核對此 CSS 語法與 reflow，沒有則明示 Chrome-only，不安裝新的本機軟體。
+既有正式入口／五個 anchor／焦點／Esc／手動刷新／收起／重開／取消／timeout／非法JSON格式／33KiB／舊回應必要回歸；無輪詢／pageerror，GET不改 revision／SQL／state／三槽、不對外呼叫。CSS不影響診斷／備份／修復；戰鬥／主選單必要非production回歸，production受阻明示，不引用舊UI作本輪真做。多實例ID若未實際測試只列useId推斷。
+新增探索抽屜達不到六欄、anchor每次加history且關閉保留hash兩Info不在此補修範圍，保留；其他Info（UI文案／小數案例測試缺口、來源未凍結、陣列非索引、±12語意、querylog、favicon、關閉按鈕捲走）也保留。真手機／讀屏／正式遊玩未測，CSS大字模擬不算OS實測。使用者選定排版與數值回報，不等於整個Phase33已通過。
+回報工程PASS/FAIL、逐項真做／引用／推斷／未測／受阻、完整命令結果、缺陷嚴重度／精確行號／重現／影響、清理與新證據。不修改專案、不commit/push、不開下一切片，不代替使用者階段驗收。
 ```

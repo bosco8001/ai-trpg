@@ -2280,7 +2280,8 @@ h1 {
 .content-catalog__label { margin: 0 0 0.6rem; color: var(--text-muted); font-size: 0.75rem; }
 .content-catalog__attributes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* 格子至少保留隨文字縮放的寬度；不足三欄時自動降為兩欄或一欄。 */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(3.5rem, calc((100% - 0.7rem) / 3))), 1fr));
   gap: 0.35rem;
   margin: 0;
 }
@@ -2333,7 +2334,9 @@ h1 {
 .content-catalog__dot { width: 0.35rem; height: 0.35rem; border-radius: 50%; background: var(--catalog-aptitude-color); }
 .content-catalog__footnote { margin: var(--space-4) 0; color: var(--text-muted); font-size: 0.75rem; line-height: 1.7; }
 @container content-catalog (min-width: 40rem) {
-  .content-catalog__attributes { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .content-catalog__attributes {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(3.5rem, calc((100% - 1.75rem) / 6))), 1fr));
+  }
   .content-catalog__race { padding: 1.35rem; }
 }
 @container content-catalog (max-width: 22.5rem) {
