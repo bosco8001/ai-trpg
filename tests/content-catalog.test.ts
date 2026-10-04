@@ -35,6 +35,12 @@ test("非法名冊整份拒絕，不接受重複 ID、額外欄位或非法機�
     (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.id = "TEST-human"; },
     (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.aptitudePercent.low = 21; },
     (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.attributeModifiers.strength = NaN; },
+    (v: typeof OFFICIAL_RACES_V1) => { Object.assign(v.races[0]!.attributeModifiers, { extra: 0 }); },
+    (v: typeof OFFICIAL_RACES_V1) => { Reflect.deleteProperty(v.races[0]!, "aptitudeReveal"); },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.attributeModifiers.strength = 13; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.attributeModifiers.strength = -13; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.races[0]!.freeAttributePoints = 13; },
+    (v: typeof OFFICIAL_RACES_V1) => { v.schemaVersion = 2; },
     (v: typeof OFFICIAL_RACES_V1) => { Object.assign(v.races[0]!, { directCasting: true }); },
     (v: typeof OFFICIAL_RACES_V1) => { v.catalogVersion = 2; },
     (v: typeof OFFICIAL_RACES_V1) => { v.namespace = "test"; },
@@ -46,10 +52,42 @@ test("非法名冊整份拒絕，不接受重複 ID、額外欄位或非法機�
     assert.throws(() => createOfficialContentCatalog(value));
   }
 });
+test("先複製再驗證同一份資料，getter 不能在驗證後替換內容", () => {
+  const input = structuredClone(OFFICIAL_RACES_V1);
+  let reads = 0;
+  Object.defineProperty(input.races[0]!, "name", {
+    enumerable: true, get() { return ++reads === 1 ? "人類" : "TEST-變"; },
+  });
+  const service = createOfficialContentCatalog(input);
+  assert.equal(reads, 1);
+  assert.equal(service.resolve("race", "race.human", 1).name, "人類");
+
+  const invalid = structuredClone(OFFICIAL_RACES_V1);
+  let invalidReads = 0;
+  Object.defineProperty(invalid.races[0]!, "name", {
+    enumerable: true, get() { return ++invalidReads === 1 ? "" : "人類"; },
+  });
+  assert.throws(() => createOfficialContentCatalog(invalid), {
+    message: "正式內容名冊格式不合法，未載入任何內容。",
+  });
+  assert.equal(invalidReads, 1);
+  assert.throws(() => createOfficialContentCatalog({ uncloneable() {} }), {
+    message: "正式內容名冊格式不合法，未載入任何內容。",
+  });
+});
 test("名冊不可變，原始輸入與呼叫者不能改已載入內容", () => {
   const input = structuredClone(OFFICIAL_RACES_V1), service = createOfficialContentCatalog(input);
   input.races[0]!.name = "未核准名稱";
   assert.equal(service.resolve("race", "race.human", 1).name, "人類");
+  assert.equal(Object.isFrozen(service.catalog), true);
+  assert.equal(Object.isFrozen(service.catalog.races), true);
+  assert.equal(Object.isFrozen(service.catalog.pendingKinds), true);
+  for (const race of service.catalog.races) {
+    assert.equal(Object.isFrozen(race), true);
+    assert.equal(Object.isFrozen(race.attributeModifiers), true);
+    assert.equal(Object.isFrozen(race.aptitudePercent), true);
+  }
+  assert.throws(() => Object.assign(service.catalog.races[0]!, { name: "未核准名稱" }));
   assert.throws(() => Object.assign(service.catalog.races[0]!.attributeModifiers, { strength: 999 }));
   assert.throws(() => Object.assign(service.catalog.races[0]!.aptitudePercent, { low: 100 }));
 });
@@ -60,14 +98,22 @@ test("HTTP：嚴格唯讀查詢、安全固定錯誤、不改既有遊戲狀態"
   assert.equal(response.headers["cache-control"], "no-store");
   const good = await app.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=1");
   assert.equal(good.statusCode, 200); assert.equal(good.json().definition.name, "人類");
+  assert.equal(good.headers["cache-control"], "no-store");
   for (const url of ["/api/content-catalog?extra=1", "/api/content-catalog/resolve?kind=race&id=race.human",
     "/api/content-catalog/resolve?kind=race&id=race.human&version=1&extra=1",
     "/api/content-catalog/resolve?kind=race&id=race.human&version=1&version=2"])
-    assert.equal((await app.inject(url)).statusCode, 400);
+  {
+    const bad = await app.inject(url);
+    assert.equal(bad.statusCode, 400);
+    assert.equal(bad.headers["cache-control"], "no-store");
+  }
   const unknown = await app.inject("/api/content-catalog/resolve?kind=skill&id=TEST-skill-1&version=1");
   assert.equal(unknown.statusCode, 404); assert.equal(unknown.json().code, "unknown-content");
+  assert.equal(unknown.headers["cache-control"], "no-store");
   assert.doesNotMatch(unknown.body, /TEST-skill-1|stack|node_modules/);
-  assert.equal((await app.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=2")).statusCode, 409);
+  const unsupported = await app.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=2");
+  assert.equal(unsupported.statusCode, 409);
+  assert.equal(unsupported.headers["cache-control"], "no-store");
   const session = createDomainSession(createTestGameState()), before = structuredClone(session.getState());
   const gameApp = await buildApp({ domainSession: session }); t.after(() => gameApp.close());
   await gameApp.inject("/api/content-catalog"); await gameApp.inject("/api/content-catalog/resolve?kind=race&id=race.human&version=1");

@@ -391,8 +391,10 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 **使用者於 2026-10-04（Asia/Hong_Kong）明確回覆「phase 32通過」。** 使用者先回報目前資料保存／取消／套用／恢復畫面、重新整理後查詢及兩種下載、存檔 1 單份修復符合預期；其後另授權開發代理只親自驗證存檔 2 的同值覆寫與舊準備拒絕，這項隔離 UI 驗證 PASS，不能擴大為其他測試授權。驗收時本地 HEAD 為 `ccb34631e2f21433463cea27c9874b131959867f`，只作版本對照，使用者未指定測試 SHA 或完整本機環境，不補寫未提供的結果。沒有新增玩法、自動 migration、合併或部署；原驗收當時下一主要階段尚未開始。接受後容量提示小補修已依使用者限定授權及 `828d520` 外部工程 PASS 判定通過，歷史 FAIL、Info 與未測限制見 [Phase 32](PHASE_32_REPAIR_APPLICATION.md)。
 
-## Phase 33：正式內容名冊第一步（R04，待驗證）
+## Phase 33：正式內容名冊第一步（R04，補修待複驗）
 
 使用者於 2026-10-04 要求「進入下一階段」。首個切片將 Race／Character 已定五種族創角資料放入有版本的正式名冊，與 TEST 目錄分開，加入嚴格未知引用拒絕及系統面板唯讀核對入口。沒有創角、屬性推導、種族能力、職業／物品／技能／法術正式內容、Save 版本遷移或資料庫改動；不是整個 R04 完成。
 
-實作及新測試已準備，開發代理未執行 build／typecheck／測試／UI。限定本階段 commit／push 尚待授權，遠端 TARGET 待填，工程仍待指定 AI TRPG Architecture Critic；未宣稱已送驗或通過。完整範圍、文件來源、審查 prompt、限定提交命令及使用者核對清單見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。Phase 32 小補修的驗收授權不延伸至本期，本期仍待使用者接受。
+使用者另以「確認授權」批准首版十一檔限定 commit／push，`641b82f1686d24991e0d1da4ba9095b629995dcc` 已於 2026-10-04 20:49 HKT 送指定 AI TRPG Architecture Critic 並讀回確認。21:00 HKT 外部工程結論為未通過：探索頁名冊入口缺漏（Medium D1）、loader 先驗證後複製（Low D2）。外部 build／新測試 5／5／隔離 PG 全套 413／413 通過，不代表整體工程或使用者驗收通過。
+
+同切片已補探索入口、改成先複製再驗證同份快照，並補 getter 與六項 mutation 缺口的相關案例；補修與新案例尚未執行，開發代理沒有自行執行 build／typecheck／測試／UI。首版授權限定十一檔，本次補修另涉及 ExplorationPage；使用者其後於 2026-10-04 回覆「授權補修 commit／push 並複驗」，另行批准限定七檔提交及送驗。完整來源、限制、送驗 prompt 與核對清單見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。本期仍待 Grok 複驗及使用者接受，未開始下一切片。

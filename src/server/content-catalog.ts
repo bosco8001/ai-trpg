@@ -1,14 +1,16 @@
 import type { FastifyInstance } from "fastify";
-import { CONTENT_KINDS, CONTENT_MESSAGES, isOfficialContentCatalog, type ContentKind, type OfficialContentCatalog } from "../shared/content-catalog.js";
+import { CONTENT_KINDS, CONTENT_MESSAGES, isOfficialContentCatalog, type ContentKind } from "../shared/content-catalog.js";
 import { OFFICIAL_RACES_V1 } from "./content/races-v1.js";
 
 export class ContentCatalogFailure extends Error {
   constructor(readonly code: keyof typeof CONTENT_MESSAGES) { super(CONTENT_MESSAGES[code]); }
 }
 export function createOfficialContentCatalog(value: unknown = OFFICIAL_RACES_V1) {
-  if (!isOfficialContentCatalog(value)) throw new Error("正式內容名冊格式不合法，未載入任何內容。");
-  // Copy before freezing: neither caller mutation nor consumers may change the validated version.
-  const copied: OfficialContentCatalog = structuredClone(value);
+  // Validate the detached snapshot that will be loaded, including values produced by getters.
+  let copied: unknown;
+  try { copied = structuredClone(value); }
+  catch { throw new Error("正式內容名冊格式不合法，未載入任何內容。"); }
+  if (!isOfficialContentCatalog(copied)) throw new Error("正式內容名冊格式不合法，未載入任何內容。");
   for (const race of copied.races) {
     Object.freeze(race.attributeModifiers); Object.freeze(race.aptitudePercent); Object.freeze(race);
   }
