@@ -1,6 +1,6 @@
 # Phase 32：單份原子修復套用、再次確認與持久報告
 
-交付及驗收日期：2026-10-04（Asia/Hong_Kong）。**使用者已明確回覆「phase 32通過」，Phase 32 已接受。** 整體 BASE 為 `3d8df060162163b1fbb60873baf95e95b19ea709`；首版為 `20773e94735e09abbcbe3d0ecd7917006410af18`，補修與最新外部工程審查 TARGET 為 `ccb34631e2f21433463cea27c9874b131959867f`。驗收回報時本地 HEAD 亦為該補修版本，只作版本對照，使用者沒有另指定測試 SHA。分支 `codex/phase27-mobile-ui`，repository `https://github.com/bosco8001/ai-trpg`。下方送驗前／未接受說法均標示為歷史狀態；剩餘 Low、Info 與未測限制見驗收紀錄，不因接受而改標解決。
+交付及驗收日期：2026-10-04（Asia/Hong_Kong）。**使用者已明確回覆「phase 32通過」，Phase 32 已接受；接受後 L-C 容量提示補修亦已依使用者授權及 bot 結果判定通過。** 整體 BASE 為 `3d8df060162163b1fbb60873baf95e95b19ea709`；首版為 `20773e94735e09abbcbe3d0ecd7917006410af18`，原驗收時的補修與外部工程審查 TARGET 為 `ccb34631e2f21433463cea27c9874b131959867f`。原驗收回報時本地 HEAD 亦為該補修版本，只作版本對照，使用者沒有另指定測試 SHA。最新容量提示外部複驗 TARGET 為 `828d520f1d6548eabbf0cb89fff78909a685ed1b`，工程 PASS；本次限定驗收授權及結果見下方。分支 `codex/phase27-mobile-ui`，repository `https://github.com/bosco8001/ai-trpg`。下方送驗前／未接受說法為歷史狀態；既有 Info 與未測限制不因本次補修通過而改標解決。
 
 使用者已逐項批准八項 A 及 [完整契約](R03_SECOND_STAGE_PROPOSAL.md)，文件送驗後另回覆「開始實作」。Phase 31 的接受與既有 Info／未測限制保留。使用者其後明確回覆「授權」，批准只 commit／push 本輪 Phase 32 改動並送指定 bot；不包含先前未提交的 `AGENTS.md` 與 Phase 31 歷史文字補正。
 
@@ -165,18 +165,18 @@ AI TRPG Architecture Critic 於 2026-10-04 回報補修 BASE `20773e94735e09abbc
 
 清單於原交付時尚未驗收；使用者其後已明確接受本階段，實際回報與未測界線以以上紀錄為準。工程報告不能替使用者接受。下一主要階段尚未開始，沒有自動新增修復類型或下一個主要系統。
 
-## 接受後的小補修：容量提示（2026-10-04，待工程複驗）
+## 接受後的小補修：容量提示（2026-10-04，已依限定授權通過）
 
 - 本次基準為 `0fce1b9d7bc3742c557134e7f431e31175fd5fe8`。Phase 32 已由使用者接受的紀錄保留；這是同階段 L-C 補修，下一主要階段尚未開始。
 - 備份發布前容量不足仍回 HTTP 507／`capacity`，提示未新增備份。完整備份已保存、資格登記容量不足則回 HTTP 507／`capacity-after-backup`，明確提示備份已保存、未取得套用資格、保留識別碼手動查詢及下載，容量問題處理後須重新預覽及使用新 ID。
 - 前後端沿用同一份固定安全訊息字典；客戶端不直接展示伺服器任意錯誤內容。沒有修改備份發布、來源寫入、容量計算、資格、同 ID 不補發、手動查詢或永久 unknown 的政策。409 衝突及其他故障安全 503 保留。
 - 新增真正 File／Memory 與 PG 容量邊界案例，涵蓋備份前失敗、備份後資格失敗、下載、來源不變、前端固定提示、同 ID 不補資格、增加可用容量後新 ID 可準備；原資格失敗 stub 案例保留並更新錯誤碼。
-- 首次送驗時，開發代理只閱讀程式及準備案例，沒有執行 build、typecheck、自動測試或 UI 驗證；新增及修改的測試當時尚未執行。其後外部結果見下方；本輪修正仍待再複驗。
+- 首次送驗時，開發代理只閱讀程式及準備案例，沒有執行 build、typecheck、自動測試或 UI 驗證；新增及修改的測試當時尚未執行。其後首次 FAIL 及修正後 PASS 的外部結果見下方。
 - 小補修手動確認：備份前容量不足顯示「未新增備份」；備份後資格不足顯示「完整備份已保存」及「未取得套用資格」，手動查詢可下載原稿且不能套用。正常準備／確認／取消／查詢流程仍應與接受時一致。
 
-### 容量提示首次外部複驗：FAIL，修正待再複驗
+### 容量提示首次外部複驗：FAIL（歷史）
 
-AI TRPG Architecture Critic 於 2026-10-04 回報 BASE `0fce1b9d7bc3742c557134e7f431e31175fd5fe8`、TARGET `efcdb4b2de1cfe0aeb516b6db50f0276e2000dc2` **FAIL**。以下為直接讀回的外部結果，非開發代理執行。使用者已授權依 bot 結果決定這次補修是否通過，因此目前未通過；不撤銷此前 Phase 32 的接受，也不延伸為後續階段的驗收授權。
+AI TRPG Architecture Critic 於 2026-10-04 回報 BASE `0fce1b9d7bc3742c557134e7f431e31175fd5fe8`、TARGET `efcdb4b2de1cfe0aeb516b6db50f0276e2000dc2` **FAIL**。以下為直接讀回的外部結果，非開發代理執行。使用者已授權依 bot 結果決定這次補修是否通過，因此當時未通過；其後修正及 PASS 見下方。不撤銷此前 Phase 32 的接受，也不延伸為後續階段的驗收授權。
 
 - 環境：Node 24.21.0、npm 9.2.0、Debian 13.7、隔離 PG 17.11／55426、Chrome 154／Playwright 1.63.0。`npm ci` 回 0，`npm run build` 回 2：新增 PG 測試向推導為 UUID 型別的 runtimeId 參數傳入空字串，造成 TS2345（D1，High）。正式產物及正式 UI 驗證受阻。
 - 指定四組隔離 PG 測試 67／67、完整隔離 PG 測試 408／408，exit 0；隔離 DB migration 回 0。無 DB 時四組 55 過／10 略過、完整 365 過／41 略過，exit 0，略過不算 PASS。BASE..TARGET diff-check 回 0。tsx 測試不做 typecheck，故全綠不能抵銷 build 失敗。
@@ -185,7 +185,23 @@ AI TRPG Architecture Critic 於 2026-10-04 回報 BASE `0fce1b9d7bc3742c557134e7
 - bot 使用 `npx vite build` 的 UI 補充實測見到正確文案、保留 ID、只一次準備 POST、不輪詢／重送、不能套用、手動查詢及下載、正常取消／套用回歸；這繞過正式 build 的補充結果不計正式 UI PASS。
 - 新 Info：I1 真容量自動案例缺少其他來源／guard 及原稿重送不變的覆蓋；I2 歷史「L-C 未修正」與補修段落易混淆，manifest 未提待複驗；I3 通用「前一次結果尚未確認」與已保存提示語氣不一致（推斷）。既有 Info 與未測限制保留；底部 nav 遮住部分按鈕亦按 bot 回報保留，沒有本輪歸因為新增。
 - 新證據 `/workspace/p32c-evidence`，88 檔；bot 回報隔離服務／proxy 已停、四個 DB／角色已 drop、叢集已停及工作目錄已刪，未碰 5432、舊證據不變，沒有修改專案或 commit／push。
-- 本次修正：PG 測試改合法 `randomUUID()`；兩個真容量案例比較四份來源原稿及可讀守衛，並比較同 ID 重送及容量放寬後完整備份不變。I2 文件改為接受當時狀態並補 manifest；I3 通用提示改為請手動查詢備份及套用資格，不改確認／重送／保存政策。開發代理沒有執行驗證命令，修改案例及正式 UI 均待指定 bot 再複驗。
+- 其後修正：PG 測試改合法 `randomUUID()`；兩個真容量案例比較四份來源原稿及可讀守衛，並比較同 ID 重送及容量放寬後完整備份不變。I2 文件改為接受當時狀態並補 manifest；I3 通用提示改為請手動查詢備份及套用資格，不改確認／重送／保存政策。開發代理沒有執行驗證命令，提交修正時修改案例及正式 UI 均待指定 bot 再複驗。
+
+### 容量提示修正後外部複驗：PASS，本次補修已通過
+
+AI TRPG Architecture Critic 於 2026-10-04 16:41 HKT 回報 BASE `efcdb4b2de1cfe0aeb516b6db50f0276e2000dc2`、TARGET `828d520f1d6548eabbf0cb89fff78909a685ed1b` **工程 PASS**，沒有新增 High、Medium 或 Low，也沒有受阻項目。開發代理直接讀回完整報告；以下均為外部執行，沒有改寫成自行執行測試。
+
+- 已核對分支 `refs/heads/codex/phase27-mobile-ui` 指向 TARGET，前述 BASE 均為祖先；遠端預設 HEAD 指向 main，不能用預設 HEAD 代替本分支版本。
+- 環境：Node 24.21.0、npm 9.2.0、Debian 13.7、新隔離 PG 17.11／55426、Chrome 154／Playwright 1.63.0。`npm ci`、`npm run build`（含 typecheck 及正式 dist）、隔離測試 DB migration、指定四組測試、完整 `npm test`、BASE..TARGET diff-check 全部 exit 0；隔離 PG 四組 67／67、完整 408／408 通過。無 DB 時四組 55 過／10 略過、完整 365 過／41 略過，exit 0，略過不算 PASS。
+- D1 已消失。真容量案例通過；六個 mutation（Memory／PG 的其他槽 raw／guard、同 ID 重送覆寫原稿及放寬容量後覆寫原稿）均由新測試攔截，舊 `efcdb4b` 測試則漏過。沒有新增測試缺陷。
+- 正式 build 產物由 UI 按保存，PG／Memory 各兩種容量錯誤全部 PASS。Memory 容量樣本使用官方 helper 或只注入容量設定的 harness，dist 逐檔 SHA 與正式 build 一致。備份前沒有新增原稿，查詢／下載／資格 404；備份後已保存但沒有資格，原稿下載 SHA／checksum／bytes 一致、查詢及套用 ineligible。四個案例各一個準備 POST、零套用 POST、閒置五秒零請求、ID 保留且無核對入口；320／430 寬度無溢出及 JS 錯誤。新通用提示與已保存提示一致。
+- 同 ID 放寬容量前後重送（API 實測，UI 沒有重送操作）仍 ineligible，原稿 SHA 不變；PG 的槽／current／token／epoch 及 Memory fingerprint 不變。正式 UI 新 ID 在 Memory current／PG 槽 2 完成保存、核對、取消後再確認、手動查詢與兩個下載，結果 applied；取消零 POST、連按三次確認只有一次套用，PG 只改槽 2。
+- 本輪真做 PG 409 衝突及資格 INSERT 前斷線安全 503，備份一列／資格零列、來源不變，日誌只有固定 `pg_connection_error`。備份 INSERT 斷線、lock 逾時、Memory guard 故障引用 `efcdb4b` 的 `/workspace/p32c-evidence`，不算本輪重測。API 實測看不到 Memory 內部 guard，不變僅屬推斷；單元案例的可讀守衛比較另有實際執行。
+- **保留兩項 Info**：I-a 放寬容量後真容量自動案例未再次比較全部來源與 guard，僅檢查 revision 及原稿不變；外部實測已涵蓋可見資料，不代表自動覆蓋完整。I-b 備份前未保存時通用提示仍要求查詢備份及套用資格，語意稍多餘（推斷），不影響行為。I2 文件及原 I3 提示矛盾已更正，不能將這兩項新 Info 一併標為解決。
+- 既有底部 nav 遮按鈕、L-A 部分成功邊界、L-B 永久 unknown／64 KiB 預留政策、焦點 body、原始 UTC、共用 operation、Memory 報告故障 503 均保留。真手機、讀屏、整庫 restore、HTTP Reset、主 pool 借出斷線及正式遊玩仍未測。
+- 新證據 `/workspace/p32d-evidence`，122 檔；mutation 總表 `logs/mutations.txt`、正式 dist SHA `json/official-dist.sha256`。bot 回報隔離服務／proxy 已停、三個 DB／角色已 drop、叢集已停、工作目錄已刪，沒有碰 5432、舊證據不變、clone 無改動，沒有 commit／push 或開新階段。
+
+使用者明確指示「讓grok bot驗收是次補修，根據grok bot的結果決定是否通過」。開發代理依上述完整工程 PASS、必要正式 UI 實測及沒有阻擋缺陷，判定 **L-C 補修（`828d520`）通過**，不要求使用者另做本次手動驗收。L-C 文案缺陷及 D1 build 阻擋已由本次外部結果確認修正；其他 Info、政策及未測限制保留。此授權僅適用本次補修，不改未來主要階段的使用者驗收流程；Phase 33 尚未開始。
 
 ## 首版的限定提交與送驗模板（歷史）
 
