@@ -1,6 +1,6 @@
 # Phase 32：單份原子修復套用、再次確認與持久報告
 
-交付日期：2026-10-04（Asia/Hong_Kong）。**實作交付，待實作工程驗證及使用者驗收。** 本稿記錄送驗前狀態；送驗是否送達及目標完整 SHA 以後續交接訊息為準。 基準為 `3d8df060162163b1fbb60873baf95e95b19ea709`；TARGET 為「待提交後填入完整 SHA」。分支 `codex/phase27-mobile-ui`，repository `https://github.com/bosco8001/ai-trpg`。
+交付及驗收日期：2026-10-04（Asia/Hong_Kong）。**使用者已明確回覆「phase 32通過」，Phase 32 已接受。** 整體 BASE 為 `3d8df060162163b1fbb60873baf95e95b19ea709`；首版為 `20773e94735e09abbcbe3d0ecd7917006410af18`，補修與最新外部工程審查 TARGET 為 `ccb34631e2f21433463cea27c9874b131959867f`。驗收回報時本地 HEAD 亦為該補修版本，只作版本對照，使用者沒有另指定測試 SHA。分支 `codex/phase27-mobile-ui`，repository `https://github.com/bosco8001/ai-trpg`。下方送驗前／未接受說法均標示為歷史狀態；剩餘 Low、Info 與未測限制見驗收紀錄，不因接受而改標解決。
 
 使用者已逐項批准八項 A 及 [完整契約](R03_SECOND_STAGE_PROPOSAL.md)，文件送驗後另回覆「開始實作」。Phase 31 的接受與既有 Info／未測限制保留。使用者其後明確回覆「授權」，批准只 commit／push 本輪 Phase 32 改動並送指定 bot；不包含先前未提交的 `AGENTS.md` 與 Phase 31 歷史文字補正。
 
@@ -24,7 +24,7 @@
 | 接線、守衛與容量 | `src/server/app.ts`、`index.ts`、`domain-session.ts`、`repair-preview-reader.ts`、`repair-preparation.ts`、`file-repair-archive.ts`、`postgres-repair-archive.ts`、`save-game/memory-repository.ts` |
 | 手動 migration | `migrations/1791100000000_repair_applications.mjs` |
 | 原面板確認及報告 | `src/web/RepairApplicationPanel.tsx`、`repair-application.ts`、`RepairPreparationPanel.tsx`、`RepairPreviewPanel.tsx`、`repair-preparation.ts`、`RuntimeSystemPanel.tsx`、`App.tsx` |
-| 待執行案例 | `tests/repair-application.test.ts`、`tests/repair-preparation.test.ts`、`tests/helpers/phase32-repair-application.mjs` |
+| 測試與隔離樣本 | `tests/repair-application.test.ts`、`tests/repair-preparation.test.ts`、`tests/helpers/phase32-repair-application.mjs` |
 | 文件 | 本文件、R03 第二階段／第一階段／討論文件、CANONICAL_MANIFEST、OPEN_QUESTIONS、IMPLEMENTATION_PLAN、POST_PHASE_27_ROADMAP、PHASE_26_FINAL_SPEC |
 
 沒有新增修復種類、還原、遊戲內容、LLM 呼叫或自動 migration。普通遊戲操作只更新獨立守衛，不更改玩法結果。
@@ -65,11 +65,11 @@ UPDATE repair_apply_epoch SET token = gen_random_uuid() WHERE singleton;
 
 外部回報：七份文件一致性 PASS，沒有需要使用者另選條件的實作阻擋；三項 Low 為直接 SQL／還原守衛邊界、PG 未決 ID 的永久未知處理、開始前拒絕與持久終態狀態表。四項 Info 為提交時「尚未送達」字眼、遠端 AGENTS 尚為舊政策、Phase 26 generation 延伸交叉引用，以及 raw 路徑／槽時間精度提醒。
 
-本輪依上述建議補足契約、epoch 維運說明、保守未知政策及 raw 整筆替換；**這些是本輪實作處理，尚未由 bot 驗證，不能改寫成 Low 已驗證解決。** 外部報告的可行性分析全部是推斷，沒有 runtime／build／測試／UI PASS。測試分工以使用者最新指示與本機 AGENTS 第 4 節為準；先前未提交的 AGENTS 不混入這次提交。
+首版提交當時依上述建議補足契約、epoch 維運說明、保守未知政策及 raw 整筆替換；**當時尚未由 bot 驗證，不能改寫成 Low 已驗證解決。** 這份契約文件審查的可行性分析全部是推斷，沒有 runtime／build／測試／UI PASS；後續實作工程結果另見下方。測試分工以使用者最新指示與本機 AGENTS 第 4 節為準；先前未提交的 AGENTS 不混入本階段提交。
 
-## 待 Grok 執行的驗證
+## 首版交付時的送驗命令（歷史）
 
-開發代理只閱讀程式／Git 差異及寫入案例，沒有執行 build、typecheck、lint、diff-check、自動化分析、單元、整合、資料庫或 UI 驗證。新增與修改的測試均尚未執行；需真 PG 環境的案例沒有 `TEST_DATABASE_URL` 會 skip，交接要求不得以 skip 當 PASS。
+首版交付及補修提交時，開發代理只閱讀程式／Git 差異及寫入案例，沒有執行 build、typecheck、lint、diff-check、自動化分析、單元、整合、資料庫或 UI 驗證，新增與修改的測試當時均尚未執行。其後 bot 的實際結果及使用者單次授權的隔離 UI 驗證各自列於下方；未授權開發代理執行其他測試。需真 PG 環境的案例沒有 `TEST_DATABASE_URL` 會 skip，交接要求不得以 skip 當 PASS。
 
 ```sh
 npm ci
@@ -81,7 +81,7 @@ git diff --check 3d8df060162163b1fbb60873baf95e95b19ea709 TARGET_FULL_SHA
 
 以上命令由 bot 執行，必須使用隔離 PostgreSQL／角色與 `TEST_DATABASE_URL`，並先對該隔離測試 DB 完成 migration；不可碰使用者正常 DB 或 5432。整體測試如發現舊問題須分開歸因，不把歷史報告當本輪執行。
 
-隔離瀏覽器樣本（同樣尚未執行，先由 bot build）：
+隔離瀏覽器樣本（首版提交當時尚未執行；其後 bot 與使用者實際使用）：
 
 ```sh
 node --import tsx tests/helpers/phase32-repair-application.mjs normal
@@ -94,7 +94,7 @@ node --import tsx tests/helpers/phase32-repair-application.mjs normal
 - `report-failure` 模式先保存開始及修改來源，但報告發布故障；POST `/api/dev/phase32-report-recover` 後手動查詢，只補報告、不再修改來源。
 - 重啟樣本保留備份與報告；舊 Memory 未決請求不重做，新程序來源不從備份恢復。
 
-上述 dev endpoint 只存在 helper，沒有加入正式 API。真 PG 還需對實際 index.ts 做兩種提交順序、來源／結果交易故障、COMMIT 回應遺失、兩程序同 ID、容量競爭、觸發器 ABA／TRUNCATE／維運 epoch、原 saved_at 微秒及多角色隔離。
+上述 dev endpoint 只存在 helper，沒有加入正式 API。首版的真 PG 送驗範圍包含實際 index.ts 的兩種提交順序、來源／結果交易故障、COMMIT 回應遺失、兩程序同 ID、容量競爭、觸發器 ABA／TRUNCATE／維運 epoch、原 saved_at 微秒及多角色隔離；實測與引用的界線見各版外部回報。
 
 ## 使用者手動驗收
 
@@ -105,9 +105,9 @@ node --import tsx tests/helpers/phase32-repair-application.mjs normal
 - `RepairPreparationPanel.tsx` 的套用資格查詢變數 `result` 遮蔽外層修復候選，造成宣告前引用；改名為 `application`，並更新回傳欄位及使用處。
 - `repair-application.test.ts` 對可同步或非同步的 reader 直接呼叫 `.then`；改為 async callback 中 await，再取 raw。
 
-另依指定 bot 的 L-A 修正資格保存容量不足的錯誤傳遞：轉成準備流程的 `capacity`／507，內容衝突維持 409，其餘固定安全 503。備份已保存但資格失敗時仍可下載原稿，同 ID 不重新綁定資格，須重新預覽並用新 ID 準備；這個保守邊界不變。新增 HTTP 回歸案例檢查錯誤碼、原稿保留、同 ID 不補資格及來源不變，尚未執行。
+另依指定 bot 的 L-A 修正資格保存容量不足的錯誤傳遞：轉成準備流程的 `capacity`／507，內容衝突維持 409，其餘固定安全 503。備份已保存但資格失敗時仍可下載原稿，同 ID 不重新綁定資格，須重新預覽並用新 ID 準備；這個保守邊界不變。新增 HTTP 回歸案例檢查錯誤碼、原稿保留、同 ID 不補資格及來源不變，提交當時尚未執行，後續 bot 結果見補修複驗。
 
-本輪沿用使用者已授權的 Phase 32 commit／push 及送指定 bot。補修完整目標 SHA 以交接訊息為準；開發代理沒有重跑 build、typecheck 或測試，結果仍待指定 bot 驗證，不記為通過。先暫停後續手動驗收步驟。
+補修當時沿用使用者已授權的 Phase 32 commit／push 及送指定 bot，目標為 `ccb34631e2f21433463cea27c9874b131959867f`；開發代理沒有重跑 build、typecheck 或測試，當時待指定 bot 驗證，未記為通過，並暫停手動驗收。其後已取得以下複驗與使用者接受。
 
 ### 指定 bot 對首版實作的外部工程回報
 
@@ -123,7 +123,38 @@ AI TRPG Architecture Critic 對 `20773e94735e09abbcbe3d0ecd7917006410af18`（BAS
 - Info 保留：展開／取消確認後焦點落到 body、時間顯示原始 UTC、PG 套用日誌 operation 與備份共用、Memory 報告查詢故障回 503；送驗狀態模板字眼於本輪改為提交當時狀態。
 - 真手機、讀屏、實際整庫 restore 及 HTTP Reset 未測；不可改記為通過。舊 Phase 31 Info／未測界線保留。
 
-bot 證據留在 `/workspace/p32-evidence`（4.4 MB），回報隔離程序、proxy、DB／角色及叢集已清理，未碰 5432、clone 乾淨，沒有 commit／push。補修版本待複驗，Phase 32 尚未由使用者接受。
+bot 證據留在 `/workspace/p32-evidence`（4.4 MB），回報隔離程序、proxy、DB／角色及叢集已清理，未碰 5432、clone 乾淨，沒有 commit／push。這份首版報告完成當時，補修版本待複驗，Phase 32 尚未由使用者接受；其後狀態見下方。
+
+### 補修版本的外部工程複驗
+
+AI TRPG Architecture Critic 於 2026-10-04 回報補修 BASE `20773e94735e09abbcbe3d0ecd7917006410af18`、TARGET `ccb34631e2f21433463cea27c9874b131959867f` 的結果。開發代理從已核對的 bot 對話直接讀回；以下均為外部執行，不改寫成開發代理親自測試。
+
+- 環境：Node 24.21.0、npm 9.2.0、Debian 13.7、隔離 PG 17.11／55426、Chrome 154.0.8037.57、Playwright 1.63.0，沒有 LLM key。
+- `npm ci`、正式 `npm run build`（含 typecheck）、四組指定測試、完整測試及補修 BASE..TARGET diff-check 均回 0。隔離 PG 四組 65／65、完整 406／406 通過；未設定 DB 時四組 54 過／9 略過、完整 364 過／40 略過，略過不算 PASS，隔離 DB 已先 migrate。
+- H1 全部 PASS：真 PG 正常／current 讀取失敗入口、helper normal 及 lost-response，四條流程均從 UI 預覽、保存、核對、二次確認、套用、手動查詢到下載。使用正式 build 產物，沒有繞 typecheck 或先用 API 準備。取消 0 套用 POST、重複點擊 1 POST、查詢不重送、回應遺失後手動取回 applied；備份與報告 SHA 一致。Phase 31 UI 保存／查詢／下載／列表回歸 PASS。
+- L-A 錯誤碼 PASS：真 PG 及 Memory 容量只夠備份時回 507／capacity，備份查詢／下載 200、來源零寫入、資格 ineligible；解除容量後同 ID 不補資格，新預覽新 ID 可正常套用。409 內容衝突、故障安全 503、同值 UPDATE stale、來源 COMMIT 回應遺失後查詢 applied 均實測通過。備份已保存但資格失敗的部分成功邊界保留，不能把整項 L-A 改標為完全解決。
+- bot 另以副本還原 L-A 修正，新案例回 1（503 不等於 507）；還原 Panel 後 tsc 回 2、12 項錯誤，證明新案例及 typecheck 可攔截該回歸。
+- 跨程序同 ID、claim COMMIT 回應遺失、Memory 故障點、TRUNCATE／epoch、舊 AI 回覆、容量競爭及 Phase 26 重啟腳本只引用 `20773e9` 的 `/workspace/p32-evidence`，不算本輪重測 PASS。
+- 新證據位於 `/workspace/p32b-evidence`（7.3 MB），bot 回報隔離服務／proxy／DB／角色／叢集及樣本已清理，未碰 5432，舊證據沒有修改，沒有 commit／push；受阻項目為無。
+
+### 使用者接受及實測來源
+
+使用者於 2026-10-04 明確回覆 **「phase 32通過」**。本地 HEAD 當時為 `ccb34631e2f21433463cea27c9874b131959867f`，只作版本對照；使用者沒有指定驗收測試 SHA 或完整本機環境，不能補寫未提供的版本或命令結果。
+
+- 使用者在 `127.0.0.1:3032` 的 Memory 隔離樣本回報：目前資料備份成功、核對正常；取消後備份保留；套用顯示確定已套用，遊戲畫面恢復。
+- 使用者回報重新整理後仍可查詢同一筆已套用結果，完整備份及修復報告均成功下載。
+- 使用者回報只修存檔 1 後該槽無需修復、存檔 2 仍有候選、目前畫面正常且沒有 Load；存檔 3 的非法資料保持受阻。
+- 使用者另以「你幫我驗證這步」授權開發代理，只親自操作上述隔離樣本的存檔 2 同值覆寫測試。開發代理由 UI 保存新準備，對 helper 的 `/api/dev/phase32-change/2` 做一次 POST（回 `{"changed":true}`），再由 UI 確認舊準備。實際顯示確定未套用、來源變動須重新準備，手動查詢仍為拒絕；重新預覽後存檔 2 仍有候選，四份來源原始 SHA-256 全部與測前一致。這項開發代理直接驗證 PASS，不代替 bot 其他測試，也不延伸為後續測試授權。
+- 該項直接驗證的 ID 為 `4f6f3afb-9662-4562-9b99-aa058ab2ef67`，本機暫存證據在 `/private/tmp/ai-trpg-phase32-stale-check/`（`result.json`、`rejected.jpg`，未加入 Git）。沒有重新套用、初始化或還原遊戲來源。
+
+### 接受後仍保留的項目
+
+- **Low L-C 未修正**：507 文案仍稱「未新增備份」，但資格保存失敗時備份可能已保存，可手動查詢／下載，文案與部分成功結果不符；沒有資料風險。本次只記錄接受，不改程式或文案。
+- L-A 部分成功資格邊界保留；L-B 依已批准保守政策永久 unknown、保留每 ID 64 KiB 預留，累積可能耗盡容量，不能擅自重試、接手或釋放。
+- Info 保留：確認開關後焦點落到 body、原始 UTC 時間、套用與備份共用日誌 operation、Memory 報告故障查詢回 503；新增案例用 stub 的覆蓋限制及缺少 H1 UI 單元測試亦保留。文件頂部的過時狀態字眼於本次驗收紀錄更新。
+- 真手機、讀屏器、實際整庫 restore、HTTP Reset、主 pool 借出期間斷線及正式遊玩體驗未測；Phase 31 的 FATAL 無日誌、release(true)、favicon、焦點觀察、舊六個無法歸因的 503 與密碼洩漏驗證設定限制均保留。
+
+### 原手動驗收清單（不代表每項都由使用者實測）
 
 - 預覽有效候選並保存原稿，核對二次確認；取消確認後來源不變且備份仍可下載。
 - 每次只套用一份來源；目前資料版本加一、新 generation；槽原時間／版本保留，其他來源不變。
@@ -132,9 +163,9 @@ bot 證據留在 `/workspace/p32-evidence`（4.4 MB），回報隔離程序、pr
 - 完成或明確拒絕都有完整報告下載；舊備份與歷史結果可取回，舊 Memory 資格不能套用。
 - 手機窄螢幕可捲動核對，鍵盤能操作確認／取消／查詢／下載，結果提示可辨識且不搶焦點。
 
-本階段未驗收；工程報告不能替使用者接受。完成此階段後才討論下一項，沒有自動開始新增修復類型或下一個主要系統。
+清單於原交付時尚未驗收；使用者其後已明確接受本階段，實際回報與未測界線以以上紀錄為準。工程報告不能替使用者接受。下一主要階段尚未開始，沒有自動新增修復類型或下一個主要系統。
 
-## 限定本輪的手動提交與送驗
+## 首版的限定提交與送驗模板（歷史）
 
 下列指令僅列本輪檔案，排除先前未提交的 AGENTS／Phase 31 文字。使用者已授權本輪限定提交與送驗，下列為限定檔案的操作紀錄模板：
 
@@ -146,7 +177,7 @@ git push origin codex/phase27-mobile-ui
 git rev-parse HEAD
 ```
 
-以下為首版提交當時的送驗模板。首版 `20773e94735e09abbcbe3d0ecd7917006410af18` 已送達並收到上述 FAIL；補修須取得遠端可讀 TARGET 後再主動送指定 bot，依技能重核對目標、讀回確認送達。補修送達與結果以後續交接訊息為準；使用模板時將 TARGET 待填欄位換成實際完整 SHA：
+以下為首版提交當時的送驗模板。首版 `20773e94735e09abbcbe3d0ecd7917006410af18` 已送達並收到上述 FAIL；補修 `ccb34631e2f21433463cea27c9874b131959867f` 其後已取得遠端可讀版本、依技能核對並確認送達，實際複驗結果見上方。保留模板中的 TARGET 待填欄位供歷史追溯，不代表目前版本仍未提交或送驗：
 
 ```text
 請以 AI TRPG Architecture Critic 做 Phase 32 工程驗證；不代替使用者最終驗收。
