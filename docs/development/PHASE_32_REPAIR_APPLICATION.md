@@ -79,7 +79,7 @@ npm test
 git diff --check 3d8df060162163b1fbb60873baf95e95b19ea709 TARGET_FULL_SHA
 ```
 
-以上命令由 bot 執行，必須使用隔離 PostgreSQL／角色與 `TEST_DATABASE_URL`，不可碰使用者正常 DB 或 5432。整體測試如發現舊問題須分開歸因，不把歷史報告當本輪執行。
+以上命令由 bot 執行，必須使用隔離 PostgreSQL／角色與 `TEST_DATABASE_URL`，並先對該隔離測試 DB 完成 migration；不可碰使用者正常 DB 或 5432。整體測試如發現舊問題須分開歸因，不把歷史報告當本輪執行。
 
 隔離瀏覽器樣本（同樣尚未執行，先由 bot build）：
 
@@ -97,6 +97,33 @@ node --import tsx tests/helpers/phase32-repair-application.mjs normal
 上述 dev endpoint 只存在 helper，沒有加入正式 API。真 PG 還需對實際 index.ts 做兩種提交順序、來源／結果交易故障、COMMIT 回應遺失、兩程序同 ID、容量競爭、觸發器 ABA／TRUNCATE／維運 epoch、原 saved_at 微秒及多角色隔離。
 
 ## 使用者手動驗收
+
+### 使用者回報的建置阻擋與同階段補修
+
+使用者在 `20773e94735e09abbcbe3d0ecd7917006410af18` 交付後自行執行 `npm run build`，轉交 typecheck 失敗輸出：兩個檔案共 14 項錯誤；未提供 exit code。這是使用者本機回報，不是 Grok 或開發代理執行結果；當時尚未進入瀏覽器驗收。
+
+- `RepairPreparationPanel.tsx` 的套用資格查詢變數 `result` 遮蔽外層修復候選，造成宣告前引用；改名為 `application`，並更新回傳欄位及使用處。
+- `repair-application.test.ts` 對可同步或非同步的 reader 直接呼叫 `.then`；改為 async callback 中 await，再取 raw。
+
+另依指定 bot 的 L-A 修正資格保存容量不足的錯誤傳遞：轉成準備流程的 `capacity`／507，內容衝突維持 409，其餘固定安全 503。備份已保存但資格失敗時仍可下載原稿，同 ID 不重新綁定資格，須重新預覽並用新 ID 準備；這個保守邊界不變。新增 HTTP 回歸案例檢查錯誤碼、原稿保留、同 ID 不補資格及來源不變，尚未執行。
+
+本輪沿用使用者已授權的 Phase 32 commit／push 及送指定 bot。補修完整目標 SHA 以交接訊息為準；開發代理沒有重跑 build、typecheck 或測試，結果仍待指定 bot 驗證，不記為通過。先暫停後續手動驗收步驟。
+
+### 指定 bot 對首版實作的外部工程回報
+
+AI TRPG Architecture Critic 對 `20773e94735e09abbcbe3d0ecd7917006410af18`（BASE `3d8df060162163b1fbb60873baf95e95b19ea709`）回報 **FAIL**，有 High H1 建置與兩個備份 UI 入口阻擋；這不是開發代理親自執行，也不代表使用者驗收。環境為 Node 24.21.0、npm 9.2.0、Debian 13.7、PG 17.11（隔離 55426）、Chrome 154／Playwright 1.63.0。
+
+- `npm ci` 回 0；`npm run build` 回 2，Panel 12 項、測試 2 項型別錯誤。
+- 指定四組測試在隔離 PG 下 64 項全過、exit 0；沒有 DB 時 53 過／9 略過，略過不算通過。
+- 完整隔離 PG 測試在補做測試 DB migration 後 405 項全過、exit 0。首次未 migrate 回 1、24 項失敗，bot 歸因為自己的環境設定；無 DB 的完整測試 363 過／40 略過、exit 0。
+- BASE build、BASE 隔離 PG 391 項、兩支 Phase 26 restart 腳本與 BASE..TARGET diff-check 均回 0。
+- bot 回報 PG／Memory 主要後端、單來源、競爭、故障及資料守衛路徑 PASS；為繼續 UI 檢查，以 `npx vite build` 繞過型別檢查及 API 準備方式建立樣本。這不能把正常備份 UI 流程改記為通過；修正後必須從真 UI 保存原稿開始重驗兩個入口與 Phase 31 回歸。
+- L-A：資格容量不足回錯 503，備份已保存但同 ID 永久無資格。本輪修正錯誤碼；已保存原稿不能重新授權的邊界保留，待 bot 複驗。
+- L-B：開始後即使是已知提交前故障，也依已批准的保守契約永久 unknown，保留每 ID 的 64 KiB 容量預留，累積會耗盡容量。本輪保留並記錄，沒有自動釋放、接手或重做。
+- Info 保留：展開／取消確認後焦點落到 body、時間顯示原始 UTC、PG 套用日誌 operation 與備份共用、Memory 報告查詢故障回 503；送驗狀態模板字眼於本輪改為提交當時狀態。
+- 真手機、讀屏、實際整庫 restore 及 HTTP Reset 未測；不可改記為通過。舊 Phase 31 Info／未測界線保留。
+
+bot 證據留在 `/workspace/p32-evidence`（4.4 MB），回報隔離程序、proxy、DB／角色及叢集已清理，未碰 5432、clone 乾淨，沒有 commit／push。補修版本待複驗，Phase 32 尚未由使用者接受。
 
 - 預覽有效候選並保存原稿，核對二次確認；取消確認後來源不變且備份仍可下載。
 - 每次只套用一份來源；目前資料版本加一、新 generation；槽原時間／版本保留，其他來源不變。
@@ -119,7 +146,7 @@ git push origin codex/phase27-mobile-ui
 git rev-parse HEAD
 ```
 
-取得遠端可讀 TARGET 後主動送指定 bot，送出前依技能重核對目標、讀回確認送達。現在實作尚未送達，不能宣稱已送驗。可直接使用完整 prompt，將 TARGET 待填欄位換成實際完整 SHA：
+以下為首版提交當時的送驗模板。首版 `20773e94735e09abbcbe3d0ecd7917006410af18` 已送達並收到上述 FAIL；補修須取得遠端可讀 TARGET 後再主動送指定 bot，依技能重核對目標、讀回確認送達。補修送達與結果以後續交接訊息為準；使用模板時將 TARGET 待填欄位換成實際完整 SHA：
 
 ```text
 請以 AI TRPG Architecture Critic 做 Phase 32 工程驗證；不代替使用者最終驗收。

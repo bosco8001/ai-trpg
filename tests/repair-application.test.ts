@@ -13,7 +13,7 @@ import { InMemorySaveGameRepository } from "../src/server/save-game/memory-repos
 import { createSaveSnapshot } from "../src/server/save-game/service.js";
 import { createMemoryRepairReader, createPostgresRepairReader, type RepairPreviewReader } from "../src/server/repair-preview-reader.js";
 import { analyzeRepairRecord } from "../src/server/repair-preview.js";
-import { createRepairPreparationService } from "../src/server/repair-preparation.js";
+import { createRepairPreparationService, registerRepairPreparationRoutes } from "../src/server/repair-preparation.js";
 import { FileRepairArchive } from "../src/server/file-repair-archive.js";
 import { PostgresRepairArchive, createRepairArchivePool } from "../src/server/postgres-repair-archive.js";
 import { MemoryRepairApplication } from "../src/server/memory-repair-application.js";
@@ -154,6 +154,23 @@ test("舊備份缺守衛或新程序準備均無資格；容量不足在來源�
   await assert.rejects(limited.apply(request, signal()), (e: unknown) => e instanceof ApplicationFailure && e.code === "capacity");
   assert.equal(f.session.getState().revision, 0); assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ready");
 });
+test("資格容量不足回 507，原稿仍可下載，同 ID 不補發資格或修改來源", async t => {
+  const f = await memoryFixture(t), request = await requestFor(f.reader), before = structuredClone(f.session.getState());
+  let bindings = 0;
+  const preparation = createRepairPreparationService(f.reader, f.archive, undefined, f.runtimeId, () => new Date(), async () => {
+    bindings++; throw new ApplicationFailure("capacity");
+  });
+  const app = Fastify(); registerRepairPreparationRoutes(app, preparation); t.after(() => app.close());
+  const response = await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) });
+  assert.equal(response.statusCode, 507); assert.equal(response.json().code, "capacity");
+  const backup = await preparation.download(request.repairId, signal());
+  assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
+  assert.equal((await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) })).statusCode, 200);
+  assert.equal(bindings, 1);
+  assert.equal(await preparation.download(request.repairId, signal()), backup);
+  assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
+  assert.deepEqual(f.session.getState(), before);
+});
 test("HTTP／前端：嚴格確認、固定安全錯誤、完整報告校驗，遺失回應沒有重試", async t => {
   const f = await memoryFixture(t), request = await requestFor(f.reader);
   const record = await f.prepare.prepare(preparationRequest(request), signal());
@@ -229,7 +246,7 @@ test("PG：單槽修復不讀取目前遊戲，微秒 saved_at 及 source_revisi
   await f.prepare.prepare(preparationRequest(request), signal()); const result = await f.backend.apply(request, signal());
   assert.equal(result.status, "applied"); const after = JSON.parse((await f.reader.read(2, sourceLimit, signal())).raw!);
   assert.equal(after.saved_at, JSON.parse(original.raw!).saved_at); assert.match(after.saved_at, /123456/); assert.equal(after.source_revision, 7);
-  assert.deepEqual(await Promise.all([1, 3].map(id => f.reader.read(id as 1 | 3, sourceLimit, signal()).then(r => r.raw))), others.map(r => r.raw));
+  assert.deepEqual(await Promise.all([1, 3].map(async id => (await f.reader.read(id as 1 | 3, sourceLimit, signal())).raw)), others.map(r => r.raw));
   assert.equal((await f.writer.query("SELECT count(*) FROM game_states")).rows[0].count, "0");
 });
 test("PG：開始 COMMIT 或來源 COMMIT 回應遺失，持久 ID 不重做，查詢依真實結果回報", pgOptions, async t => {

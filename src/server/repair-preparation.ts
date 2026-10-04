@@ -6,6 +6,7 @@ import { PREPARATION_MESSAGES, REPAIR_BACKUP_MAX_BYTES, isPreparationRequest, re
 import { analyzeRepairRecord } from "./repair-preview.js";
 import type { RepairPreviewReader } from "./repair-preview-reader.js";
 import { RawBackupFailure, boundedJson } from "./raw-data-backup.js";
+import { ApplicationFailure } from "./repair-application-core.js";
 import { PreparationFailure, backupSummary, makeRepairBackup, preparationBinding, verifiedBackup, type RepairArchive } from "./repair-archive.js";
 
 export function createRepairPreparationService(reader: RepairPreviewReader, archive: RepairArchive,
@@ -43,7 +44,14 @@ export function createRepairPreparationService(reader: RepairPreviewReader, arch
       signal.throwIfAborted();
       // A concurrent publisher may have won this ID with an earlier capture.
       // Never attach a later guard to that earlier immutable backup (including ABA).
-      if (saved === text) await onPrepared?.(saved, record, signal);
+      if (saved === text) {
+        try { await onPrepared?.(saved, record, signal); }
+        catch (error) {
+          if (error instanceof ApplicationFailure) throw new PreparationFailure(
+            error.code === "capacity" || error.code === "conflict" ? error.code : "unavailable");
+          throw error;
+        }
+      }
       signal.throwIfAborted();
       return backupSummary(saved, characterId, runtimeId);
     },

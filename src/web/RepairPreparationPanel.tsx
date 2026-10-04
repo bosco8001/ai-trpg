@@ -84,10 +84,10 @@ export function RepairPreparationPanel({ report, stale, onApplied }: { report: R
     void run("正在保存並驗證完整原稿，你可以繼續遊戲……", async signal => {
       const prepared = await prepareRepair({ repairId: newId, source: result.source,
         storage: report.storage, previewVersion: 1, rulesVersion: 1, fingerprint: result.fingerprint!, candidateFingerprint: result.candidateFingerprint! }, signal);
-      const result = await lookupApplication(newId, signal).catch(() => null);
-      return { prepared, result };
+      const application = await lookupApplication(newId, signal).catch(() => null);
+      return { prepared, application };
     }, next => {
-      setRecord(next.prepared); setApplication(next.result); setUncertain(false); confirmId(newId); setFeedback("完整備份已保存。請核對差異，再於原頁面確認套用。");
+      setRecord(next.prepared); setApplication(next.application); setUncertain(false); confirmId(newId); setFeedback("完整備份已保存。請核對差異，再於原頁面確認套用。");
     });
   }
   function lookup() {
@@ -95,10 +95,10 @@ export function RepairPreparationPanel({ report, stale, onApplied }: { report: R
     const selectedId = repairId; rememberId(selectedId);
     void run("正在查詢本次備份與套用紀錄……", async signal => {
       const prepared = await lookupPreparation(selectedId, signal);
-      const result = await lookupApplication(selectedId, signal).catch(() => null);
-      return { prepared, result };
+      const application = await lookupApplication(selectedId, signal).catch(() => null);
+      return { prepared, application };
     }, next => {
-      setRecord(next.prepared); setApplication(next.result); setUncertain(false); confirmId(selectedId); setFeedback("已讀取備份；套用狀態請看下方結果。");
+      setRecord(next.prepared); setApplication(next.application); setUncertain(false); confirmId(selectedId); setFeedback("已讀取備份；套用狀態請看下方結果。");
     });
   }
   function list(cursor: string | null) {
