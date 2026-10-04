@@ -23,6 +23,9 @@ import { ApplicationFailure } from "../src/server/repair-application-core.js";
 import { isRepairApplication, parseRepairReport, REPAIR_REPORT_MAX_BYTES, type RepairApplyRequest } from "../src/shared/repair-application.js";
 import { applyRepair, loadRepairReport } from "../src/web/repair-application.js";
 import { append } from "../src/server/history.js";
+import { makeRepairBackup } from "../src/server/repair-archive.js";
+import { REPAIR_BACKUP_MAX_BYTES } from "../src/shared/repair-preparation.js";
+import { prepareRepair, PreparationClientFailure } from "../src/web/repair-preparation.js";
 
 const signal = () => new AbortController().signal;
 const sourceLimit = 10 * 1024 * 1024;
@@ -162,7 +165,7 @@ test("資格容量不足回 507，原稿仍可下載，同 ID 不補發資格或
   });
   const app = Fastify(); registerRepairPreparationRoutes(app, preparation); t.after(() => app.close());
   const response = await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) });
-  assert.equal(response.statusCode, 507); assert.equal(response.json().code, "capacity");
+  assert.equal(response.statusCode, 507); assert.equal(response.json().code, "capacity-after-backup");
   const backup = await preparation.download(request.repairId, signal());
   assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
   assert.equal((await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) })).statusCode, 200);
@@ -170,6 +173,59 @@ test("資格容量不足回 507，原稿仍可下載，同 ID 不補發資格或
   assert.equal(await preparation.download(request.repairId, signal()), backup);
   assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
   assert.deepEqual(f.session.getState(), before);
+});
+// Size a real archive to fit the backup exactly, leaving no room for its certificate.
+async function backupOnlyBytes(reader: RepairPreviewReader, request: RepairApplyRequest, runtimeId: string, now: Date) {
+  const record = reader.readGuarded ? await reader.readGuarded(request.source, sourceLimit, signal())
+    : await reader.read(request.source, sourceLimit, signal());
+  const result = analyzeRepairRecord(reader, request.source, record);
+  assert.equal(result.status, "candidate"); assert.ok(record.raw); assert.notEqual(result.revision, null);
+  return Buffer.byteLength(makeRepairBackup({ ...preparationRequest(request), characterId: reader.characterId,
+    runtimeId: reader.storage === "memory" ? runtimeId : null, capturedAt: record.capturedAt, preparedAt: now.toISOString(),
+    revision: result.revision!, formatVersion: 2, changes: result.changes, raw: record.raw }, REPAIR_BACKUP_MAX_BYTES));
+}
+async function checkCapacityResponse(t: TestContext, reader: RepairPreviewReader, request: RepairApplyRequest,
+  preparation: ReturnType<typeof createRepairPreparationService>, backend: MemoryRepairApplication | PostgresRepairApplication,
+  saved: boolean) {
+  const before = await reader.read(request.source, sourceLimit, signal());
+  const app = Fastify(); registerRepairPreparationRoutes(app, preparation); t.after(() => app.close());
+  const response = await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) });
+  assert.equal(response.statusCode, 507);
+  assert.equal(response.json().code, saved ? "capacity-after-backup" : "capacity");
+  if (saved) {
+    assert.match(response.json().message, /完整備份已保存/);
+    assert.match(response.json().message, /未取得套用資格/);
+    assert.doesNotMatch(response.json().message, /未新增備份/);
+  } else assert.match(response.json().message, /未新增備份/);
+  // The client must use its safe dictionary, even when the server message is untrusted.
+  const body = JSON.stringify({ ...response.json(), message: "untrusted SQL /private/secret" });
+  await assert.rejects(prepareRepair(preparationRequest(request), signal(), async () => new Response(body, {
+    status: 507, headers: { "Content-Type": "application/json", "Content-Length": String(Buffer.byteLength(body)) },
+  })), (error: unknown) => error instanceof PreparationClientFailure
+    && error.code === response.json().code && error.message === response.json().message);
+  const download = await app.inject(`/api/repair-preparations/${request.repairId}/backup`);
+  assert.equal(download.statusCode, saved ? 200 : 404);
+  if (saved) {
+    assert.equal(download.body, await preparation.download(request.repairId, signal()));
+    assert.equal((await backend.lookup(request.repairId, signal())).status, "ineligible");
+    assert.equal((await app.inject({ method: "POST", url: "/api/repair-preparations", payload: preparationRequest(request) })).statusCode, 200);
+    assert.equal((await backend.lookup(request.repairId, signal())).status, "ineligible");
+  }
+  assert.equal((await reader.read(request.source, sourceLimit, signal())).raw, before.raw);
+}
+test("Memory 真容量：備份前與資格階段 507 提示分開，同 ID 不補資格，新 ID 可準備", async t => {
+  const f = await memoryFixture(t), now = new Date("2026-10-04T00:00:00.000Z"), request = await requestFor(f.reader);
+  const full = new FileRepairArchive(f.parent, undefined, 1);
+  await checkCapacityResponse(t, f.reader, request, createRepairPreparationService(f.reader, full), f.backend, false);
+  const archive = new FileRepairArchive(f.parent, undefined, await backupOnlyBytes(f.reader, request, f.runtimeId, now) + 4096);
+  const backend = new MemoryRepairApplication(f.reader, archive, f.session, f.slots, f.runtimeId);
+  const prepare = createRepairPreparationService(f.reader, archive, undefined, f.runtimeId, () => now, backend.bind.bind(backend));
+  await checkCapacityResponse(t, f.reader, request, prepare, backend, true);
+  await f.prepare.prepare(preparationRequest(request), signal());
+  assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
+  const fresh = await requestFor(f.reader); await f.prepare.prepare(preparationRequest(fresh), signal());
+  assert.equal((await f.backend.lookup(fresh.repairId, signal())).status, "ready");
+  assert.equal(f.session.getState().revision, 0);
 });
 test("HTTP／前端：嚴格確認、固定安全錯誤、完整報告校驗，遺失回應沒有重試", async t => {
   const f = await memoryFixture(t), request = await requestFor(f.reader);
@@ -209,6 +265,20 @@ async function postgresFixture(t: TestContext) {
   await writer.query("INSERT INTO game_states VALUES ('TEST-character',$1,$2)", [revision, JSON.stringify({ ...snapshot, activity: "in-combat", character: { ...snapshot.character, currentMp: 23 } })]);
   return { writer, reader, archive, backend, prepare };
 }
+test("PG 真容量：備份前與資格階段 507 提示分開，同 ID 不補資格，新 ID 可準備", pgOptions, async t => {
+  const f = await postgresFixture(t), now = new Date("2026-10-04T00:00:00.000Z"), request = await requestFor(f.reader);
+  const full = new PostgresRepairArchive(f.writer, undefined, 1);
+  await checkCapacityResponse(t, f.reader, request, createRepairPreparationService(f.reader, full), f.backend, false);
+  const capacity = await backupOnlyBytes(f.reader, request, "", now) + Buffer.byteLength(f.reader.characterId) + 16;
+  const archive = new PostgresRepairArchive(f.writer, undefined, capacity), backend = new PostgresRepairApplication(f.reader, archive);
+  const prepare = createRepairPreparationService(f.reader, archive, undefined, "", () => now, backend.bind.bind(backend));
+  await checkCapacityResponse(t, f.reader, request, prepare, backend, true);
+  await f.prepare.prepare(preparationRequest(request), signal());
+  assert.equal((await f.backend.lookup(request.repairId, signal())).status, "ineligible");
+  const fresh = await requestFor(f.reader); await f.prepare.prepare(preparationRequest(fresh), signal());
+  assert.equal((await f.backend.lookup(fresh.repairId, signal())).status, "ready");
+  assert.equal(Number((await f.writer.query("SELECT revision FROM game_states WHERE character_id='TEST-character'")).rows[0].revision), 0);
+});
 test("PG：跨實例同 ID 只寫一次；來源、世代與報告同筆提交，重啟可取回", pgOptions, async t => {
   const f = await postgresFixture(t), request = await requestFor(f.reader);
   const before = JSON.parse((await f.reader.read("current", sourceLimit, signal())).raw!);

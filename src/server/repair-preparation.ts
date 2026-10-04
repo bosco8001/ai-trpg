@@ -48,7 +48,7 @@ export function createRepairPreparationService(reader: RepairPreviewReader, arch
         try { await onPrepared?.(saved, record, signal); }
         catch (error) {
           if (error instanceof ApplicationFailure) throw new PreparationFailure(
-            error.code === "capacity" || error.code === "conflict" ? error.code : "unavailable");
+            error.code === "capacity" ? "capacity-after-backup" : error.code === "conflict" ? "conflict" : "unavailable");
           throw error;
         }
       }
@@ -85,7 +85,7 @@ function abortable<T>(work: () => Promise<T>, signal: AbortSignal): Promise<T> {
 export function registerRepairPreparationRoutes(app: FastifyInstance, service: RepairPreparationService,
   maxBytes = REPAIR_BACKUP_MAX_BYTES, timeoutMs = REPAIR_TIMEOUT_MS) {
   const status = { "invalid-request": 400, stale: 409, blocked: 409, "identity-conflict": 409,
-    conflict: 409, capacity: 507, "too-large": 413, "not-found": 404, unavailable: 503 };
+    conflict: 409, capacity: 507, "capacity-after-backup": 507, "too-large": 413, "not-found": 404, unavailable: 503 };
   function route<T extends FastifyRequest = FastifyRequest>(operation: (request: T, signal: AbortSignal) => Promise<unknown>, download = false) {
     return async (request: T, reply: import("fastify").FastifyReply) => {
       reply.header("Cache-Control", "no-store");
