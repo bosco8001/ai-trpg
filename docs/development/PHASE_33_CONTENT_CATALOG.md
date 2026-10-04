@@ -1,8 +1,8 @@
 # Phase 33：正式內容名冊第一步
 
-2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正待 bot 驗證、使用者尚未驗收。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
+2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正 `940e1f3` 已獲外部工程 PASS；使用者已回報新版文案及五族數值正常，並選定緊湊資料卡排版。正式排版整合待新一輪 bot 驗證及使用者接受。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
 
-Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mobile-ui`。首版整體 BASE：`8f5c0334c2dbab10d2c519c3118af44c383c5a1e`；補修 BASE：`641b82f1686d24991e0d1da4ba9095b629995dcc`；已複驗 TARGET：`8792e15843fbfe02d9f035db27e9ef5e5d784b4a`。本次外部結果紀錄的後續文件變更，不是該測試 TARGET 的一部分。
+Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mobile-ui`。首版整體 BASE：`8f5c0334c2dbab10d2c519c3118af44c383c5a1e`；補修 BASE：`641b82f1686d24991e0d1da4ba9095b629995dcc`；版本 1 已複驗 TARGET：`8792e15843fbfe02d9f035db27e9ef5e5d784b4a`；版本 2 已複驗 TARGET：`940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`（BASE 為前述版本 1 TARGET）。本次外部結果紀錄的後續文件變更，不是該測試 TARGET 的一部分。
 
 ## 範圍與來源
 
@@ -34,13 +34,13 @@ Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mo
 
 修改：`src/server/app.ts`、`src/web/RuntimeSystemPanel.tsx`、`docs/development/CANONICAL_MANIFEST.md`、`docs/development/OPEN_QUESTIONS.md`、`docs/development/IMPLEMENTATION_PLAN.md`。首版共十一檔；同切片 D1 補修另修改 `src/web/ExplorationPage.tsx`。不包含原有未提交的 `AGENTS.md` 或 Phase 31 文字。
 
-## 工程檢查：版本 1 外部 PASS，版本 2 修正待驗證
+## 工程檢查：歷史版本各自 PASS，最新排版補修待驗證
 
-開發代理只閱讀程式／Git、編寫案例及核對差異，沒有執行 build、typecheck、lint、測試或 UI 驗證。首版五項測試與 D1／D2 補修六項測試分別由 Grok 執行，版本 1 結果見下方歷史複驗紀錄。本次版本 2 的修改與相關測試尚未執行，不能沿用 `8792e15` 的 PASS。
+開發代理只閱讀程式／Git、編寫案例及核對差異，沒有執行 build、typecheck、lint、測試或 UI 驗證。首版五項測試與 D1／D2 補修六項測試分別由 Grok 執行，版本 1 結果見下方歷史複驗紀錄。版本 2 交付當時待驗證，其後由 Grok 對 `940e1f3` 獨立執行並回報 PASS，詳見文末；不是沿用 `8792e15` 的 PASS。
 
 指定 bot 的命令：`npm ci`、`npm run build`、`node --import tsx --test tests/content-catalog.test.ts`、完整 `npm test`、BASE..TARGET `git diff --check`。完整 PG 回歸須隔離 `TEST_DATABASE_URL` 並先 migrate，不能碰正常 DB 或 5432；skip 不算 PASS。本次本身無 DB migration。
 
-## 使用者核對清單（版本 2 工程驗證後繼續）
+## 使用者核對清單（版本 2 文案與數值已回報正常，最新排版待工程驗證）
 
 1. 開啟系統／存檔 → 正式內容名冊，看到五個種族與內容版本 2。
 2. 人類固定加成皆零，另有兩點自由種族點；精靈力量 -1／體質 -2／智慧 +1／感知 +2；矮人力量 +1／敏捷 -1／體質 +2／魅力 -2；獸人敏捷 +2／感知 +2／智慧 -3／魅力 -1；龍裔力量 +2／體質 +2／智慧 +1。
@@ -165,15 +165,15 @@ D2 驗可變getter不能使載入值跳過驗證；被複製的非法值整份�
 
 外部清理：服務已停，隔離 DB／角色 drop、cluster 停，`/workspace/p33b` 已刪；5432、clone、舊證據未變。新證據 `/workspace/p33b-evidence` 共 105 檔。bot 未改檔、commit／push 或開下一切片；Codex 沒有在本機重跑或核驗該證據目錄。使用者尚未確認本切片通過。
 
-## 使用者核對澄清：所有角色創角後揭曉（同切片，待驗證）
+## 使用者核對澄清：所有角色創角後揭曉（同切片，交付當時待驗證）
 
 使用者先回報本機 build 成功、探索畫面開啟及名冊入口／五族正常，沒有回報全部數值一致或整體驗收。其後明確澄清：「全部角色的資質都是創角完成才揭曉，不用寫玩家可以是普通人或代行者」。因此手動核對停在資料註記步驟，依指示修正後重新送工程驗證，再繼續核對。
 
 本次更新 Character §5／Race §2 共通規則，五族皆 `after-creation`；畫面移除普通人／代行者提示，保留資質不代表施法資格的說明。先前玩家身分方向澄清仍保留於 OPEN_QUESTIONS，沒有因移除 UI 句子而取消玩家可扮演普通人或代行者的方向。各族固定加成、自由點、資質機率及施法資格規則不變。
 
-內容版本升為 2、資料檔更名為 `races-v2.ts`／`OFFICIAL_RACES_V2`；資料結構版本仍 1。正式 loader 僅提供版本 2，舊內容版本 1 查詢明確 409，不默默轉成版本 2 或 TEST。既有 state／Save 尚未引用名冊，不做 migration。測試對照改為版本 2／全族 after-creation，加入 unspecified／before-creation 拒絕及舊版本拒絕案例；尚未執行。本次沒有補小數屬性案例，新舊 Info 仍保留。
+內容版本升為 2、資料檔更名為 `races-v2.ts`／`OFFICIAL_RACES_V2`；資料結構版本仍 1。正式 loader 僅提供版本 2，舊內容版本 1 查詢明確 409，不默默轉成版本 2 或 TEST。既有 state／Save 尚未引用名冊，不做 migration。測試對照改為版本 2／全族 after-creation，加入 unspecified／before-creation 拒絕及舊版本拒絕案例；交付當時尚未執行，其後外部結果見下。本次沒有補小數屬性案例，新舊 Info 仍保留。
 
-本次限定範圍為十一項檔案變更（名冊更名涉及兩個路徑）：`docs/gameplay/character_system.md`、`docs/world/races.md`、`src/server/content/races-v1.ts` → `races-v2.ts`、`src/server/content-catalog.ts`、`src/shared/content-catalog.ts`、`src/web/ContentCatalogPanel.tsx`、`tests/content-catalog.test.ts`、本文件、`CANONICAL_MANIFEST.md`、`OPEN_QUESTIONS.md`、`IMPLEMENTATION_PLAN.md`。四份 development 文件包含先前未提交的 `8792e15` 外部 PASS 紀錄；該紀錄僅適用內容版本 1，本次版本 2 仍待驗證。不包含原有 AGENTS.md／Phase 31 變更。使用者於 2026-10-04 回覆「授權此次修正 commit／push 並送驗」，批准本次限定提交與驗證，不代替階段驗收或延伸至下一切片。
+本次限定範圍為十一項檔案變更（名冊更名涉及兩個路徑）：`docs/gameplay/character_system.md`、`docs/world/races.md`、`src/server/content/races-v1.ts` → `races-v2.ts`、`src/server/content-catalog.ts`、`src/shared/content-catalog.ts`、`src/web/ContentCatalogPanel.tsx`、`tests/content-catalog.test.ts`、本文件、`CANONICAL_MANIFEST.md`、`OPEN_QUESTIONS.md`、`IMPLEMENTATION_PLAN.md`。四份 development 文件包含先前未提交的 `8792e15` 外部 PASS 紀錄；該紀錄僅適用內容版本 1，本次版本 2 交付當時仍待驗證；其後獨立結果見下。不包含原有 AGENTS.md／Phase 31 變更。使用者於 2026-10-04 回覆「授權此次修正 commit／push 並送驗」，批准本次限定提交與驗證，不代替階段驗收或延伸至下一切片。
 
 ```sh
 git add -- docs/gameplay/character_system.md docs/world/races.md src/server/content/races-v1.ts src/server/content/races-v2.ts src/server/content-catalog.ts src/shared/content-catalog.ts src/web/ContentCatalogPanel.tsx tests/content-catalog.test.ts docs/development/PHASE_33_CONTENT_CATALOG.md docs/development/CANONICAL_MANIFEST.md docs/development/OPEN_QUESTIONS.md docs/development/IMPLEMENTATION_PLAN.md
@@ -183,7 +183,7 @@ git push origin codex/phase27-mobile-ui
 git rev-parse HEAD
 ```
 
-本次完整工程審查 prompt（TARGET 待填，尚未送達）：
+本次完整工程審查 prompt 範本（保留交付當時的 TARGET 待填文字；實際送出已填 `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`，2026-10-04 22:18:31 HKT 已讀回確認送達）：
 
 ```text
 請以 AI TRPG Architecture Critic 驗證 Phase 33 第一個切片的使用者核對澄清補修，回報工程 PASS/FAIL，不代替使用者最終驗收。
@@ -200,4 +200,83 @@ TARGET: 待本次限定提交及 push 後填入完整 SHA
 正式build產物、NODE_ENV=production正常探索頁→系統→名冊：版本2、五族都顯示創角完成後揭曉註記，不再顯示玩家可為普通人或代行者，保留資質不代表施法資格；無暗示已完成創角。手動刷新/收起/重開、取消/timeout/格式非法/舊回應、鍵盤/live/320/375/430寬度依diff做必要驗證，無自動輪詢/JS錯誤。GET不讀寫DB、不改state/revision/slots/guard、不呼叫LLM。戰鬥/主選單必要回歸明示production模式受阻；引用舊UI結果標版本，不當今輪真做。
 保留小數屬性測試缺口、來源原物件未凍結、陣列非索引屬性、格式界限語意、query access log、favicon、抽屜關閉按鈕捲走可Esc等Info，不因新PASS自動改標解決。真手機/讀屏/正式遊玩未測與舊版本結果分開。
 回報完整SHA/環境/完整命令exitcode、逐項結果、缺陷嚴重度/精確行號/重現/影響、真做/引用/推斷/未測/受阻、清理與新證據。不修改專案、不commit/push、不展開下一切片，不代替使用者接受。
+```
+
+
+## 內容版本 2 澄清補修外部工程 PASS（2026-10-04，待使用者驗收）
+
+來源：AI TRPG Architecture Critic，2026-10-04 22:27:59 與 22:28:05（Asia/Hong_Kong）的報告，Codex 經 Grok Bot Control 直接讀取。BASE `8792e15843fbfe02d9f035db27e9ef5e5d784b4a`；TARGET `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`。外部核對遠端分支為 TARGET、祖先正確及限定十一項變更（名冊更名 R087）；src、tests、dist 無舊 races-v1 引用。工程結論 **PASS**，無新 High、Medium 或 Low。這是外部結果，開發代理沒有執行 build、typecheck、測試或 UI 驗證，也未在本機核驗外部證據。
+
+外部環境：Node 24.21.0、npm 9.2.0、Debian 13.7、新隔離 PG 17.11（55426）、Chrome 154、Playwright 1.63.0。
+
+| 外部命令 | exit | 結果 |
+|---|---:|---|
+| `npm ci` | 0 | 成功 |
+| `npm run build` | 0 | 包含 typecheck |
+| `node --import tsx --test tests/content-catalog.test.ts` | 0 | 6／6 通過 |
+| `env -u TEST_DATABASE_URL npm test` | 0 | 371 通過、41 略過，共 412 |
+| `DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_test npx node-pg-migrate up` | 0 | 隔離 DB migration 成功 |
+| `TEST_DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_test npm test` | 0 | 414／414 通過 |
+| `git diff --check BASE TARGET` | 0 | BASE／TARGET 為本節完整 SHA |
+
+略過不算通過。以上命令均為 bot 回報，不是 Codex 親自執行。
+
+**Canon／loader 外部真做**：五族加成、人類自由兩點、資質百分比及 schemaVersion 1 與 BASE／Canon 一致，全部揭曉標記為 after-creation；身分方向與施法資格規則未改。四份 development 文件保留歷史來源、FAIL、等價 mutant 更正及限制。非法揭曉標記（unspecified、before-creation、其他字串、大小寫、尾端空格、null、缺欄）整份拒絕；快照驗證、凍結與 TEST 隔離回歸正常。45 個 mutant 捕捉 44 個，包含舊版本回退、409 改 404、逐族改回 unspecified；整個 v1 還原時六項新測試全部失敗。小數加成案例缺口仍保留，不將 mutation 漏網寫成現行產品缺陷。
+
+**HTTP／UI 外部真做**：production dist 接 PG 的 54 個 HTTP 情況符合預期；版本 2 成功、1／3／999999999 回 409，格式錯誤 400、未知或 TEST 引用 404；全部 no-store、固定安全錯誤、不回退及不洩漏。名冊 GET 期間 SQL 與對外呼叫均零，state／slots／token／epoch／revision 不變。正式 production 探索頁 → 系統 → 名冊顯示版本 2、五族創角後揭曉註記 5／5、移除指定句子、保留資質不代表直接施法資格，無暗示已創角。開啟／刷新各一個 GET、閒置五秒無請求；取消及舊回應保護、鍵盤／焦點／live／aria-busy 正常；13 種非法回應（含整份舊 v1）只顯示固定錯誤。320／375／430 寬度無溢出、無 JS pageerror。戰鬥／主選單入口僅非 production 回歸，production 仍受阻。
+
+**新增 Info**：UI 文案尚無自動化測試（ContentCatalogPanel.tsx L30、L41），本輪由真 UI 驗證；歷史 Info 的 OFFICIAL_RACES_V1 名稱適用當時版本，目前 OFFICIAL_RACES_V2 來源原物件同樣未凍結，service 使用獨立凍結快照。這是名稱補充，不宣稱已修正凍結限制。
+
+**既有 Info 保留**：小數加成測試缺口、來源原物件未凍結、陣列非索引屬性接受、±12 格式界限語意、access log 記 query、favicon 404、抽屜關閉按鈕隨內容捲走但可用 Esc 關閉。沒有因本次 PASS 改標解決。
+
+真做：上述命令、Canon／文件、loader、45 個 mutant／v1 還原、54 個 HTTP 情況、production 探索 UI、非 production 戰鬥／主選單。引用而非本輪真做：版本 1 `8792e15`、首版 `641b82f`、Phase 32 UI `828d520`。推斷：矮人普通 100% 合理、上下限屬格式防錯。版本 2 未測：真手機、讀屏器、正式遊玩。受阻：production 戰鬥／主選單入口。
+
+外部清理：服務已停、DB／role 已 drop、cluster 已停、`/workspace/p33c` 已刪；5432、clone 與舊證據未變。新證據 `/workspace/p33c-evidence` 共 120 檔。bot 未改檔、commit／push 或展開下一切片。
+
+本段外部結果紀錄交付當時 Phase 33 第一個切片仍待使用者接受，版本 2 尚待使用者重新 build／重啟後核對；其後文案與數值回報及新排版選定見下。後續文件紀錄不包含在被測 TARGET 中。
+
+
+## 使用者核對及緊湊資料卡正式整合（2026-10-04，同切片待驗證）
+
+使用者在 `940e1f3` 外部工程 PASS 後，回報「重啟成功」、「新版文案正常」、「五族數值正常」。開發代理提供收起／重開／刷新／Esc／窄畫面／鍵盤核對步驟，但使用者沒有回報「名冊操作正常」或 Phase 33 通過；不能補寫全部操作及整階段已接受。
+
+其後使用者指出長句排版混亂，要求參考 apple-design 並觀看 prototype。獨立原型位於本機 3043，五族數值直接取自 `races-v2.ts`；原型沒有接入遊戲。使用者要求屬性格縮小，修正為緊湊內距與 1.25rem 數字，再回覆「先用這個設計吧，五族數值正常」。這代表選定排版並確認所見數值，沒有授權下一切片或宣告階段通過。正式整合後已停止原型服務並移除獨立原型，原型的寬度切換／picker 不進正式遊戲。
+
+**正式整合範圍**：`ContentCatalogPanel.tsx` 改為資料卡；`style.css` 新增限 content-catalog 的樣式。六屬性 dt／dd 對齊成三欄；容器至少 40rem 時六欄。屬性格使用原型縮小後的 0.4rem／0.45rem 上下內距及 1.25rem 數字，零值完整保留、加減號明確，顏色只是輔助。人類自由兩點獨立；資質百分比另成一組，裝飾分布條 aria-hidden，仍保留文字數值。共通創角後揭曉／生成後固定／資質不等於施法資格說明集中，每卡保留短註記。種族跳轉連結使用每個面板 useId 的唯一目標與焦點框；沒有自動捲動動畫。手動刷新、狀態／錯誤提示與既有取消／接收限制保留。
+
+**不改動的資料與規則**：五族資料、schemaVersion 1、catalogVersion 2、Canon、server／API、state／Save／DB／LLM 未變；不是創角或完整 R04。舊版本 1 明確拒絕。`940e1f3` 的工程 PASS 僅適用其當時畫面，不能套到本次排版。UI 文案／小數加成測試覆蓋缺口、來源物件未凍結等 Info 保留，不因改成資料卡而宣稱解決。
+
+**本次完整提交範圍六檔**：`src/web/ContentCatalogPanel.tsx`、`src/web/style.css`、本文件、`CANONICAL_MANIFEST.md`、`OPEN_QUESTIONS.md`、`IMPLEMENTATION_PLAN.md`。四份 development 文件包含此前未提交的 `940e1f3` 外部結果紀錄與本次進度。不包含原有未提交 `AGENTS.md`、Phase 31。開發代理僅閱讀／修改／核對程式及 Git 差異，沒有執行 build、typecheck、lint、測試或瀏覽器／UI 驗證；沒有新增測試，最新排版待指定 bot 驗證。
+
+**手動核對（新一輪工程驗證後）**：重新 build／重啟服務並在正式遊戲系統抽屜開名冊；檢查緊湊格子、六屬性正負與零值、人類自由兩點、資質分布及揭曉註記；跳到五族、刷新／收起／重開／Esc、Tab／Enter、窄視窗與放大文字。原型上的選定不代替正式整合驗收。
+
+以下限定提交指令交付當時尚待使用者批准。使用者其後回覆「接受，交給grok驗收吧」，依剛才明列的六檔提交及送驗範圍，批准本次 commit／push 與指定 bot 交接；不包含 AGENTS／Phase 31、不延伸下一切片。本紀錄提交前尚未送達 bot，TARGET 待限定提交後填入：
+
+```sh
+git add -- src/web/ContentCatalogPanel.tsx src/web/style.css docs/development/PHASE_33_CONTENT_CATALOG.md docs/development/CANONICAL_MANIFEST.md docs/development/OPEN_QUESTIONS.md docs/development/IMPLEMENTATION_PLAN.md
+git diff --cached --name-only
+git commit -m "style: use compact race catalog cards"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+```
+
+完整送驗 prompt（待取得可讀遠端 TARGET 後主動送交指定 bot）：
+
+```text
+請以 AI TRPG Architecture Critic 驗證 Phase 33 第一個切片的緊湊資料卡排版補修，回報工程 PASS/FAIL，不代替使用者最終驗收。
+操作者 Codex。
+Repository: https://github.com/bosco8001/ai-trpg
+Branch: codex/phase27-mobile-ui
+BASE: 940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2
+TARGET: 待本次限定六檔 commit／push 後填入完整 SHA
+核對遠端分支／完整 SHA／BASE 祖先；本次範圍只含 src/web/ContentCatalogPanel.tsx、src/web/style.css、docs/development/PHASE_33_CONTENT_CATALOG.md、CANONICAL_MANIFEST.md、OPEN_QUESTIONS.md、IMPLEMENTATION_PLAN.md。四份文件也包含先前 940e1f3 的外部 PASS 紀錄；不含原有未提交 AGENTS.md／Phase 31。必要文件：AGENTS、Manifest、Open Questions、Phase 33、Character §5、Race §2–7。
+使用者回報版本 2 新文案與五族數值正常，其後選定獨立 prototype 的緊湊資料卡；未宣告 Phase 33 通過。正式整合後仍待驗證。Codex 沒有跑 build/typecheck/lint/測試/UI；沒有新增測試案例。之前的 940e1f3 PASS 不適用這次 UI diff。
+變更：六屬性 dl 網格，三欄窄版／容器寬度 >=40rem 六欄，數字 1.25rem／緊湊內距；零值仍完整顯示、正負號明確；人類自由兩點獨立；資質分組與裝飾分布條（aria-hidden、百分比文字仍可讀）；共通創角後揭曉說明及每卡短註記；種族 anchor 與 useId 唯一目標、tabIndex -1／焦點框；既有手動刷新及狀態提示保留。prototype 寬度控制／picker 未進正式遊戲。
+資料／schema 1／內容版本 2／Canon／server／API／GET 不寫入／Save／state／DB／LLM／創角未改。既有 fetch/no-store、5 秒、32 KiB、取消、舊回應與固定錯誤程式保留。所有新增 CSS 限 content-catalog，不可使資料診斷／修復面板或其他 UI 退化。
+新隔離 checkout npm ci、npm run build、node --import tsx --test tests/content-catalog.test.ts、env -u TEST_DATABASE_URL npm test、隔離 PG migrate 後 TEST_DATABASE_URL=<隔離 URL> npm test、git diff --check BASE TARGET。列完整實際命令／環境／exit code／pass／skip，skip 不算 PASS，不碰正常 DB／5432／舊證據。不沿用先前 414/414 當新執行結果。
+正式 production dist 正常探索→系統→名冊驗五族全部 30 個加成與 Canon／BASE 一致（含零、負號）、人類自由 2、各資質百分比正確；不是角色生成結果或直接施法資格。版本 2／共通揭曉說明／每卡短註記正確，沒有普通人／代行者句子。窄版320/375/430、寬容器及200%字體／zoom、對比／鍵盤：數值不截斷、百分比不與標籤分開、無左右溢出；讀屏結構 dl/dt/dd 與裝飾 aria-hidden 請分清實測或僅結構檢查，真讀屏未做不要寫通過。
+五個 anchor 均能在抽屜內跳到正確族，鍵盤可見焦點、Esc 關閉仍正常；多個面板實例 ID 不碰撞，hash 不觸發遊戲命令／fetch／revision，刷新／取消／收起／重開／舊回應正常，不殘留舊資料或錯誤 anchor。打開／刷新各一個 GET、閒置不輪詢；逾時／格式非法／舊v1／壞JSON／500／33KiB皆固定錯誤、零種族、不洩漏，aria-live／busy／disabled 正常。名冊 GET 零 SQL／對外呼叫，狀態與三槽前後一致。
+檢查新增 CSS 不影響診斷／備份／修復，沿用正式入口及隔離資料做必要回歸；戰鬥／主選單 UI 若 production 受阻明示，不寫成 production PASS。主張仍與 940e1f3 不同時須列準確來源，不將 Phase32 UI 引用變成今輪真做。bar 使用實際機率，1%仍有文字證據，不加入新數值或隱藏零屬性。
+既有 Info 保留：UI 文案自動化測試缺口、小數加成案例缺口、來源原物件未凍結、陣列非索引屬性、±12 界限語意、access log query、favicon、抽屜關閉掣捲走可 Esc。真手機／讀屏／正式遊玩未測及 production 模式限制保留。選定 prototype 與手動數值正常，不等同整階段接受。
+回報工程 PASS/FAIL、缺陷嚴重度／精確行號／重現／影響、完整命令結果、逐項實測／引用／推斷／未測／受阻、清理與新證據。不修改專案、不 commit/push、不啟動下一切片、不代替使用者驗收。
 ```

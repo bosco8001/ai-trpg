@@ -22,25 +22,59 @@ export function ContentCatalogPanel() {
       .finally(() => { window.clearTimeout(timer); if (!disposed) setBusy(false); });
     return () => { disposed = true; controller.abort(); window.clearTimeout(timer); };
   }, [open, attempt]);
-  return <section className="data-health">
+  return <section className="data-health content-catalog">
     <Button variant="secondary" aria-expanded={open} aria-controls={id} onClick={() => setOpen(v => !v)}>正式內容名冊</Button>
-    {open ? <div id={id} aria-busy={busy} className="data-health__report">
-      <h3>正式內容名冊</h3>
-      <p>目前收錄五個種族的已定創角資料。種族天生能力、職業、物品及技能尚未在此名冊接入。查看不會建立角色或改動遊戲。</p>
-      <p>魔力資質不代表直接施法資格。</p>
-      <p role="status" aria-live="polite">{busy ? "正在讀取名冊……" : catalog ? "正式內容名冊已讀取。" : ""}</p>
-      {error ? <p role="alert">{error}</p> : null}
+    {open ? <div id={id} aria-busy={busy} className="data-health__report content-catalog__report">
+      <header className="content-catalog__heading">
+        <h3>正式內容名冊</h3>
+        {catalog ? <span className="content-catalog__version">正式內容版本：{catalog.catalogVersion}</span> : null}
+      </header>
+      <p className="content-catalog__intro">五種族的已定創角資料，供你查看與比較。</p>
+      <aside className="content-catalog__rule">
+        <strong>所有角色的資質在創角完成後揭曉。</strong>
+        <p>生成後固定，不重新隨機。<br />魔力資質不代表直接施法資格。</p>
+      </aside>
+      <p className="content-catalog__feedback" role="status" aria-live="polite">{busy ? "正在讀取名冊……" : catalog ? "正式內容名冊已讀取。" : ""}</p>
+      {error ? <p className="content-catalog__error" role="alert">{error}</p> : null}
       {catalog ? <>
-        <p>正式內容版本：{catalog.catalogVersion}。</p>
-        <ul className="data-health__results">{catalog.races.map(race => <li className="data-health__item" key={race.id}>
-          <h4>{race.name}</h4>
-          <p>固定屬性加成：{CONTENT_ATTRIBUTES.map(k => `${CONTENT_ATTRIBUTE_LABELS[k]} ${race.attributeModifiers[k] > 0 ? "+" : ""}${race.attributeModifiers[k]}`).join("、")}。</p>
-          {race.freeAttributePoints > 0 ? <p>另有 {race.freeAttributePoints} 點自由種族屬性點。</p> : null}
-          <p>魔力資質分布：{CONTENT_APTITUDES.filter(k => race.aptitudePercent[k] > 0)
-            .map(k => `${CONTENT_APTITUDE_LABELS[k]} ${race.aptitudePercent[k]}%`).join("、")}。</p>
-          {race.aptitudeReveal === "after-creation" ? <p>個別角色的資質在創角完成後才揭曉，生成後固定。</p> : null}
+        <nav className="content-catalog__jump" aria-label="跳到種族">
+          {catalog.races.map(race => <a href={`#${id}-${race.id}`} key={race.id}>{race.name}</a>)}
+        </nav>
+        <ul className="content-catalog__races">{catalog.races.map((race, index) => <li className="content-catalog__race" id={`${id}-${race.id}`} tabIndex={-1} key={race.id}>
+          <header className="content-catalog__race-heading">
+            <div className="content-catalog__race-name">
+              <span className="content-catalog__ordinal" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+              <h4>{race.name}</h4>
+            </div>
+            {race.aptitudeReveal === "after-creation" ? <span className="content-catalog__reveal">創角後揭曉</span> : null}
+          </header>
+          <p className="content-catalog__label">固定屬性加成</p>
+          <dl className="content-catalog__attributes">{CONTENT_ATTRIBUTES.map(key => {
+            const modifier = race.attributeModifiers[key];
+            return <div className="content-catalog__attribute" key={key}>
+              <dt>{CONTENT_ATTRIBUTE_LABELS[key]}</dt>
+              <dd data-sign={modifier > 0 ? "positive" : modifier < 0 ? "negative" : "zero"}>
+                {modifier > 0 ? `+${modifier}` : modifier < 0 ? `−${Math.abs(modifier)}` : modifier}
+              </dd>
+            </div>;
+          })}</dl>
+          {race.freeAttributePoints > 0 ? <p className="content-catalog__free-points"><span>自由種族屬性點</span><strong>+{race.freeAttributePoints} 點</strong></p> : null}
+          <section className="content-catalog__aptitude" aria-label={`${race.name}魔力資質分布`}>
+            <p className="content-catalog__label">魔力資質分布</p>
+            <div className="content-catalog__aptitude-bar" aria-hidden="true">
+              {CONTENT_APTITUDES.filter(key => race.aptitudePercent[key] > 0).map(key =>
+                <span data-aptitude={key} style={{ flexGrow: race.aptitudePercent[key] }} key={key} />)}
+            </div>
+            <dl className="content-catalog__distribution">
+              {CONTENT_APTITUDES.filter(key => race.aptitudePercent[key] > 0).map(key => <div key={key}>
+                <dt><span className="content-catalog__dot" data-aptitude={key} aria-hidden="true" />{CONTENT_APTITUDE_LABELS[key]}</dt>
+                <dd>{race.aptitudePercent[key]}%</dd>
+              </div>)}
+            </dl>
+          </section>
         </li>)}</ul>
       </> : null}
+      <p className="content-catalog__footnote">種族天生能力、職業、物品及技能尚未在此名冊接入。查看不會建立角色或改動遊戲。</p>
       <Button variant="secondary" disabled={busy} onClick={() => setAttempt(v => v + 1)}>重新讀取名冊</Button>
     </div> : null}
   </section>;
