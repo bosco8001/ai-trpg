@@ -11,11 +11,11 @@ export interface OfficialRaceDefinition {
   readonly attributeModifiers: Readonly<Record<typeof CONTENT_ATTRIBUTES[number], number>>;
   readonly freeAttributePoints: number;
   readonly aptitudePercent: Readonly<Record<typeof CONTENT_APTITUDES[number], number>>;
-  readonly aptitudeReveal: "after-creation" | "unspecified";
+  readonly aptitudeReveal: "after-creation";
 }
 export interface OfficialContentCatalog {
   readonly schemaVersion: 1;
-  readonly catalogVersion: 1;
+  readonly catalogVersion: 2;
   readonly namespace: "official";
   readonly scope: "race-creation-metadata";
   readonly races: readonly OfficialRaceDefinition[];
@@ -34,7 +34,7 @@ export function isOfficialRaceDefinition(v: unknown): v is OfficialRaceDefinitio
     || typeof v.id !== "string" || !/^race\.[a-z][a-z0-9-]{0,47}$/.test(v.id)
     || typeof v.name !== "string" || v.name.length < 1 || v.name.length > 40 || v.name.trim() !== v.name
     || !Number.isSafeInteger(v.freeAttributePoints) || (v.freeAttributePoints as number) < 0
-    || (v.freeAttributePoints as number) > 12 || !["after-creation", "unspecified"].includes(v.aptitudeReveal as string)) return false;
+    || (v.freeAttributePoints as number) > 12 || v.aptitudeReveal !== "after-creation") return false;
   const modifiers = v.attributeModifiers, aptitude = v.aptitudePercent;
   if (!object(modifiers) || !keys(modifiers, CONTENT_ATTRIBUTES) || !CONTENT_ATTRIBUTES.every(k =>
     Number.isSafeInteger(modifiers[k]) && (modifiers[k] as number) >= -12 && (modifiers[k] as number) <= 12)
@@ -46,7 +46,7 @@ export function isOfficialContentCatalog(v: unknown): v is OfficialContentCatalo
   if (!object(v)) return false;
   const pending = v.pendingKinds;
   if (!keys(v, ["schemaVersion", "catalogVersion", "namespace", "scope", "races", "pendingKinds"])
-    || v.schemaVersion !== 1 || v.catalogVersion !== 1 || v.namespace !== "official" || v.scope !== "race-creation-metadata"
+    || v.schemaVersion !== 1 || v.catalogVersion !== 2 || v.namespace !== "official" || v.scope !== "race-creation-metadata"
     || !Array.isArray(v.races) || v.races.length !== 5 || !v.races.every(isOfficialRaceDefinition)
     || new Set(v.races.map(r => r.id)).size !== v.races.length
     || !Array.isArray(pending) || pending.length !== 4

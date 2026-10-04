@@ -1,22 +1,22 @@
 # Phase 33：正式內容名冊第一步
 
-2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將已定五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 的指定 bot 外部工程結論為未通過；同切片 D1／D2 補修待複驗，使用者尚未驗收。不宣稱全部 R04 或正式創角已完成。
+2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正待 bot 驗證、使用者尚未驗收。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
 
-Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mobile-ui`。BASE：`8f5c0334c2dbab10d2c519c3118af44c383c5a1e`。TARGET：本階段限定提交的完整 SHA，提交及 push 後填入實際送交 bot 的 prompt；本文件不以自身尚未產生的 SHA 作為驗證結果。
+Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mobile-ui`。首版整體 BASE：`8f5c0334c2dbab10d2c519c3118af44c383c5a1e`；補修 BASE：`641b82f1686d24991e0d1da4ba9095b629995dcc`；已複驗 TARGET：`8792e15843fbfe02d9f035db27e9ef5e5d784b4a`。本次外部結果紀錄的後續文件變更，不是該測試 TARGET 的一部分。
 
 ## 範圍與來源
 
 - `docs/world/races.md` §3–7：五種族名稱、固定六屬性加成、人類兩點自由種族屬性點、魔力資質分布。
-- `docs/gameplay/character_system.md` §5：魔力資質與直接施法資格分開；精靈／龍裔生成結果於創角完成後揭曉。
+- `docs/gameplay/character_system.md` §5 與 `docs/world/races.md` §2：魔力資質與直接施法資格分開；依使用者 2026-10-04 核對澄清，所有角色的資質均於創角完成後揭曉。
 - 玩家可長期扮演普通人或代行者。沒有為任何角色預設代行者身分，沒有產生施法資格。
 - 不含種族能力執行、壽命／文化資料、職業起始套裝、物品／技能／法術內容、創角、HP／MP 推導、存檔版本遷移或正式 Run。這些內容未收錄，不代表其 Canon 被移除或全部尚未設計。
 
 ## 工程契約
 
-- 首批使用隨程式編譯的 TypeScript 結構化資料，位於 `src/server/content/races-v1.ts`；這是檔案格式選擇，不新增玩法。正式數值來源仍是上述 Canon，測試數值不得反寫。
-- `schemaVersion=1` 定義這個有限資料格式；`catalogVersion=1` 定義首批內容；`namespace=official` 與 `scope=race-creation-metadata` 明確標示不是完整種族能力目錄。後續增改正式內容須明確處理版本及引用，不在本期決定舊存檔相容政策。
+- 使用隨程式編譯的 TypeScript 結構化資料，現位於 `src/server/content/races-v2.ts`（原 v1 檔更名）；這是檔案格式選擇。揭曉規則依使用者明確澄清更新，正式數值來源仍是上述 Canon，測試數值不得反寫。
+- `schemaVersion=1` 定義這個有限資料結構；`catalogVersion=2` 標示本次揭曉規則更新，避免以同一內容版本暗換 v1 語意。版本 2 的全部種族要求 `after-creation`，不再接受 `unspecified`；版本 1 解析請求回 `unsupported-version`／409，沒有 v1 到 v2 或 TEST 的自動回退。`namespace=official` 與 `scope=race-creation-metadata` 明確標示不是完整種族能力目錄。尚無角色／Save 正式引用此名冊，不新增資料遷移或決定未來舊存檔相容政策。
 - ID 為 `race.human`、`race.elf`、`race.dwarf`、`race.orc`、`race.dragonborn`，屬穩定工程識別碼，不是新世界名稱。六屬性完整列出；未列加成以零表達已定無加成。人類自由加成另列兩點，不能默默套到某屬性。
-- 魔力資質列整數百分比（低／普通／高／極高），總和必須為 100；矮人普通以 100% 表示。精靈／龍裔揭曉標為 `after-creation`；其他種族標為 `unspecified`，不替未定時機新增規則。沒有隨機抽取、角色資質或直接施法資格欄位。
+- 魔力資質列整數百分比（低／普通／高／極高），總和必須為 100；矮人普通以 100% 表示。五族揭曉皆為 `after-creation`，配合所有角色創角完成後揭曉的規則。各族機率不變；沒有隨機抽取、角色資質或直接施法資格欄位。
 - 載入時整份結構驗證，拒絕未知 schema／內容版本、額外或缺少欄位、重複或 TEST 種族 ID、非整數／越界數值、非法機率總和。數值界限只是首版格式的防錯限制，不是新屬性上限或平衡規則；未來 Canon 擴充須同步調整格式。
 - 先複製，對即將載入的同一份快照驗證，再深層凍結；複製失敗或快照不合法時使用固定錯誤並整份拒絕。原始物件的 getter 不會在驗證後再被讀取以替換已載入值；呼叫者與原始物件不能改同一版本的內容。正式 lookup 只查正式 Map；未知、錯誤種類或 TEST 引用沒有 fallback。
 - 正式 `class`／`item`／`skill`／`spell` 類別目前列在 `pendingKinds`，沒有任何正式定義；全部引用返回 unknown-content，不以 TEST fixture 代替。這個拒絕只作用於本次正式 lookup，既有 TEST state／inventory／技能／Save 驗證沒有改接這個服務。
@@ -24,27 +24,27 @@ Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mo
 ## API 與畫面
 
 - `GET /api/content-catalog`：不接受 query，返回完整五種族名冊。
-- `GET /api/content-catalog/resolve?kind=race&id=race.human&version=1`：恰好接受 `kind`、`id`、`version` 三欄。非法格式 400、不支援版本 409、未知正式內容 404；固定安全文案，不回顯任意 ID 或內部錯誤。兩個 GET 都 `Cache-Control: no-store`，不讀取／寫入玩家、存檔或 DB，不呼叫 LLM。
+- `GET /api/content-catalog/resolve?kind=race&id=race.human&version=2`：恰好接受 `kind`、`id`、`version` 三欄。非法格式 400、不支援版本（包含 1）409、未知正式內容 404；固定安全文案，不回顯任意 ID 或內部錯誤。兩個 GET 都 `Cache-Control: no-store`，不讀取／寫入玩家、存檔或 DB，不呼叫 LLM。
 - 系統／存檔面板新增「正式內容名冊」，手動開啟讀取五個種族，顯示版本、固定加成、自由種族點、資質分布及揭曉註記。前端驗證完整回應，32 KiB 接收上限、5 秒等待、收起／離頁取消、固定錯誤文案、手動重新讀取；不輪詢、不生成角色。
-- 補修將 `ContentCatalogPanel` 接入探索頁自己的系統抽屜；戰鬥與主選單沿用 `RuntimeSystemPanel` 的入口。首版只接入後者，正常探索缺少入口（D1）；補修後的實際畫面仍待 bot 複驗。本期沒有新增初始讀取失敗畫面的入口。
+- 補修將 `ContentCatalogPanel` 接入探索頁自己的系統抽屜；戰鬥與主選單沿用 `RuntimeSystemPanel` 的入口。首版只接入後者，正常探索缺少入口（D1）；`8792e15` 的 production 探索入口已由 bot 複驗通過。戰鬥與主選單的 UI 回歸僅在非 production 模式實測，production 入口仍受阻。本期沒有新增初始讀取失敗畫面的入口。
 
-## 本次限定檔案
+## 首版與 D1／D2 補修檔案（歷史）
 
 新增：`src/shared/content-catalog.ts`、`src/server/content/races-v1.ts`、`src/server/content-catalog.ts`、`src/web/ContentCatalogPanel.tsx`、`tests/content-catalog.test.ts`、本文件。
 
 修改：`src/server/app.ts`、`src/web/RuntimeSystemPanel.tsx`、`docs/development/CANONICAL_MANIFEST.md`、`docs/development/OPEN_QUESTIONS.md`、`docs/development/IMPLEMENTATION_PLAN.md`。首版共十一檔；同切片 D1 補修另修改 `src/web/ExplorationPage.tsx`。不包含原有未提交的 `AGENTS.md` 或 Phase 31 文字。
 
-## 工程檢查：待 Grok Bot
+## 工程檢查：版本 1 外部 PASS，版本 2 修正待驗證
 
-開發代理只閱讀程式／Git、編寫案例及核對差異，沒有執行 build、typecheck、lint、測試或 UI 驗證。首版五項測試由 Grok 執行；本次補修與新增案例尚未執行，不能引用首版結果作為補修通過。
+開發代理只閱讀程式／Git、編寫案例及核對差異，沒有執行 build、typecheck、lint、測試或 UI 驗證。首版五項測試與 D1／D2 補修六項測試分別由 Grok 執行，版本 1 結果見下方歷史複驗紀錄。本次版本 2 的修改與相關測試尚未執行，不能沿用 `8792e15` 的 PASS。
 
 指定 bot 的命令：`npm ci`、`npm run build`、`node --import tsx --test tests/content-catalog.test.ts`、完整 `npm test`、BASE..TARGET `git diff --check`。完整 PG 回歸須隔離 `TEST_DATABASE_URL` 並先 migrate，不能碰正常 DB 或 5432；skip 不算 PASS。本次本身無 DB migration。
 
-## 使用者核對清單（待工程驗證後）
+## 使用者核對清單（版本 2 工程驗證後繼續）
 
-1. 開啟系統／存檔 → 正式內容名冊，看到五個種族與內容版本 1。
+1. 開啟系統／存檔 → 正式內容名冊，看到五個種族與內容版本 2。
 2. 人類固定加成皆零，另有兩點自由種族點；精靈力量 -1／體質 -2／智慧 +1／感知 +2；矮人力量 +1／敏捷 -1／體質 +2／魅力 -2；獸人敏捷 +2／感知 +2／智慧 -3／魅力 -1；龍裔力量 +2／體質 +2／智慧 +1。
-3. 分布與 Canon 一致；精靈／龍裔註記創角後揭曉。沒有預設直接施法資格或聲稱種族能力已接入。
+3. 分布與 Canon 一致；五族都註記創角後揭曉，畫面不再有「玩家可以是普通人或代行者」，保留「魔力資質不代表直接施法資格」。沒有預設直接施法資格或聲稱種族能力已接入。
 4. 收起、重開、重新讀取、窄螢幕及鍵盤操作正常；開名冊後繼續遊戲、Save／Load／修復仍照原流程，讀取名冊不增加 revision。
 
 如使用者未另行修訂，Phase 32 小補修的 bot 結果驗收授權不延伸至 Phase 33；本階段仍等使用者接受。下一步可討論首批職業內容或另拆 R05 屬性推導，未自動開始。
@@ -96,9 +96,9 @@ TARGET 待限定提交及 push 後填入完整 SHA；先確認遠端分支與祖
 
 略過不算通過。以上是首版外部執行，不能套用為本次補修結果。
 
-- **D1 Medium**：首版只有 RuntimeSystemPanel 接入名冊，探索頁獨立系統抽屜缺少入口；production 預設非戰鬥狀態無法到達名冊，與文件及核對清單不符。補修在 `ExplorationPage.tsx` 系統抽屜加入現有 `ContentCatalogPanel`，不重建探索工具或改動遊戲命令；待正式 production UI 複驗。
-- **D2 Low**：loader 先驗原始輸入、再複製，getter 可使載入值與驗證值不同。首版固定 literal 不會觸發，但快照保證不成立。補修先 `structuredClone`，驗證該快照再凍結；複製失敗也整份拒絕並用固定訊息。新增變動 getter、非法首次快照與不可複製輸入案例，尚未執行。
-- **測試 Info**：首版 28 個 mutation 捕捉 22 個，漏掉屬性多鍵、種族缺欄、移除 ±12 界限、移除 schemaVersion 檢查、未凍結種族物件、resolve 缺 no-store。已補相關資料變體、各層凍結及修改種族名稱、resolve 成功與錯誤回應 header 斷言；未宣稱六項已被測試捕捉，交 bot 重新評估。
+- **D1 Medium**：首版只有 RuntimeSystemPanel 接入名冊，探索頁獨立系統抽屜缺少入口；production 預設非戰鬥狀態無法到達名冊，與文件及核對清單不符。補修在 `ExplorationPage.tsx` 系統抽屜加入現有 `ContentCatalogPanel`，不重建探索工具或改動遊戲命令；補修交付當時待複驗，其後 `8792e15` production 探索 UI 已由 bot 實測通過。
+- **D2 Low**：loader 先驗原始輸入、再複製，getter 可使載入值與驗證值不同。首版固定 literal 不會觸發，但快照保證不成立。補修先 `structuredClone`，驗證該快照再凍結；複製失敗也整份拒絕並用固定訊息。新增變動 getter、非法首次快照與不可複製輸入案例，補修交付當時尚未執行；其後 `8792e15` 已由 bot 複驗通過。
+- **測試 Info（首版報告）**：首版 28 個 mutation 捕捉 22 個，當時報漏掉屬性多鍵、種族缺欄、移除 ±12 界限、移除 schemaVersion 檢查、未凍結種族物件、resolve 缺 no-store。補相關資料變體、各層凍結及修改種族名稱、resolve 成功與錯誤回應 header 斷言後，當時待 bot 重新評估；複驗確認六項均被新測試捕捉，並更正首版「種族缺欄」漏網項為等價 mutant，真正缺欄 mutant 原已能捕捉，見文末。新的小數案例缺口仍保留。
 - **其餘 Info 保留**：export 的 OFFICIAL_RACES_V1 原物件未凍結，service 使用獨立快照；races 陣列非索引屬性會被接受並在 JSON 輸出丟棄；±12 格式界限可能與 Canon 的 12 點自由屬性分配混淆，文件仍明示兩者無關。沒有改名冊數值、版本或世界規則。
 - **既有觀察保留**：favicon 404；Fastify access log 會記錄傳入 query，外部回報沒有 SQL 或密碼洩漏。API 固定錯誤與 access log 是不同範圍。
 
@@ -116,7 +116,7 @@ git push origin codex/phase27-mobile-ui
 git rev-parse HEAD
 ```
 
-補修完整送驗 prompt（TARGET 待填，尚未送達）：
+補修完整送驗 prompt 範本（保留交付當時的 TARGET 待填文字；實際送出時已填 `8792e15843fbfe02d9f035db27e9ef5e5d784b4a`，2026-10-04 21:17 HKT 讀回確認送達，複驗結果見下）：
 
 ```text
 請以 AI TRPG Architecture Critic 複驗 Phase 33/R04 首個種族名冊切片 D1、D2 同切片補修，回報工程 PASS 或 FAIL，不代替使用者驗收。
@@ -133,4 +133,71 @@ D1 必須用正式 build 產物、NODE_ENV=production 的正常探索頁，從�
 D2 驗可變getter不能使載入值跳過驗證；被複製的非法值整份拒絕；不可複製或getter拋錯也固定訊息，驗證與載入同份快照、原始輸入隔離、各層凍結。六項 mutation 請重新判斷新增測試是否捉到：多屬性鍵、種族缺欄、移除數值界限、移除schemaVersion檢查、未凍結種族物件、resolve缺no-store。保留來源原物件未凍結、陣列非索引屬性、界限語意及access log既有Info，未改的不能自動標解決。
 真HTTP的200/400/404/409與no-store/固定錯誤、未知/TEST引用不fallback依diff做必要回歸。既有Save/Load/修復可依diff安排；引用舊結果明示版本，不能寫成今輪真做。核對文件所述首版結果與本次待複驗一致。
 回報完整 SHA/環境/命令exit code、逐項結果、缺陷嚴重度與精確行號/重現/影響、真做/引用/推斷/未測/受阻、清理及新證據位置。不修改專案、不commit/push、不開始下一切片，不代替使用者接受。
+```
+
+## 內容版本 1 補修外部複驗 PASS（2026-10-04，當時待使用者驗收）
+
+來源：AI TRPG Architecture Critic，Asia/Hong_Kong 21:27:01、21:27:08、21:27:09 的報告，Codex 經 Grok Bot Control 直接讀取。補修 BASE `641b82f1686d24991e0d1da4ba9095b629995dcc`；TARGET `8792e15843fbfe02d9f035db27e9ef5e5d784b4a`；首版整體 BASE `8f5c0334c2dbab10d2c519c3118af44c383c5a1e`。外部核對遠端分支為 TARGET、祖先正確及限定七檔；種族數值、shared 格式、接收上限、app 與 state／Save／LLM 路徑未改。工程結論 **PASS**，D1／D2 已修正，無新 High、Medium 或 Low；不重判 Phase 32，首版 FAIL 保留，Phase 33 最終接受仍由使用者決定。
+
+外部環境：Node 24.21.0、npm 9.2.0、Debian 13.7、隔離 PG 17.11（55426）、Chrome 154、Playwright 1.63.0。
+
+| 外部命令 | exit | 結果 |
+|---|---:|---|
+| `npm ci` | 0 | 成功 |
+| `npm run build` | 0 | 成功 |
+| `node --import tsx --test tests/content-catalog.test.ts` | 0 | 6／6 通過 |
+| `env -u TEST_DATABASE_URL npm test` | 0 | 371 通過、41 略過，共 412 |
+| migrate 隔離 DB（報告未列出本輪完整命令文字） | 0 | 成功 |
+| `npm test`（隔離 PG） | 0 | 414／414 通過 |
+| `git diff --check BASE TARGET` | 0 | 成功 |
+
+略過不算通過。這些結果由 bot 執行，開發代理沒有自行執行驗證。
+
+**D1 外部真做**：正式 dist、`NODE_ENV=production` 的正常探索頁，從系統抽屜開啟名冊；五族、版本 1、固定加成、人類自由兩點、資質與揭曉註記均正確，沒有 TEST 字樣或暗示已創角。打開／刷新各一個 GET，前後各閒置五秒沒有請求；收起再開及 Esc 離頁取消不顯示舊回應。逾時、格式非法、壞 JSON、500、33 KiB 回應均固定錯誤、零種族顯示、不洩漏；忙碌與刷新禁用、Enter／Space／Tab、3px 焦點圈及 live 提示正常。320／375／430 寬度無溢出、無 JS pageerror，console 僅既有 favicon 404。名冊 GET 期間 SQL 與對外呼叫均零，state／slots／token／epoch／revision 前後一致；頁面載入本身有兩句既有 idempotent SQL，不能把全頁載入宣稱零 SQL。
+
+**D2 外部真做**：先複製、再驗證同份快照並逐層凍結；變動 getter 只讀一次，首次非法值整份拒絕。拋錯 getter、不可複製輸入、Proxy／Map／Date／function／symbol 均固定錯誤；原始輸入與快照隔離、各層凍結。六項指定 mutation 均被新增測試捕捉；bot 更正首版「種族缺欄」漏網判斷：先前漏網的是行為不變的等價 mutant，真正缺欄 mutant 原已捕捉。還原 D2 修正後新測試失敗，首版舊測試漏網。
+
+**HTTP 外部真做**：production 接 PG 的 50 個情況符合預期，200／400／404／409、安全固定錯誤、所有 no-store、未知與 TEST 不回退、無輸入回顯或洩漏。Save／Load／修復由 PG 全套測試覆蓋；Phase 32 UI 引用 `828d520`，沒有當成本輪 UI 真做。
+
+**Info 與限制**：本輪新增「移除整數檢查」mutation 未捕捉，小數屬性加成案例尚缺；NaN 仍被上下限擋住，沒有回報現行產品接受小數的缺陷。原始 OFFICIAL_RACES_V1 未凍結、陣列非索引屬性接受、±12 界限可能混淆、access log 記 query、favicon 404，以及抽屜關閉按鈕隨內容捲走但可用 Esc 關閉，均保留。沒有以本次 PASS 將這些改標解決。
+
+真做：全部命令、production 探索 UI、非 production 戰鬥／主選單 UI、HTTP、D2 探測、mutation／還原測試及文件。引用：首版 `641b82f` 的 `/workspace/p33-evidence`、Phase 32 `828d520` UI。推斷：矮人普通寫成 100% 合理、上下限屬格式防錯。未測：真手機、讀屏器、正式遊玩。受阻：production 戰鬥／主選單入口；非 production 回歸正常，不擴大為 production 已測。
+
+外部清理：服務已停，隔離 DB／角色 drop、cluster 停，`/workspace/p33b` 已刪；5432、clone、舊證據未變。新證據 `/workspace/p33b-evidence` 共 105 檔。bot 未改檔、commit／push 或開下一切片；Codex 沒有在本機重跑或核驗該證據目錄。使用者尚未確認本切片通過。
+
+## 使用者核對澄清：所有角色創角後揭曉（同切片，待驗證）
+
+使用者先回報本機 build 成功、探索畫面開啟及名冊入口／五族正常，沒有回報全部數值一致或整體驗收。其後明確澄清：「全部角色的資質都是創角完成才揭曉，不用寫玩家可以是普通人或代行者」。因此手動核對停在資料註記步驟，依指示修正後重新送工程驗證，再繼續核對。
+
+本次更新 Character §5／Race §2 共通規則，五族皆 `after-creation`；畫面移除普通人／代行者提示，保留資質不代表施法資格的說明。先前玩家身分方向澄清仍保留於 OPEN_QUESTIONS，沒有因移除 UI 句子而取消玩家可扮演普通人或代行者的方向。各族固定加成、自由點、資質機率及施法資格規則不變。
+
+內容版本升為 2、資料檔更名為 `races-v2.ts`／`OFFICIAL_RACES_V2`；資料結構版本仍 1。正式 loader 僅提供版本 2，舊內容版本 1 查詢明確 409，不默默轉成版本 2 或 TEST。既有 state／Save 尚未引用名冊，不做 migration。測試對照改為版本 2／全族 after-creation，加入 unspecified／before-creation 拒絕及舊版本拒絕案例；尚未執行。本次沒有補小數屬性案例，新舊 Info 仍保留。
+
+本次限定範圍為十一項檔案變更（名冊更名涉及兩個路徑）：`docs/gameplay/character_system.md`、`docs/world/races.md`、`src/server/content/races-v1.ts` → `races-v2.ts`、`src/server/content-catalog.ts`、`src/shared/content-catalog.ts`、`src/web/ContentCatalogPanel.tsx`、`tests/content-catalog.test.ts`、本文件、`CANONICAL_MANIFEST.md`、`OPEN_QUESTIONS.md`、`IMPLEMENTATION_PLAN.md`。四份 development 文件包含先前未提交的 `8792e15` 外部 PASS 紀錄；該紀錄僅適用內容版本 1，本次版本 2 仍待驗證。不包含原有 AGENTS.md／Phase 31 變更。使用者於 2026-10-04 回覆「授權此次修正 commit／push 並送驗」，批准本次限定提交與驗證，不代替階段驗收或延伸至下一切片。
+
+```sh
+git add -- docs/gameplay/character_system.md docs/world/races.md src/server/content/races-v1.ts src/server/content/races-v2.ts src/server/content-catalog.ts src/shared/content-catalog.ts src/web/ContentCatalogPanel.tsx tests/content-catalog.test.ts docs/development/PHASE_33_CONTENT_CATALOG.md docs/development/CANONICAL_MANIFEST.md docs/development/OPEN_QUESTIONS.md docs/development/IMPLEMENTATION_PLAN.md
+git diff --cached --name-only
+git commit -m "fix: reveal all character aptitudes after creation"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+```
+
+本次完整工程審查 prompt（TARGET 待填，尚未送達）：
+
+```text
+請以 AI TRPG Architecture Critic 驗證 Phase 33 第一個切片的使用者核對澄清補修，回報工程 PASS/FAIL，不代替使用者最終驗收。
+操作者 Codex。Repository: https://github.com/bosco8001/ai-trpg
+Branch: codex/phase27-mobile-ui
+BASE: 8792e15843fbfe02d9f035db27e9ef5e5d784b4a
+TARGET: 待本次限定提交及 push 後填入完整 SHA
+使用者明確指示所有角色魔力資質都在創角完成後揭曉，並移除 UI「玩家可以是普通人或代行者」。只去掉畫面句子，不撤銷既有角色身分方向；保留資質與施法資格分開。
+先核對遠端指定分支、完整SHA/祖先及本次限定十一項變更（更名涉及兩路徑）：Character Canon、Race Canon、races-v1.ts改races-v2.ts、server/content-catalog.ts、shared/content-catalog.ts、ContentCatalogPanel.tsx、content-catalog.test.ts、PHASE_33_CONTENT_CATALOG、CANONICAL_MANIFEST、OPEN_QUESTIONS、IMPLEMENTATION_PLAN。AGENTS／Phase31原有未提交變更不包含。
+必要文件：AGENTS、CANONICAL_MANIFEST、OPEN_QUESTIONS、PHASE_33_CONTENT_CATALOG、docs/gameplay/character_system.md §5、docs/world/races.md §2–7。四份development文件同時加入上輪8792e15外部PASS紀錄；只適用內容版本1，未把舊PASS套到版本2，保留641b82f FAIL、mutation等價項更正、Info、模式限制。
+變更：五族皆after-creation、共享格式拒絕unspecified/before-creation、內容版本2（schemaVersion1）、正式版本1查詢409無fallback、v2資料檔與所有使用處接線、UI去普通人/代行者句子。固定加成/自由點/資質百分比、直接施法資格、state/Save/DB/LLM/創角生成/取消/接收限制都未改。Codex未跑build/typecheck/測試/UI；相關案例尚未執行，使用者只回報先前版本本機build與入口正常。
+新隔離環境npm ci、npm run build（包含typecheck）、node --import tsx --test tests/content-catalog.test.ts、完整無DB與隔離PG npm test、git diff --check BASE TARGET；隔離TEST_DATABASE_URL先migrate，記完整命令/exitcode/pass/skip，不碰正常DB/5432或舊證據，skip不算PASS。
+對照全部五族機率/加成與Canon相同，全部揭曉after-creation；名冊GET/resolve版本2成功、版本1及未知版本409、不轉新版本或TEST，安全固定錯誤/no-store，非法revealing標記整份拒絕。檔更名不能造成編譯/執行引用失效；資料結構與內容版本分開，不新增存檔migration。loader快照驗證/凍結/未知TEST隔離做必要回歸。
+正式build產物、NODE_ENV=production正常探索頁→系統→名冊：版本2、五族都顯示創角完成後揭曉註記，不再顯示玩家可為普通人或代行者，保留資質不代表施法資格；無暗示已完成創角。手動刷新/收起/重開、取消/timeout/格式非法/舊回應、鍵盤/live/320/375/430寬度依diff做必要驗證，無自動輪詢/JS錯誤。GET不讀寫DB、不改state/revision/slots/guard、不呼叫LLM。戰鬥/主選單必要回歸明示production模式受阻；引用舊UI結果標版本，不當今輪真做。
+保留小數屬性測試缺口、來源原物件未凍結、陣列非索引屬性、格式界限語意、query access log、favicon、抽屜關閉按鈕捲走可Esc等Info，不因新PASS自動改標解決。真手機/讀屏/正式遊玩未測與舊版本結果分開。
+回報完整SHA/環境/完整命令exitcode、逐項結果、缺陷嚴重度/精確行號/重現/影響、真做/引用/推斷/未測/受阻、清理與新證據。不修改專案、不commit/push、不展開下一切片，不代替使用者接受。
 ```

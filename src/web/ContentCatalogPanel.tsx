@@ -27,7 +27,7 @@ export function ContentCatalogPanel() {
     {open ? <div id={id} aria-busy={busy} className="data-health__report">
       <h3>正式內容名冊</h3>
       <p>目前收錄五個種族的已定創角資料。種族天生能力、職業、物品及技能尚未在此名冊接入。查看不會建立角色或改動遊戲。</p>
-      <p>玩家可以是普通人或代行者；魔力資質不代表直接施法資格。</p>
+      <p>魔力資質不代表直接施法資格。</p>
       <p role="status" aria-live="polite">{busy ? "正在讀取名冊……" : catalog ? "正式內容名冊已讀取。" : ""}</p>
       {error ? <p role="alert">{error}</p> : null}
       {catalog ? <>

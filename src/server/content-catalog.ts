@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { CONTENT_KINDS, CONTENT_MESSAGES, isOfficialContentCatalog, type ContentKind } from "../shared/content-catalog.js";
-import { OFFICIAL_RACES_V1 } from "./content/races-v1.js";
+import { OFFICIAL_RACES_V2 } from "./content/races-v2.js";
 
 export class ContentCatalogFailure extends Error {
   constructor(readonly code: keyof typeof CONTENT_MESSAGES) { super(CONTENT_MESSAGES[code]); }
 }
-export function createOfficialContentCatalog(value: unknown = OFFICIAL_RACES_V1) {
+export function createOfficialContentCatalog(value: unknown = OFFICIAL_RACES_V2) {
   // Validate the detached snapshot that will be loaded, including values produced by getters.
   let copied: unknown;
   try { copied = structuredClone(value); }
