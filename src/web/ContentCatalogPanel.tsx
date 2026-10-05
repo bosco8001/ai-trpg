@@ -54,7 +54,7 @@ export function ContentCatalogPanel() {
             return <div className="content-catalog__attribute" key={key}>
               <dt>{CONTENT_ATTRIBUTE_LABELS[key]}</dt>
               <dd data-sign={modifier > 0 ? "positive" : modifier < 0 ? "negative" : "zero"}>
-                {modifier > 0 ? `+${modifier}` : modifier < 0 ? `−${Math.abs(modifier)}` : modifier}
+                {modifier > 0 ? `+${modifier}` : modifier < 0 ? <><span className="content-catalog__minus">−</span>{Math.abs(modifier)}</> : modifier}
               </dd>
             </div>;
           })}</dl>

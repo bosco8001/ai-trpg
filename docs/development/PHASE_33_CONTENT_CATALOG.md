@@ -1,6 +1,6 @@
 # Phase 33：正式內容名冊第一步
 
-2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正 `940e1f3` 已獲外部工程 PASS；使用者已回報新版文案及五族數值正常，並選定緊湊資料卡排版。正式排版 `cd4cbb4` 外部工程 FAIL（Low D1：小螢幕大字數值溢格）；同切片自適應欄數補修待複驗及使用者接受。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
+2026-10-04 使用者要求「進入下一階段」。本次是 R04 的小切片：只將五種族的創角資料轉為可讀、可驗證的正式名冊，並提供唯讀核對入口。首版 `641b82f` 外部工程未通過；D1／D2 補修 `8792e15` 的內容版本 1 已獲外部工程 PASS。使用者核對時澄清所有角色資質均在創角後揭曉，內容版本 2 與文案同切片修正 `940e1f3` 已獲外部工程 PASS；使用者已回報新版文案及五族數值正常，並選定緊湊資料卡排版。正式排版 `cd4cbb4` 外部工程 FAIL（Low D1：小螢幕大字數值溢格）；同切片自適應欄數補修 `9a4471a` 已獲外部工程 PASS，使用者其後回報新版其他項目正常，但要求縮小負號；此同切片微調待 Grok 驗證及使用者接受。歷史結果保留，不宣稱全部 R04 或正式創角已完成。
 
 Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mobile-ui`。首版整體 BASE：`8f5c0334c2dbab10d2c519c3118af44c383c5a1e`；補修 BASE：`641b82f1686d24991e0d1da4ba9095b629995dcc`；版本 1 已複驗 TARGET：`8792e15843fbfe02d9f035db27e9ef5e5d784b4a`；版本 2 已複驗 TARGET：`940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`（BASE 為前述版本 1 TARGET）。本次外部結果紀錄的後續文件變更，不是該測試 TARGET 的一部分。
 
@@ -34,13 +34,13 @@ Repository：`https://github.com/bosco8001/ai-trpg`；分支：`codex/phase27-mo
 
 修改：`src/server/app.ts`、`src/web/RuntimeSystemPanel.tsx`、`docs/development/CANONICAL_MANIFEST.md`、`docs/development/OPEN_QUESTIONS.md`、`docs/development/IMPLEMENTATION_PLAN.md`。首版共十一檔；同切片 D1 補修另修改 `src/web/ExplorationPage.tsx`。不包含原有未提交的 `AGENTS.md` 或 Phase 31 文字。
 
-## 工程檢查：歷史版本各自 PASS，最新排版補修待驗證
+## 工程檢查：D1 補修外部 PASS，後續負號微調待驗證
 
 開發代理只閱讀程式／Git、編寫案例及核對差異，沒有執行 build、typecheck、lint、測試或 UI 驗證。首版五項測試與 D1／D2 補修六項測試分別由 Grok 執行，版本 1 結果見下方歷史複驗紀錄。版本 2 交付當時待驗證，其後由 Grok 對 `940e1f3` 獨立執行並回報 PASS，詳見文末；不是沿用 `8792e15` 的 PASS。
 
 指定 bot 的命令：`npm ci`、`npm run build`、`node --import tsx --test tests/content-catalog.test.ts`、完整 `npm test`、BASE..TARGET `git diff --check`。完整 PG 回歸須隔離 `TEST_DATABASE_URL` 並先 migrate，不能碰正常 DB 或 5432；skip 不算 PASS。本次本身無 DB migration。
 
-## 使用者核對清單（版本 2 文案與數值已回報正常，最新排版待工程驗證）
+## 使用者核對清單（版本 2 文案與數值已回報正常，D1 排版已獲工程 PASS，負號微調待工程與手動核對）
 
 1. 開啟系統／存檔 → 正式內容名冊，看到五個種族與內容版本 2。
 2. 人類固定加成皆零，另有兩點自由種族點；精靈力量 -1／體質 -2／智慧 +1／感知 +2；矮人力量 +1／敏捷 -1／體質 +2／魅力 -2；獸人敏捷 +2／感知 +2／智慧 -3／魅力 -1；龍裔力量 +2／體質 +2／智慧 +1。
@@ -287,7 +287,7 @@ TARGET: 待本次限定六檔 commit／push 後填入完整 SHA
 依使用者「接受，交給grok驗收吧」授權，限定六檔已 commit／push 為 `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`，BASE `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`；遠端既有分支完整 SHA 已讀回吻合。2026-10-05 00:00:21（Asia/Hong_Kong）經 Grok Bot Control 送達指定 AI TRPG Architecture Critic，讀回新 outgoing 的完整 BASE／TARGET／要求且 composer 清空，確認只送一次。工程結果待回覆，Codex 沒有執行 build／測試／UI 驗證，也沒有沿用舊版 PASS。使用者已選定並接受這次排版交付；正式整合操作仍依回報與階段邊界核對，尚未展開下一切片。此送達紀錄為 TARGET 之後的未提交純文字，不是被測 diff 的一部分。
 
 
-## 緊湊排版外部工程 FAIL 與 D1 同切片補修（2026-10-05，待複驗）
+## 緊湊排版外部工程 FAIL 與 D1 同切片補修（2026-10-05，當時待複驗）
 
 來源：AI TRPG Architecture Critic，2026-10-05 00:15:55／00:16:01／00:16:03（Asia/Hong_Kong），Codex 經 Grok Bot Control 直接讀取。BASE `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`、TARGET `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`。外部核對遠端、祖先與限定六檔；資料／Canon／內容版本 2／server／API／Save／state／DB／LLM／fetch 未改，新 CSS 限 content-catalog。工程結論 **FAIL**，一項新 Low D1；其餘項目通過不抵銷整體 FAIL，不代替使用者階段驗收。
 
@@ -313,7 +313,7 @@ TARGET: 待本次限定六檔 commit／push 後填入完整 SHA
 
 真做：全部命令／diff／production UI／BASE 對照／非 production 回歸。引用：bot 本輪報告列為無。推斷：多個名冊不撞 id 來自 React useId，實際每頁只有一個名冊。未測：真手機、真讀屏器、正式遊玩；系統大字只用 CSS 模擬。受阻：production 戰鬥／主選單入口。外部清理：服務停、三個 DB／role 已 drop、cluster 停、`/workspace/p33d` 刪除；5432、clone、舊證據未變；新證據 `/workspace/p33d-evidence` 共 104 檔。bot 未改檔或 commit／push；Codex 未本機核驗該證據目錄。
 
-**D1 補修設計，尚未驗證**：只改 `style.css` 的兩處屬性網格欄數定義。採 auto-fit 與隨文字縮放的 3.5rem 最小格寬；一般區最多三欄、寬容器最多六欄，空間不足自動減為兩欄或一欄，min(100%, …) 使極窄容器可採單欄。數字仍 1.25rem、緊湊內距及 nowrap；沒有縮小使用者的大字、切掉字、隱藏零值或拆開正負號。數值／markup／其他面板與既有讀取行為不變。複驗須逐項量測標籤／數字文字範圍不超出各格或與相鄰格交疊，不只看 scrollWidth；320／360／375／430 × 100／125／150／175／200% 字體及真頁面 zoom 200%，並驗正常字體外觀仍緊湊、寬版六欄。
+**D1 補修設計，當時尚未驗證（其後 `9a4471a` 外部 PASS，見文末）**：只改 `style.css` 的兩處屬性網格欄數定義。採 auto-fit 與隨文字縮放的 3.5rem 最小格寬；一般區最多三欄、寬容器最多六欄，空間不足自動減為兩欄或一欄，min(100%, …) 使極窄容器可採單欄。數字仍 1.25rem、緊湊內距及 nowrap；沒有縮小使用者的大字、切掉字、隱藏零值或拆開正負號。數值／markup／其他面板與既有讀取行為不變。複驗須逐項量測標籤／數字文字範圍不超出各格或與相鄰格交疊，不只看 scrollWidth；320／360／375／430 × 100／125／150／175／200% 字體及真頁面 zoom 200%，並驗正常字體外觀仍緊湊、寬版六欄。
 
 本次為既有六檔提交與送驗授權內的同切片缺陷補修，實際只改 `style.css` 與四份 Phase 33 文件，不擴大檔案範圍。文件包含上次送達與本輪外部 FAIL 紀錄；保留前次 PASS 的版本界線。本次沒有新增測試或自行執行 build／typecheck／lint／測試／UI 驗證，等待指定 bot 複驗。下一切片未開始。
 
@@ -345,3 +345,48 @@ D1 必須用正式 dist NODE_ENV=production 正常探索→系統→名冊重現
 新增探索抽屜達不到六欄、anchor每次加history且關閉保留hash兩Info不在此補修範圍，保留；其他Info（UI文案／小數案例測試缺口、來源未凍結、陣列非索引、±12語意、querylog、favicon、關閉按鈕捲走）也保留。真手機／讀屏／正式遊玩未測，CSS大字模擬不算OS實測。使用者選定排版與數值回報，不等於整個Phase33已通過。
 回報工程PASS/FAIL、逐項真做／引用／推斷／未測／受阻、完整命令結果、缺陷嚴重度／精確行號／重現／影響、清理與新證據。不修改專案、不commit/push、不開下一切片，不代替使用者階段驗收。
 ```
+
+
+## D1 補修已提交及送達（2026-10-05，送達當時待工程複驗）
+
+既有六檔授權內的限定五檔補修已 commit／push 為 `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`（BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`），遠端分支完整 SHA 已讀回確認。2026-10-05 00:24:29 HKT 經 Grok Bot Control 送指定 AI TRPG Architecture Critic，完整新 outgoing 與清空 composer 已讀回確認，只送一次。複驗要求包含逐格 Range 量測及 BASE 對照，D1 修正效果當時仍待工程結果，其後外部 PASS 見下；沒有自行測試或沿用舊 PASS。此送達紀錄為 TARGET 後未提交純文字，不包含在被測 diff 中。
+
+
+## 自適應欄數 D1 補修外部工程 PASS（2026-10-05，待使用者接受）
+
+來源：AI TRPG Architecture Critic，2026-10-05 00:38:02／00:38:06／00:38:07（Asia/Hong_Kong），Codex 經 Grok Bot Control 直接讀取。BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`；TARGET `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`。外部核對遠端分支、祖先及限定五檔；CSS 僅兩處網格規則改為自適應欄數，markup、數值、內容版本 2、Canon、server、API、fetch 未變。工程結論 **PASS**，Low D1 修正，沒有新 High、Medium 或 Low。`cd4cbb4` 的歷史 FAIL 保留；不是沿用其他版本的 PASS，也不代替使用者 Phase 33 最終驗收。
+
+外部環境：Node 24.21.0、npm 9.2.0、Debian 13.7、新隔離 PostgreSQL 17.11（55426）、Chrome 154、Playwright 1.63.0。UI 結果只涵蓋 Chrome；環境沒有 WebKit，bot 沒有另行安裝。
+
+| 外部本輪實際命令 | exit | 結果 |
+|---|---:|---|
+| `npm ci` | 0 | 成功 |
+| `npm run build` | 0 | 成功 |
+| `node --import tsx --test tests/content-catalog.test.ts` | 0 | 6／6 通過 |
+| `env -u TEST_DATABASE_URL npm test` | 0 | 371 通過、41 略過，共 412 |
+| `DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_test npx node-pg-migrate up` | 0 | 成功 |
+| `TEST_DATABASE_URL=postgres://phase26_test@127.0.0.1:55426/ai_trpg_phase26_test npm test` | 0 | 414／414 通過 |
+| `git diff --check BASE TARGET` | 0 | 本節完整 SHA |
+
+略過不算通過。以上均為外部執行結果，開發代理沒有在本機執行或重跑。
+
+**D1 外部真做**：正式 dist、production 正常探索入口，用 Range 量測全部 30 個屬性標籤／數字及各格邊界。320／360／375／430px × 字體 100／125／150／175／200%，加上 320px 頁面 zoom 200%（有效 CSS 寬度 160px），共 21 組設定，TARGET 全部零溢格、零交疊；正負號與數字保持完整，數值與 Canon 一致。BASE 在 320px／175% 有 15 個溢格，320px／200% 有 15 個溢格、10 次交疊，360px／200% 有 15 個溢格；320px 頁面 zoom 200% 同樣有 15 個溢格、10 次交疊。精靈 −1／0、+2／0、−2 在 TARGET 均完整可讀。隔離副本還原固定三欄 CSS 後，bundle 與 BASE 一致，重現相同失敗；證明修正來自本次兩處 CSS。
+
+**欄數與外觀外部真做**：實際網格寬度至少 11.2rem 為三欄、至少 7.35rem 為兩欄、更窄為一欄。一般字體 320–1920px 的探索抽屜仍為三欄且沒有溢格；探索抽屜約 22.4rem，不會達到六欄。六欄只在非 production 主選單實測：1280px／字體至 150% 為六欄，175% 減為三欄；1920px／200% 仍為六欄，邊界上的 30 個值沒有溢格。200% 時共通說明、分布文字及按鈕與 BASE 一致，對比度皆至少 4.5。dl／dt／dd、aria-hidden 僅 DOM 結構檢查，不能寫成讀屏通過。
+
+**必要回歸外部真做**：五族 anchor、焦點、Esc、手動刷新、收起／重開、取消、timeout、13 種非法回應及舊回應處理正常，沒有輪詢或 pageerror。名冊 GET 零 SQL／對外呼叫，revision、state 與三個存檔前後不變。診斷／備份／修復三個面板逐元素與 BASE 比較差異零。戰鬥／主選單只在非 production 回歸，production 入口仍受阻。
+
+既有 Info 保留：探索抽屜不到六欄、anchor 增加 history 且關閉後 hash 保留、UI 文案／小數案例測試缺口、來源未凍結、陣列非索引屬性、±12 語意、access log query、favicon、關閉按鈕捲走。沒有因本輪工程 PASS 宣告這些已修復。
+
+真做：本輪全部命令、diff、文件、D1 TARGET／BASE／還原 CSS 對照、21 組矩陣與欄數邊界、六欄邊界、必要 UI／HTTP 回歸。引用：無。推斷：React useId 的多實例不撞 ID，實際每頁只有一個名冊，未實測多實例。未測：真手機、真讀屏、正式遊玩、作業系統字體縮放、Safari／WebKit；CSS 字體模擬不等於系統大字實測。受阻：production 戰鬥／主選單入口。
+
+外部清理：服務停止、四個 DB 與角色已 drop、叢集停止、`/workspace/p33e` 刪除；5432、clone、舊證據未改。新證據 `/workspace/p33e-evidence` 共 122 檔，矩陣為 `json/d1-matrix-target.json`、`json/d1-matrix-base.json`、`json/d1-matrix-revert.json`。bot 沒有改檔、commit／push 或啟動下一切片；Codex 未本機核驗外部證據目錄。此結果紀錄是 TARGET 後未提交純文字，未包含在被測 diff 中。Phase 33 仍待使用者核對正式整合操作及明確接受。
+
+
+## 負號大小同切片微調（2026-10-05，待工程驗證）
+
+使用者在新版名冊手動核對後回覆「負號字體太大了，可以縮小。其他都正常」。只記錄其回報，不擴大為 Safari／真手機等全部環境通過，也不視為 Phase 33 已接受。
+
+本次只將負加成的 Unicode 負號 `−` 包在文字 span，CSS 設為數字字級的 75%（0.9375rem）、輕微垂直對齊。數字仍 1.25rem，正號與零值不變。負號保留實際文字、不加 aria-hidden、不使用偽元素；`dd` 的 nowrap 保留，負號與數字不換行分離。兩處自適應欄數 CSS 不變，所有 Canon／30 個加成／版本 2／API／讀取行為／state／Save／DB／LLM 不變。
+
+限定六檔：`src/web/ContentCatalogPanel.tsx`、`src/web/style.css` 與本文件、`CANONICAL_MANIFEST.md`、`OPEN_QUESTIONS.md`、`IMPLEMENTATION_PLAN.md`。四份文件包含前輪 `9a4471a` 外部 PASS 紀錄，該 PASS 不適用本次新 diff。沿用使用者已批准六檔內的同切片補修 commit／push／送驗授權；不含原有 AGENTS／Phase 31 變更。開發代理未執行 build／typecheck／lint／測試／UI 驗證，沒有新增測試；待指定 AI TRPG Architecture Critic 對固定新 TARGET 驗證。歷史 FAIL、既有 Info 及 Chrome-only／其他未測與受阻限制保留。下一切片未開始。

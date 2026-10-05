@@ -391,7 +391,7 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 **使用者於 2026-10-04（Asia/Hong_Kong）明確回覆「phase 32通過」。** 使用者先回報目前資料保存／取消／套用／恢復畫面、重新整理後查詢及兩種下載、存檔 1 單份修復符合預期；其後另授權開發代理只親自驗證存檔 2 的同值覆寫與舊準備拒絕，這項隔離 UI 驗證 PASS，不能擴大為其他測試授權。驗收時本地 HEAD 為 `ccb34631e2f21433463cea27c9874b131959867f`，只作版本對照，使用者未指定測試 SHA 或完整本機環境，不補寫未提供的結果。沒有新增玩法、自動 migration、合併或部署；原驗收當時下一主要階段尚未開始。接受後容量提示小補修已依使用者限定授權及 `828d520` 外部工程 PASS 判定通過，歷史 FAIL、Info 與未測限制見 [Phase 32](PHASE_32_REPAIR_APPLICATION.md)。
 
-## Phase 33：正式內容名冊第一步（R04，緊湊排版外部 FAIL，D1 補修待複驗及使用者接受）
+## Phase 33：正式內容名冊第一步（R04，D1 排版補修外部 PASS，負號微調待驗證與使用者接受）
 
 使用者於 2026-10-04 要求「進入下一階段」。首個切片將 Race／Character 已定五種族創角資料放入有版本的正式名冊，與 TEST 目錄分開，加入嚴格未知引用拒絕及系統面板唯讀核對入口。沒有創角、屬性推導、種族能力、職業／物品／技能／法術正式內容、Save 版本遷移或資料庫改動；不是整個 R04 完成。
 
@@ -410,3 +410,11 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 緊湊資料卡限定六檔已依本次授權 commit／push 為 `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`（BASE `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`），2026-10-05 00:00:21 HKT 已送指定 AI TRPG Architecture Critic 並讀回確認送達；工程結果待回覆，沒有自行執行驗證或展開下一切片。這段送達紀錄為 TARGET 後未提交文件。
 
 2026-10-05 00:15:55／00:16:01／00:16:03 HKT 指定 bot 對 `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`（BASE `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`）回報工程 FAIL：Low D1 在320px／200%文字時數字溢格，相鄰 −1／0 可誤看為 −10。外部 build、新測試6／6、隔離 PG414／414及其他項目通過，不能抵銷 FAIL。新增探索抽屜達不到六欄及 anchor history／hash Info 保留。既有授權六檔內的同切片補修只改 style.css 網格為有最小字體相對格寬的 auto-fit，不足時減欄，不縮字／裁切或改數據；加上四份文件，待固定新版本送 Grok 複驗。開發代理未執行驗證；真手機／讀屏／正式遊玩未測與 production 入口限制保留，未進下一切片。
+
+D1 補修 `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`（BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`）已依既有六檔授權內的限定五檔範圍 commit／push，2026-10-05 00:24:29 HKT 送達指定 bot 並讀回確認；送達當時待工程複驗，不宣告缺陷已通過或 Phase 33 結案。此送達紀錄為 TARGET 後未提交文件。
+
+
+2026-10-05 00:38:02／00:38:06／00:38:07 HKT 指定 AI TRPG Architecture Critic 對 `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`（BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`）回報工程 PASS，D1 修正、無新 High／Medium／Low。外部本輪 build、新測試 6／6、隔離 PG 全套 414／414 通過；無 DB 模式 371 通過／41 略過，略過不算通過。production 探索的 21 組尺寸／放大設定全部零溢格或交疊，BASE 與還原固定三欄 CSS 均重現失敗。正常字體緊湊外觀、六欄邊界及其他面板回歸正常；UI 限 Chrome，Safari／WebKit、系統字體縮放、真手機／讀屏／正式遊玩未測，production 戰鬥／主選單仍受阻。既有 Info 與歷史 FAIL 保留。開發代理僅讀取外部報告及記錄，沒有自行執行驗證；仍待使用者核對正式整合與接受 Phase 33，未開始下一切片。完整來源／命令／限制／證據見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。此紀錄為 TARGET 後未提交純文字。
+
+
+使用者其後開啟正式新版名冊並回報「負號字體太大了，可以縮小。其他都正常」。同切片只將負加成負號包在文字 span，設為數字字級 75% 並微調垂直對齊，完整負號／數字文字及 nowrap 保留；正號、數字大小、自適應欄數、30 個加成、Canon、資料／讀取／state 路徑不變。範圍是既有批准六檔內的 ContentCatalogPanel、style.css 及四份 Phase 33 文件（含前輪外部結果紀錄）；沿用同切片補修 commit／push／送驗授權。開發代理未執行驗證，待固定新 TARGET 送指定 bot；`9a4471a` PASS 不當作本次結果，Phase 33 尚未接受或開始下一切片。

@@ -2305,6 +2305,12 @@ h1 {
 }
 .content-catalog__attribute dd[data-sign="positive"] { color: var(--action-primary-hover); }
 .content-catalog__attribute dd[data-sign="negative"] { color: var(--state-danger); }
+.content-catalog__minus {
+  display: inline-block;
+  font-size: 0.75em;
+  line-height: 1;
+  vertical-align: 0.06em;
+}
 .content-catalog__free-points {
   display: flex;
   flex-wrap: wrap;
