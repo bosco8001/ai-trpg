@@ -3,6 +3,7 @@ import { Button } from './ui/Button.js';
 import { Panel } from './ui/Panel.js';
 import { DataHealthPanel } from './DataHealthPanel.js';
 import { ContentCatalogPanel } from './ContentCatalogPanel.js';
+import { ClassCatalogPanel } from './ClassCatalogPanel.js';
 import { RawDataBackupPanel } from './RawDataBackupPanel.js';
 import { RepairPreviewPanel } from './RepairPreviewPanel.js';
 import { SaveSlotsPanel, type SaveConfirmation } from './SaveSlotsPanel.js';
@@ -70,6 +71,6 @@ export function RuntimeSystemPanel({ state, onStateUpdate, onRetryState, onMainM
     {open ? <><SaveSlotsPanel slots={slots} loading={slots === null} busySlotId={busy} feedback={feedback} confirmation={confirmation} onSave={slot => slot.empty ? void run('save', slot.slotId) : setConfirmation({ kind: 'overwrite', slotId: slot.slotId })} onLoad={slotId => setConfirmation({ kind: 'load', slotId })} onConfirm={() => {
                 if (confirmation)
                     void run(confirmation.kind === 'load' ? 'load' : 'save', confirmation.slotId);
-            }} onCancel={() => setConfirmation(null)}/><ContentCatalogPanel /><DataHealthPanel /><RawDataBackupPanel /><RepairPreviewPanel currentState={state.state} onApplied={onRetryState} /></> : null}
+            }} onCancel={() => setConfirmation(null)}/><ContentCatalogPanel /><ClassCatalogPanel /><DataHealthPanel /><RawDataBackupPanel /><RepairPreviewPanel currentState={state.state} onApplied={onRetryState} /></> : null}
   </Panel>;
 }

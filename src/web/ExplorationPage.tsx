@@ -7,6 +7,7 @@ import { Icon, type IconName } from "./ui/Icon.js";
 import { Panel } from "./ui/Panel.js";
 import { DataHealthPanel } from "./DataHealthPanel.js";
 import { ContentCatalogPanel } from "./ContentCatalogPanel.js";
+import { ClassCatalogPanel } from "./ClassCatalogPanel.js";
 import { RawDataBackupPanel } from "./RawDataBackupPanel.js";
 import { RepairPreviewPanel } from "./RepairPreviewPanel.js";
 import { executeExplorationAction, listSaveSlots, loadExplorationState, loadGame, saveGame } from "./api.js";
@@ -395,6 +396,7 @@ export function ExplorationPage({
                   onCancel={() => setSaveConfirmation(null)}
                 />
                 <ContentCatalogPanel />
+                <ClassCatalogPanel />
                 <DataHealthPanel />
                 <RawDataBackupPanel />
                 <RepairPreviewPanel currentState={authoritativeState?.state} />

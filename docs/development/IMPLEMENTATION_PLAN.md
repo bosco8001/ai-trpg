@@ -1,5 +1,9 @@
 # 已批准的 Implementation Phase Plan
 
+## 當前小切片（2026-10-06）
+
+使用者已指定「做四個初階職業的正式名冊與唯讀核對畫面」。[Phase 33 第二切片](PHASE_33_CLASS_CATALOG.md) 收錄劍士、弓箭手、斥候、魔術師的正式 metadata，採獨立職業名冊 v1 與已接受的手機 Sheet 設計方向；不接入轉職、創角、配裝或戰鬥被動。本輪實作待 Grok 工程驗證及使用者核對，使用者已授權限定 17 檔 commit／push 及送驗；此處是提交前紀錄，Git 與送達結果以當次交接為準。後面的「下一切片尚未開始」為先前第一切片接受時的歷史狀態。
+
 Phase 1–32 已由使用者確認驗收；Phase 26 於 2026-09-30、Phase 27／28／29 於 2026-10-01 回報手動測試通過，Phase 30 於同日確認「R02通過」，Phase 31 於 2026-10-03 回覆「Phase 31通過」。Phase 28 唯讀資料健康檢查的驗收版本為 `d2b400bdc0e22369be4188c05ff7ffa2d9a4720f`。R03 第一階段於 2026-10-02 批准為 Phase 31，持久備份與準備已交付並接受；第二階段 [完整契約](R03_SECOND_STAGE_PROPOSAL.md) 已於 2026-10-04 批准，依使用者選定順序，文件工程審查已完成；使用者另回覆「開始實作」，Phase 32 已於 2026-10-04 由使用者驗收通過。
 
 依使用者修訂，先以 Phase 3 定義 domain、權威狀態與合法命令，再由 Phase 4 實作 domain 所需的保存介面。
@@ -391,7 +395,7 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 **使用者於 2026-10-04（Asia/Hong_Kong）明確回覆「phase 32通過」。** 使用者先回報目前資料保存／取消／套用／恢復畫面、重新整理後查詢及兩種下載、存檔 1 單份修復符合預期；其後另授權開發代理只親自驗證存檔 2 的同值覆寫與舊準備拒絕，這項隔離 UI 驗證 PASS，不能擴大為其他測試授權。驗收時本地 HEAD 為 `ccb34631e2f21433463cea27c9874b131959867f`，只作版本對照，使用者未指定測試 SHA 或完整本機環境，不補寫未提供的結果。沒有新增玩法、自動 migration、合併或部署；原驗收當時下一主要階段尚未開始。接受後容量提示小補修已依使用者限定授權及 `828d520` 外部工程 PASS 判定通過，歷史 FAIL、Info 與未測限制見 [Phase 32](PHASE_32_REPAIR_APPLICATION.md)。
 
-## Phase 33：正式內容名冊第一步（R04，D1 排版補修外部 PASS，負號微調待驗證與使用者接受）
+## Phase 33：正式內容名冊第一步（R04 第一切片，2026-10-05 已由使用者接受）
 
 使用者於 2026-10-04 要求「進入下一階段」。首個切片將 Race／Character 已定五種族創角資料放入有版本的正式名冊，與 TEST 目錄分開，加入嚴格未知引用拒絕及系統面板唯讀核對入口。沒有創角、屬性推導、種族能力、職業／物品／技能／法術正式內容、Save 版本遷移或資料庫改動；不是整個 R04 完成。
 
@@ -399,11 +403,11 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 
 同切片已補探索入口、改成先複製再驗證同份快照，並補 getter 與六項 mutation 缺口的相關案例；補修交付當時尚未執行，開發代理沒有自行執行 build／typecheck／測試／UI。首版授權限定十一檔，本次補修另涉及 ExplorationPage；使用者其後於 2026-10-04 回覆「授權補修 commit／push 並複驗」，另行批准限定七檔提交及送驗。
 
-補修 `8792e15843fbfe02d9f035db27e9ef5e5d784b4a` 已於 21:17 HKT 送達指定 bot；21:27 HKT 外部工程結果為 PASS，D1／D2 修正確認、無新 High／Medium／Low。外部 build 成功、新測試 6／6、隔離 PG 全套 414／414 通過；production 探索頁入口實測通過，戰鬥／主選單 UI 僅非 production 回歸，production 仍受阻。六項指定 mutation 均被捕捉，但首版種族缺欄漏網屬等價 mutant 的判斷已更正；新增小數加成案例缺口與既有 Info／未測限制保留。完整來源與核對清單見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。本期仍待使用者接受，未開始下一切片。
+補修 `8792e15843fbfe02d9f035db27e9ef5e5d784b4a` 已於 21:17 HKT 送達指定 bot；21:27 HKT 外部工程結果為 PASS，D1／D2 修正確認、無新 High／Medium／Low。外部 build 成功、新測試 6／6、隔離 PG 全套 414／414 通過；production 探索頁入口實測通過，戰鬥／主選單 UI 僅非 production 回歸，production 仍受阻。六項指定 mutation 均被捕捉，但首版種族缺欄漏網屬等價 mutant 的判斷已更正；新增小數加成案例缺口與既有 Info／未測限制保留。完整來源與核對清單見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。本期當時仍待使用者接受，未開始下一切片；其後第一切片已接受，見本節末。
 
 使用者其後在逐步核對中回報本機 build 成功、探索畫面與名冊入口／五族正常；未指定完整測試環境，不擴大為全部數值或階段驗收通過。使用者澄清：「全部角色的資質都是創角完成才揭曉，不用寫玩家可以是普通人或代行者」。依此更新 Character／Race Canon、五族揭曉資料及畫面文案，內容版本升為 2；資料格式版本維持 1，舊內容版本 1 查詢明確拒絕，不暗中回退至新版本或 TEST。固定加成、機率及施法資格規則未變，既有角色／Save 未接入名冊。使用者另於 2026-10-04 回覆「授權此次修正 commit／push 並送驗」，批准限定十一項檔案變更（包含名冊更名）。此修正與相關測試未由開發代理執行；交付當時待指定 bot 驗證，後續版本 2 的獨立結果見下，沒有沿用 `8792e15` 的版本 1 PASS。
 
-版本 2 修正 `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`（BASE `8792e15843fbfe02d9f035db27e9ef5e5d784b4a`）已於 2026-10-04 22:18:31 HKT 送達指定 bot；22:27:59／22:28:05 外部工程結果為 PASS，無新 High／Medium／Low。外部 build、新測試 6／6、隔離 PG 全套 414／414 通過；正式 production 探索 UI 的版本 2、五條創角後揭曉註記與指定句子移除均實測通過。UI 文案自動化測試缺口及來源物件 V2 未凍結的 Info、新舊限制保留；真手機／讀屏／正式遊玩未測，production 戰鬥／主選單入口仍受阻。詳見 [Phase 33 外部版本 2 結果](PHASE_33_CONTENT_CATALOG.md#內容版本-2-澄清補修外部工程-pass2026-10-04待使用者驗收)。本切片仍待使用者重新 build／重啟後繼續手動核對，未開始下一切片。
+版本 2 修正 `940e1f3ac9d6cda82f6c7d52c6e9cd1612ef85f2`（BASE `8792e15843fbfe02d9f035db27e9ef5e5d784b4a`）已於 2026-10-04 22:18:31 HKT 送達指定 bot；22:27:59／22:28:05 外部工程結果為 PASS，無新 High／Medium／Low。外部 build、新測試 6／6、隔離 PG 全套 414／414 通過；正式 production 探索 UI 的版本 2、五條創角後揭曉註記與指定句子移除均實測通過。UI 文案自動化測試缺口及來源物件 V2 未凍結的 Info、新舊限制保留；真手機／讀屏／正式遊玩未測，production 戰鬥／主選單入口仍受阻。詳見 [Phase 33 外部版本 2 結果](PHASE_33_CONTENT_CATALOG.md#內容版本-2-澄清補修外部工程-pass2026-10-04待使用者驗收)。本切片當時仍待使用者重新 build／重啟後繼續手動核對，未開始下一切片。
 
 使用者其後回報重新啟動成功、新版文案正常與五族數值正常；操作核對尚未回報全數通過。使用者要求 apple-design 排版原型並將屬性格縮小，再選定「先用這個設計吧，五族數值正常」。同切片正式整合緊湊六屬性網格、資質分組、共通揭曉說明／短註記與五族跳轉入口；只修改 ContentCatalogPanel.tsx、style.css 及四份 Phase 33 文件，資料／內容版本 2／server／state 未改。獨立原型已停止並移除，不將原型控制器接入正式遊戲。開發代理未執行 build／測試／UI 驗證，使用者其後回覆「接受，交給grok驗收吧」，批准剛才列明的六檔 commit／push 及送驗，新排版待指定 bot 工程驗證；舊 `940e1f3` PASS 不當作新 diff 結果。尚未宣告 Phase 33 通過或開始下一切片，送驗要求與限定指令見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。
 
@@ -414,7 +418,16 @@ PostgreSQL Gameplay／History／Load／Reset 共用短 row-lock 邊界，持久�
 D1 補修 `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`（BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`）已依既有六檔授權內的限定五檔範圍 commit／push，2026-10-05 00:24:29 HKT 送達指定 bot 並讀回確認；送達當時待工程複驗，不宣告缺陷已通過或 Phase 33 結案。此送達紀錄為 TARGET 後未提交文件。
 
 
-2026-10-05 00:38:02／00:38:06／00:38:07 HKT 指定 AI TRPG Architecture Critic 對 `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`（BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`）回報工程 PASS，D1 修正、無新 High／Medium／Low。外部本輪 build、新測試 6／6、隔離 PG 全套 414／414 通過；無 DB 模式 371 通過／41 略過，略過不算通過。production 探索的 21 組尺寸／放大設定全部零溢格或交疊，BASE 與還原固定三欄 CSS 均重現失敗。正常字體緊湊外觀、六欄邊界及其他面板回歸正常；UI 限 Chrome，Safari／WebKit、系統字體縮放、真手機／讀屏／正式遊玩未測，production 戰鬥／主選單仍受阻。既有 Info 與歷史 FAIL 保留。開發代理僅讀取外部報告及記錄，沒有自行執行驗證；仍待使用者核對正式整合與接受 Phase 33，未開始下一切片。完整來源／命令／限制／證據見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。此紀錄為 TARGET 後未提交純文字。
+2026-10-05 00:38:02／00:38:06／00:38:07 HKT 指定 AI TRPG Architecture Critic 對 `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`（BASE `cd4cbb4294e80c0f06ba4838c98aeb1af94242f0`）回報工程 PASS，D1 修正、無新 High／Medium／Low。外部本輪 build、新測試 6／6、隔離 PG 全套 414／414 通過；無 DB 模式 371 通過／41 略過，略過不算通過。production 探索的 21 組尺寸／放大設定全部零溢格或交疊，BASE 與還原固定三欄 CSS 均重現失敗。正常字體緊湊外觀、六欄邊界及其他面板回歸正常；UI 限 Chrome，Safari／WebKit、系統字體縮放、真手機／讀屏／正式遊玩未測，production 戰鬥／主選單仍受阻。既有 Info 與歷史 FAIL 保留。開發代理僅讀取外部報告及記錄，沒有自行執行驗證；當時仍待使用者核對正式整合與接受 Phase 33，未開始下一切片。完整來源／命令／限制／證據見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。此紀錄為 TARGET 後未提交純文字。
 
 
 使用者其後開啟正式新版名冊並回報「負號字體太大了，可以縮小。其他都正常」。同切片只將負加成負號包在文字 span，設為數字字級 75% 並微調垂直對齊，完整負號／數字文字及 nowrap 保留；正號、數字大小、自適應欄數、30 個加成、Canon、資料／讀取／state 路徑不變。範圍是既有批准六檔內的 ContentCatalogPanel、style.css 及四份 Phase 33 文件（含前輪外部結果紀錄）；沿用同切片補修 commit／push／送驗授權。開發代理未執行驗證，待固定新 TARGET 送指定 bot；`9a4471a` PASS 不當作本次結果，Phase 33 尚未接受或開始下一切片。
+
+
+負號微調限定六檔已 commit／push 為 `8a59cfe82f04c75758a9468abcca75996d1a3eaa`（BASE `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`），2026-10-05 20:18:02 HKT 送指定 bot 並讀回確認；送達當時工程結果待回覆，使用者最終接受仍待定。此送達紀錄為 TARGET 後未提交純文字。
+
+
+2026-10-05 20:37:39／20:37:45／20:37:46 HKT 指定 AI TRPG Architecture Critic 對負號微調 `8a59cfe82f04c75758a9468abcca75996d1a3eaa`（BASE `9a4471af0bceb8ca401adb9afbbca4e80d5dd810`）回報工程 PASS（Chrome-only），無新 High／Medium／Low。外部 build、名冊測試 6／6、隔離 PG 414／414 通過，無 DB 371 通過／41 略過（略過不算通過）；全部 21 組尺寸／縮放無溢格／交疊／裁切／符號分行，六個負號字級均為數字 75%，30 個完整值與 Canon 一致，必要回歸正常。新增 Info：Chrome 無障礙樹將負號／數字拆成兩段文字（順序正確、沒有隱藏負號；讀屏效果未測），沒有自動化測試覆蓋負號 span。既有 Info、歷史 FAIL、未測限制與 production 入口受阻保留；不把文字完整等同可及名稱或讀屏通過。詳細來源／命令／證據見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。開發代理僅讀報告及記錄、未執行本機驗證；當時仍待使用者確認負號外觀與名冊操作並接受第一切片，未啟動下一切片；其後接受見下。本紀錄為 TARGET 後未提交純文字。
+
+
+**使用者於 2026-10-05（Asia/Hong_Kong）明確回覆「Phase 33 第一切片通過」。** 依使用者回覆記錄正式五族創角資料名冊第一切片已接受，包含內容版本 2、唯讀入口、緊湊資料卡、自適應欄數及負號微調。記錄時本地 HEAD `8a59cfe82f04c75758a9468abcca75996d1a3eaa` 僅作版本對照，不冒稱使用者指定的手動測試 SHA 或完整本機環境；最新外部 TARGET／BASE、工程 PASS 與 Info 保留各自來源。歷史 FAIL、新兩項 Info、其他既有 Info、Safari／真手機／讀屏等未測及 production 入口受阻均未改標通過或解決。這項接受只涵蓋第一切片，不代表完整 R04／創角／職業內容／R05 已完成或新規則已批准。詳細驗收見 [Phase 33](PHASE_33_CONTENT_CATALOG.md)。本輪只有四份文件的純文字紀錄，沒有執行測試或新增 commit／push，下一切片尚未開始。
