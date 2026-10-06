@@ -1,6 +1,6 @@
 # Phase 33 · 新手機角色原型 02
 
-2026-10-06。狀態：使用者已接受本原型的視覺設計方向，未經 Grok 工程驗證。不是正式第二切片完成或通過的紀錄。
+2026-10-06。狀態：使用者已接受本原型的視覺設計方向，首輪 Grok 工程驗證 FAIL，補修待複驗。不是正式第二切片完成或通過的紀錄。
 
 ## 本次交付
 
@@ -104,3 +104,36 @@ git rev-parse HEAD
 不可混入既有未提交的 AGENTS／Phase 31／四份 Phase 33 文件或原型 01 三檔。若這些已有 staged 變更，先保持其原狀並限制 commit 範圍，不執行全量提交。
 
 送出 prompt 時填入實際完整 SHA，不把目標 SHA 再寫入該 commit 造成循環。視覺方向已由使用者接受；下一步為 Grok 工程驗證，再確認有限的正式整合範圍，不自動全面替換正式 UI。
+
+### 首輪送達紀錄（歷史）
+
+依本次已列明的四檔交接流程，新原型已 commit／push 為 `4ee0a54aa9bebb65ab44a8eaa078da15b458b72d`，BASE 為 `8a59cfe82f04c75758a9468abcca75996d1a3eaa`。遠端既有分支完整 SHA 已讀回吻合，commit 僅新增上述四檔；其他既有修改及原型 01 保持原狀。
+
+2026-10-06 19:54:54（Asia/Hong_Kong）透過 Grok Bot Control 送達指定 AI TRPG Architecture Critic：先核對目標及空白輸入框、貼入完整 prompt 並讀回，再只送一次；新 outgoing 完整版本與案例要求、清空 composer 已讀回確認，交接紀錄已標示 confirmed。這證明當時訊息已送達；其後收到下述 FAIL 報告。Working 狀態不是 PASS。開發代理未執行本專案 build／測試／瀏覽器 UI 驗證。
+
+本段原為首輪 TARGET 之後的本地未提交純文字，現在隨補修保留；不屬首輪被測 commit 的 diff，亦未因送達而宣告 Phase 33 第二切片通過。
+
+
+## 首輪外部工程回報與本輪補修
+
+來源：AI TRPG Architecture Critic，2026-10-06 20:30:36–20:30:48（Asia/Hong_Kong）原生對話完整回報。首輪 BASE `8a59cfe82f04c75758a9468abcca75996d1a3eaa`／TARGET `4ee0a54aa9bebb65ab44a8eaa078da15b458b72d`。工程結論 **FAIL：1 個 Medium、4 個 Low**；不是開發代理親測結果。
+
+| 編號 | 外部觀察 | 本輪修改，仍待 Grok 複驗 |
+|---|---|---|
+| M1 | 320×720／200% 字體時 Sheet 標題被左右按鈕擠成逐字換行，header 高 887px、CTA 裁掉；其他大字／橫向案例 body 過小 | 圖示按鈕固定物理觸控尺寸；窄容器的標題獨佔一列，副標與說明放進 body，footer 僅保留一個必要 CTA |
+| L1 | 320px／150% 起主畫面橫向溢出，職業／導航入口在畫面外 | Header 可換行、容器 min-width 歸零、窄字體空間時職業入口另成一列；摘要與文字允許重排 |
+| L2 | 雙 Enter 或 Esc＋Enter 快速重開後，舊 close 事件清掉新 Sheet 堆疊，radio 報錯、預覽停用 | 關閉時同步清理與返回焦點；延後的 close 事件不清理已重開的 dialog；事件另檢查目前任務 |
+| L3 | 390×844 裝備捲到底、關閉、開完整數值時承襲舊 scrollTop，4／5 組重現 | showModal 顯示之後才重設 body 的 scrollTop；新任務以 preventScroll 聚焦標題 |
+| L4 | 844×390 橫向被當桌面，512px 最小高度使底部導航在 viewport 外 | 桌面模式須同時滿足 64rem 寬、40rem 高，移除 32rem 最小高度 |
+
+同一操作補修順便處理 Info I2／I4／I8：示範屬性保存按鈕關聯表單，支援 Enter 提交；圖示入口不被 flex 擠小於 44px；核對返回可找回原預覽 CTA 的穩定焦點 key。這些也尚未實測，不能記成已解決。
+
+首輪外部通過範圍：數值案例、4 職業×9 裝備共 36 組、配置保留、篩選／技能格操作、取消／保存、隔離與 Chrome 動態偏好。291 個文字樣本最低對比 4.85；主要按鈕 11.7、次要 10.36、選取 10.54、停用 6.03。Linux 實際為 Noto Sans CJK TC 備用字型，沒有證明 Mac 的 Heiti／Avenir 載入。這是首輪 TARGET 的結果，本輪不得直接沿用為 PASS。
+
+其餘 Info 保留：快速第二次點擊可能開背景技能庫但未改配置（I1）；1e1／12.0 分別作整數 10／12 接受（I3）；負號 AX 是分段文字，未做真讀屏（I5）；部分狀態色對比僅 4.85–4.89（I6）；原型 01 不在遠端，互動比較受阻（I7）。未改試作數值或已接受的色彩／字體方向。
+
+外部環境為 Debian 13.7、Node 24.21.0、headless Chrome 154.0.8037.57、Playwright 1.63.0。Grok 的 diff --check、inline node --check、HTML parser 均 exit 0；13 個 Playwright 驅動腳本均 exit 0，但腳本記錄了上述失敗，**不能把腳本 exit 0 等同案例全部通過**。52 個版面組合×14 個畫面中出現上述缺陷。Git fetch 因 DNS 失敗兩次 exit 128；Grok 用 GitHub API 在隔離 clone 重建並核對四個 blob／tree／commit SHA。
+
+Safari／WebKit、真手機、讀屏、虛擬鍵盤、OS 字型放大、遊戲手把及正式遊玩未測或受阻；safe-area 僅程式推斷。瀏覽器 Back／拖曳未實作。外部證據在 bot 機器 `/workspace/p33g-evidence`（344 檔、296 截圖），開發代理未下載或逐檔核實。Grok 已停止隔離服務、清理 clone，未 commit／push、未碰 5432。
+
+本輪限於上述四檔。開發代理僅閱讀原始碼／差異並修改，沒有執行 build、typecheck、lint、格式／靜態分析、單元／整合或瀏覽器 UI 測試。補修待 Grok 對新完整 SHA 複驗；視覺接受保留，工程未通過，正式整合與下一階段未開始。

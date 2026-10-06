@@ -41,13 +41,17 @@
     .sr { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
     .icon { width:1.5rem; height:1.5rem; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
     .workspace { min-height:100svh; display:grid; place-items:center; background:radial-gradient(ellipse at 15% 15%,#263d432b,transparent 50%),radial-gradient(ellipse at 90% 70%,#7e46331c,transparent 50%); }
-    .app { width:100%; max-width:30rem; height:100svh; height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr) auto; background:var(--background); isolation:isolate; }
+    .app { width:100%; max-width:30rem; min-width:0; height:100svh; height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr) auto; background:var(--background); isolation:isolate; container:app / inline-size; }
     .topbar { display:flex; gap:var(--s3); align-items:center; justify-content:space-between; padding:calc(var(--s3) + env(safe-area-inset-top)) var(--s5) var(--s3); }
     .brand { display:flex; align-items:center; gap:var(--s2); font-size:.8125rem; letter-spacing:.07em; color:var(--text-secondary); }
     .brand .icon { color:var(--secondary); width:1.25rem; height:1.25rem; }
     .utility { display:flex; gap:var(--s2); align-items:center; }
     .old-link { display:grid; place-items:center; min-height:2.75rem; padding:0 var(--s2); font-size:.875rem; }
-    .icon-button { display:grid; place-items:center; padding:var(--s2); width:2.75rem; min-height:2.75rem; border:1px solid var(--control-border); border-radius:var(--r2); background:var(--control); }
+    .icon-button { display:grid; place-items:center; padding:0; width:clamp(44px,2.75rem,56px); height:clamp(44px,2.75rem,56px); min-width:44px; min-height:44px; flex-shrink:0; border:1px solid var(--control-border); border-radius:var(--r2); background:var(--control); }
+    .icon-button .icon { width:clamp(20px,1.5rem,32px); height:clamp(20px,1.5rem,32px); }
+    .topbar { flex-wrap:wrap; padding-inline:clamp(12px,4vw,20px); }
+    .brand { flex-wrap:wrap; min-width:0; overflow-wrap:anywhere; }
+    .utility { flex-wrap:wrap; }
     .content { min-height:0; overflow:auto; overscroll-behavior:contain; padding:0 var(--s5) var(--s3); scrollbar-width:thin; }
     .hero { position:relative; isolation:isolate; padding:var(--s5) 0 var(--s4); overflow:hidden; border-bottom:1px solid var(--border); }
     .ruins { position:absolute; width:100%; height:100%; inset:0; pointer-events:none; opacity:.48; }
@@ -167,10 +171,36 @@
     .swatch-bar { height:2rem; background:var(--swatch); } .swatch p { padding:var(--s2); font-size:.8125rem; } .swatch code { display:block; color:var(--muted); }
     .demo-buttons { display:grid; gap:var(--s2); } .demo-status { display:flex; gap:var(--s3); flex-wrap:wrap; font-size:.875rem; margin-top:var(--s3); }
     .desktop-note { display:none; }
-    @media (min-width:48rem) {
+    .content { min-width:0; padding-inline:clamp(12px,4vw,20px); }
+    .summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .summary-card { flex-wrap:wrap; overflow-wrap:anywhere; }
+    .section-head { flex-wrap:wrap; }
+    .gear-copy,.hero-title,.nav-item,.choice-text,.library-item { overflow-wrap:anywhere; }
+    @container app (max-width:22rem) {
+      .hero-row { display:grid; grid-template-columns:auto minmax(0,1fr); }
+      .hero-row .quiet { grid-column:1 / -1; }
+      .gear-card { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+      .gear-glyph { display:none; }
+    }
+    dialog { container:sheet / inline-size; }
+    .sheet-header { padding:var(--s2) clamp(12px,3vw,20px); }
+    .sheet-top { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s2); }
+    .sheet-top>div { grid-column:1 / -1; grid-row:2; }
+    .sheet-top>[data-action="close"] { grid-column:2; grid-row:1; }
+    #sheet-back { grid-column:1; grid-row:1; }
+    .sheet-body { flex:1 1 auto; padding:var(--s3) clamp(12px,3vw,20px); }
+    .sheet-subtitle { color:var(--muted); font-size:.8125rem; margin-bottom:var(--s3); }
+    .sheet-footer { padding:var(--s2) clamp(12px,3vw,20px) calc(var(--s2) + env(safe-area-inset-bottom)); }
+    .footer-note { color:var(--muted); font-size:.8125rem; margin-top:var(--s4); }
+    @container sheet (min-width:20rem) {
+      .sheet-top { grid-template-columns:auto minmax(0,1fr) auto; }
+      .sheet-top>div { grid-column:2; grid-row:1; }
+      .sheet-top>[data-action="close"] { grid-column:3; }
+    }
+    @media (min-width:64rem) and (min-height:40rem) {
       .workspace { display:flex; justify-content:center; gap:4rem; padding:2rem; align-items:center; }
-      .app { height:min(54rem,calc(100dvh - 4rem)); min-height:32rem; border:1px solid var(--border); border-radius:var(--r4); box-shadow:var(--shadow); overflow:hidden; }
-      .desktop-note { display:block; width:17rem; }
+      .app { flex:0 1 30rem; height:min(54rem,calc(100dvh - 4rem)); min-height:0; border:1px solid var(--border); border-radius:var(--r4); box-shadow:var(--shadow); overflow:hidden; }
+      .desktop-note { display:block; flex:0 1 17rem; min-width:0; width:17rem; overflow-wrap:anywhere; }
       .desktop-note h2 { font-size:2rem; margin:var(--s4) 0; }
       .desktop-note p { color:var(--text-secondary); margin-bottom:var(--s5); font-size:.9375rem; }
       .desktop-note small { display:block; color:var(--muted); margin-top:var(--s5); }
@@ -229,7 +259,7 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <dialog id="sheet" aria-labelledby="sheet-title" aria-describedby="sheet-subtitle">
-    <header class="sheet-header"><div class="sheet-top"><button class="icon-button" id="sheet-back" data-action="back" aria-label="返回上一層"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button><div><h2 id="sheet-title" tabindex="-1"></h2><p id="sheet-subtitle"></p></div><button class="icon-button" data-action="close" aria-label="取消並關閉"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div></header>
+    <header class="sheet-header"><div class="sheet-top"><button class="icon-button" id="sheet-back" data-action="back" aria-label="返回上一層"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button><div><h2 id="sheet-title" tabindex="-1"></h2></div><button class="icon-button" data-action="close" aria-label="取消並關閉"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div></header>
     <div class="sheet-body" id="sheet-body"></div><footer class="sheet-footer" id="sheet-footer"></footer>
     <div id="sheet-status" class="sr" role="status" aria-live="polite"></div>
   </dialog>
@@ -286,7 +316,8 @@
       });
     }
     function open(type,trigger,extra={}) {
-      returnFocusKey=trigger.dataset.key;stack=[makeRoute(type,extra)];renderSheet(true);$('sheet').showModal();$('sheet-title').focus();setNav();
+      if($('sheet').open)return;
+      returnFocusKey=trigger.dataset.key;stack=[makeRoute(type,extra)];renderSheet(true);$('sheet').showModal();focusSheetTop();setNav();
     }
     function makeRoute(type,extra={}) {
       return {type,...(type==='jobs'?{selected:state.job}:type==='gear'?{selected:state.gear}:type==='library'?{filter:'all'}:type==='sample'?{base:{...state.base}}:{}),...extra};
@@ -295,10 +326,24 @@
       if(route())route().focusKey=document.activeElement?.dataset?.key;
       stack.push(makeRoute(type,extra));renderSheet(true);setNav();
     }
-    function back() { if(stack.length>1){stack.pop();renderSheet();const key=route().focusKey;const target=key?$('sheet-body').querySelector(`[data-key="${key}"]`):null;(target||$('sheet-title')).focus();}else close(); }
-    function close(message='已返回角色，未套用的選擇已取消。') { $('sheet').close();if(message)announce(message); }
+    function back() { if(stack.length>1){stack.pop();renderSheet();const key=route().focusKey;const target=key?$('sheet').querySelector(`[data-key="${key}"]`):null;(target||$('sheet-title')).focus();}else close(); }
+    function restoreEntryFocus() {
+      const key=returnFocusKey;returnFocusKey=null;setNav();
+      const target=key?document.querySelector(`.app [data-key="${key}"]`):null;
+      (target||document.querySelector('[data-key="nav-home"]')).focus();$('sheet-status').textContent='';
+    }
+    function close(message='已返回角色，未套用的選擇已取消。') {
+      if(!$('sheet').open)return;
+      // 原生 close 事件稍後才派發；先同步清理，避免它清掉新開任務。
+      stack=[];$('sheet').close();restoreEntryFocus();if(message)announce(message);
+    }
+    function focusSheetTop() {
+      $('sheet-title').focus({preventScroll:true});
+      // dialog 顯示之後才重設捲動，隱藏時的 scrollTop 不可靠。
+      $('sheet-body').scrollTop=0;
+    }
     $('sheet').addEventListener('cancel',event=>{event.preventDefault();close();});
-    $('sheet').addEventListener('close',()=>{stack=[];setNav();const target=returnFocusKey?document.querySelector(`.app [data-key="${returnFocusKey}"]`):null;(target||document.querySelector('[data-key="nav-home"]')).focus();$('sheet-status').textContent='';});
+    $('sheet').addEventListener('close',()=>{if(!$('sheet').open&&stack.length){stack=[];restoreEntryFocus();}});
     function choices(items,selected,kind,legend) {
       return `<fieldset class="choice-list"><legend class="sr">${legend}</legend>${items.map(item=>`<label class="choice"><input type="radio" name="${kind}" value="${item.id}" data-key="${kind}-${item.id}" ${item.id===selected?'checked':''}>${icon(item.icon||'shield')}<span class="choice-text"><strong>${item.name}</strong><small>${item.note}</small></span><span class="check">${icon('check')}</span></label>`).join('')}</fieldset>`;
     }
@@ -307,7 +352,7 @@
       return `<h3 class="block-title">切換後的資格數值</h3><dl class="numbers">${attrs.map(([id,n])=>{const delta=after.qualification[id]-before.qualification[id];return `<div class="number-card"><dt>${n}</dt><dd>${before.qualification[id]} → ${after.qualification[id]}${delta?`<span class="delta ${delta>0?'success':'warning'}"><span class="sign">${delta>0?'+':'−'}</span>${Math.abs(delta)}</span>`:''}</dd></div>`;}).join('')}</dl><h3 class="block-title">裝備與技能影響</h3><ul class="impact-list"><li>${after.gear.name}<small class="${after.gearActive?'success':'warning'}">${gearReason(after)}</small></li>${after.entries.filter(Boolean).map(e=>`<li>${e.skill.name}<small class="${e.active?'success':'warning'}">${skillReason(e.skill,after)}</small></li>`).join('')}</ul><div class="callout warn">未生效的配置仍然保留。恢復條件後會再次生效。</div>`;
     }
     function renderSheet(toTop=false) {
-      const r=route(),d=derive();
+      const r=route(),d=derive();if(!r)return;
       const focused=document.activeElement?.dataset?.key;
       const oldScroll=$('sheet-body').scrollTop;
       let title='',subtitle='',body='',footer='',full=false;
@@ -316,7 +361,8 @@
           title='更換職業';subtitle='四個初階職業已開放 · 共用角色等級';
           body=choices(jobs.map(j=>({...j,note:`${name(j.attr)} ×1.25 · ${j.passive}${j.id===state.job?' · 目前':''}`})),r.selected,'job','預選職業');
           body+=`<div class="callout"><strong>${job(r.selected).passive}</strong><p>${job(r.selected).description}</p></div><p class="small muted">選職業不限制技能種類。能否生效仍取決於屬性與獨立資格。</p>`;
-          footer=`<p>目前仍是${job(state.job).name}，核對後才切換。</p><button class="btn primary wide" data-action="preview-job" ${r.selected===state.job?'disabled':''}>核對切換 ${icon('chevron')}</button>`;break;
+          body+=`<p class="footer-note">目前仍是${job(state.job).name}，核對後才切換。</p>`;
+          footer=`<button class="btn primary wide" data-action="preview-job" data-key="preview-job" ${r.selected===state.job?'disabled':''}>核對切換 ${icon('chevron')}</button>`;break;
         }
         case 'confirm-job':
           title='確認職業切換';subtitle='尚未套用 · 配置不會被刪除';
@@ -325,7 +371,8 @@
         case 'gear': {
           title='挑選裝備';subtitle='一件示範裝備 · 先選擇，再核對';
           body=choices(gear.map(g=>({...g,note:g.id==='none'?'移除本欄位裝備':`${name(g.attr)} +${g.bonus} · ${g.job?`${job(g.job).name}限定`:'所有職業'}${g.id===state.gear?' · 目前':''}`})),r.selected,'gear','預選裝備');
-          footer=`<p>職業特化裝備不符職業時保留，但不生效。</p><button class="btn primary wide" data-action="preview-gear" ${r.selected===state.gear?'disabled':''}>核對裝備 ${icon('chevron')}</button>`;break;
+          body+='<p class="footer-note">職業特化裝備不符職業時保留，但不生效。</p>';
+          footer=`<button class="btn primary wide" data-action="preview-gear" data-key="preview-gear" ${r.selected===state.gear?'disabled':''}>核對裝備 ${icon('chevron')}</button>`;break;
         }
         case 'confirm-gear':
           title='確認裝備更換';subtitle='尚未套用 · 技能生效狀態同步計算';
@@ -358,7 +405,8 @@
         case 'sample':
           full=true;title='示範角色屬性';subtitle='暫用 1–99 · 不代表正式屬性上限';
           body=`<p class="small muted">這是任意成長角色，預設固有屬性均為 12。保存後同步資格與生效狀態。</p><form id="sample-form" novalidate><div class="base-fields">${attrs.map(([id,n])=>`<label class="field" for="base-${id}">${n}<input id="base-${id}" name="${id}" type="number" min="1" max="99" step="1" inputmode="numeric" value="${r.base[id]}" aria-describedby="error-${id}" data-key="base-${id}"><span id="error-${id}" class="error"></span></label>`).join('')}</div></form><details><summary>示範規則與範圍</summary><p>四個初階職業主要屬性 ×1.25；四個已學技能需求 15、生效 +1。通用裝備 +2、職業特化 +3。失效保留，恢復條件後自動生效。</p><p>裝備一格、數值、名稱及同技能不可重複配置只供試作。進階解鎖、完整戰鬥、正式裝備欄位與存檔都未實作。</p></details>`;
-          footer='<button class="btn primary wide" data-action="save-base">保存示範屬性</button><button class="quiet" data-action="reset">恢復初始示範配置</button>';break;
+          body+='<div class="callout"><button class="quiet" data-action="reset">恢復初始示範配置</button></div>';
+          footer='<button class="btn primary wide" type="submit" form="sample-form">保存示範屬性</button>';break;
         case 'log':
           full=true;title='本頁操作紀錄';subtitle='最多保留 20 筆 · 重新整理會清除';
           body=`<ol class="impact-list">${records.map(text=>`<li>${text}</li>`).join('')||'<li class="muted">還沒有保存任何變更。</li>'}</ol>`;break;
@@ -366,9 +414,11 @@
           full=true;title='遺跡與餘燼';subtitle='Design System 02 · 新手機視覺提案';
           body=`<p class="small muted">冷黑石材、霧銀文字、魔導青光與餘燼橙。氣氛在表面，清楚在操作。</p><h3 class="block-title">色彩系統</h3><div class="palette">${[['主要操作','#ffc39d'],['次要按鈕','#bfd3dd'],['互動底色','#3d5362'],['魔導資訊','#a0ddd6'],['次要刻線','#b6b5d8'],['基礎表面','#18212c'],['浮起表面','#202d39'],['成功','#a4d5b3'],['警告','#e8c393'],['危險','#ffaaa8']].map(([n,c])=>`<div class="swatch"><div class="swatch-bar" style="--swatch:${c}" aria-hidden="true"></div><p>${n}<code>${c}</code></p></div>`).join('')}</div><h3 class="block-title">文字層次</h3><h2>古老世界，清楚選擇。</h2><p style="margin-top:var(--s3)">功能與標題使用俐落黑體；標題加粗，數字另用 Avenir Next 字型搭配與等寬數字排列。</p><p class="small muted" style="margin-top:var(--s2)">使用裝置既有字型，其他平台可能以備用字體顯示。輔助文字不壓在裝飾上，放大後允許重排。</p><h3 class="block-title">按鈕層次與互動</h3><div class="demo-buttons"><button class="btn primary" data-action="demo">主要操作 · 點我感受回饋</button><button class="btn" data-action="demo">次要操作</button><button class="quiet" data-action="demo">低強度操作</button><button class="btn" disabled>暫不可用 · 有清楚原因</button><button class="btn" id="loading-demo" data-action="loading-demo" aria-busy="false">切換載入展示</button></div><div class="demo-status"><span class="success">● 生效</span><span class="warning">○ 未生效</span><span class="danger">！輸入錯誤</span></div><div class="callout">按下即有回饋。載入展示由你手動開始／結束，不代表正在連線或處理遊戲資料。</div><h3 class="block-title">選取與資訊層級</h3>${choices([{id:'example',name:'選取範例',note:'邊框、勾選與文字共同表達狀態',icon:'rune'}],'example','example','選取狀態範例')}<details><summary>動畫與手機操作原則</summary><p>短過場、不鎖操作；減少動態時取消位移。Sheet 內部捲動，Header／主要操作保留在外。沒有拖曳手勢或強制聲音／震動。</p></details>`;break;
       }
-      $('sheet').classList.toggle('full',full);$('sheet-title').textContent=title;$('sheet-subtitle').textContent=subtitle;$('sheet-back').hidden=stack.length<2;
-      $('sheet-body').innerHTML=body;$('sheet-footer').innerHTML=footer;
-      if(toTop){$('sheet-body').scrollTop=0;if($('sheet').open)$('sheet-title').focus();}
+      // 說明文字跟長內容一起捲動，固定區只保留標題與必要操作。
+      footer=footer.replace(/<p>(.*?)<\/p>/g,(_,text)=>{body+=`<p class="footer-note">${text}</p>`;return '';});
+      $('sheet').classList.toggle('full',full);$('sheet-title').textContent=title;$('sheet-back').hidden=stack.length<2;
+      $('sheet-body').innerHTML=`<p id="sheet-subtitle" class="sheet-subtitle">${subtitle}</p>${body}`;$('sheet-footer').innerHTML=footer;
+      if(toTop){if($('sheet').open)focusSheetTop();}
       else{ $('sheet-body').scrollTop=oldScroll;const target=focused?$('sheet').querySelector(`[data-key="${focused}"]`):null;target?.focus({preventScroll:true}); }
     }
     function saveSkill(slot,id) {
@@ -384,6 +434,7 @@
     document.addEventListener('click',event=>{
       const b=event.target.closest('[data-action]');if(!b||b.disabled)return;
       const action=b.dataset.action,r=route();
+      if(b.closest('#sheet')&&(!r||!$('sheet').open))return;
       switch(action) {
         case 'open':open(b.dataset.route,b);break;
         case 'home':$('main-content').scrollTop=0;$('job-title').setAttribute('tabindex','-1');$('job-title').focus();break;
@@ -406,7 +457,7 @@
         case 'loading-demo':{const active=b.getAttribute('aria-busy')!=='true';b.setAttribute('aria-busy',String(active));b.textContent=active?'載入樣式展示 · 點選結束':'切換載入展示';$('sheet-status').textContent=active?'載入樣式展示開始，沒有資料請求。':'載入樣式展示結束。';break;}
       }
     });
-    $('sheet').addEventListener('change',event=>{const input=event.target,r=route();if(input.name==='job'&&r.type==='jobs'){r.selected=input.value;renderSheet();$('sheet-status').textContent=`已預選${job(r.selected).name}，尚未套用。`;}if(input.name==='gear'&&r.type==='gear'){r.selected=input.value;renderSheet();$('sheet-status').textContent='已預選裝備，尚未套用。';}});
+    $('sheet').addEventListener('change',event=>{const input=event.target,r=route();if(input.name==='job'&&r?.type==='jobs'){r.selected=input.value;renderSheet();$('sheet-status').textContent=`已預選${job(r.selected).name}，尚未套用。`;}if(input.name==='gear'&&r?.type==='gear'){r.selected=input.value;renderSheet();$('sheet-status').textContent='已預選裝備，尚未套用。';}});
     $('sheet').addEventListener('input',event=>{const r=route(),input=event.target;if(r?.type==='sample'&&attrs.some(([id])=>id===input.name))r.base[input.name]=input.value;});
     $('sheet').addEventListener('submit',event=>{event.preventDefault();if(route()?.type==='sample')saveBase();});
     renderMain();

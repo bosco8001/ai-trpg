@@ -1,42 +1,43 @@
-# 新手機原型 02 · 工程驗證交接
+# 新手機原型 02 · 首輪 FAIL 補修複驗
 
-提交前狀態：未送達。尚未 commit／push，TARGET 待填。這是待用完整 prompt，不是已執行結果；送出時以新完整 SHA 取代 TARGET 欄位，送達狀態另行記錄。
-
-使用者已於 2026-10-06 接受調整後的視覺設計方向；工程驗證及正式整合範圍仍待處理。
+首輪外部 TARGET `4ee0a54aa9bebb65ab44a8eaa078da15b458b72d` 結論為 FAIL：1 Medium、4 Low。本輪同原型補修已準備，尚未送達，TARGET 待限定四檔 commit／push 後填入。不是已解決紀錄；視覺方向接受保留。
 
 ```text
-請 AI TRPG Architecture Critic 對這次獨立 Mobile UI 全面重設原型進行工程驗證。操作者 Codex。不是正式遊戲 UI 整合，也不代替使用者確認視覺方向或 Phase 33 驗收。
-
-使用者已於 2026-10-06 回覆「接受這個設計」，請保留這項視覺方向接受，不重新判定其偏好。這不代表工程 PASS、正式 UI 全面替換批准或 Phase 33 第二切片通過；仍須獨立檢查全部工程案例。
+請 AI TRPG Architecture Critic 複驗新手機原型 02 的首輪 FAIL 補修。操作者 Codex。使用者已接受視覺方向，不重新判定其偏好；工程結果仍由你獨立實測，不能把上輪 PASS 子項直接沿用成本輪 PASS。不是正式 UI 整合、Phase 33 第二切片通過或下一階段授權。
 
 Repository: https://github.com/bosco8001/ai-trpg
 Branch: codex/phase27-mobile-ui
-BASE: 8a59cfe82f04c75758a9468abcca75996d1a3eaa
+BASE: 4ee0a54aa9bebb65ab44a8eaa078da15b458b72d
 TARGET: 待本次四檔限定 commit／push 後填入完整 SHA
 
-固定 SHA、確認遠端能讀取 TARGET、祖先與限定 diff；不要拿分支移動 HEAD 或第一切片舊 PASS 代替此次 TARGET。新增範圍僅 prototypes/phase33-mobile-redesign/index.html、DESIGN_SYSTEM.md、README.md、GROK_REVIEW.md。此前未提交的 AGENTS／Phase 31／四份 Phase 33 文件、原型 01 都不應混入本次 commit。若範圍或 BASE 不符，先回報。
+固定完整 SHA，確認遠端可讀 TARGET、BASE 祖先與 diff；只能改 prototypes/phase33-mobile-redesign/index.html、DESIGN_SYSTEM.md、README.md、GROK_REVIEW.md。既有未提交 AGENTS／Phase31／Phase33 文件、原型01均不得混入。不要用移動 HEAD、舊第一切片 PASS 或純閱讀代替這輪實測。
 
-必要讀取：遠端 AGENTS.md、Canonical manifest、Open questions、Phase 33 content catalog、docs/gameplay/character_system.md、docs/gameplay/magic.md、新原型 DESIGN_SYSTEM.md／README.md。使用者本次優先序：已確認規則需求 → Canon/Phase Spec → 手機可用性 → 視覺一致性 → skill 一般建議。新原型試作規則屬使用者已確認的 provisional 範圍，不是永久 Canon。
+必要文件：遠端 AGENTS.md、docs/development/CANONICAL_MANIFEST.md、OPEN_QUESTIONS.md、PHASE_33_CONTENT_CATALOG.md、docs/gameplay/character_system.md、magic.md、原型 DESIGN_SYSTEM.md／README.md。優先序：使用者已確認規則 → Canon/Phase Spec → 手機可用性 → 視覺一致性 → skill 建議。試作規則不是永久 Canon。
 
-背景：使用者要求另外建立真正 Mobile-first 的新視覺，不沿用舊深金資料冊；冷黑石材／霧銀／魔導青光／餘燼橙、現代手機遊戲功能層、抽象中世紀遺跡氣氛，沒有羊皮紙大框或 SaaS 儀表板。主畫面只顯示目前職業、主屬性、裝備、六格技能，詳細流程放原生 modal Sheet，header/footer 固定、內部捲動。遊戲規則不因改設計而變動。
+你在 2026-10-06 20:30:36–20:30:48（HKT）的首輪回報：Chrome 工程 FAIL，M1 大字 Sheet 標題／CTA 裁掉，L1 主畫面橫向溢出，L2 雙 Enter／Esc+Enter 清掉新任務，L3 新 Sheet 繼承舊捲動，L4 橫向誤用桌面最小高度。外部證據 /workspace/p33g-evidence。13 個驅動 exit 0 只是記錄完成，並非案例 PASS。上輪 fetch DNS 失敗後用 GitHub API 重建核對 SHA，若本輪再受阻需同樣清楚交代來源。
 
-隔離 clone 中展示：
+本輪補修：
+- M1：圖示控件44–56px不被flex擠小；Sheet容器小於20rem時標題獨佔一列，其他寬度同列；副標／footer說明移進body，固定footer只留一個主要CTA，示範重設移至body。沒有縮小使用者文字、裁掉資訊或把CTA藏起。
+- L1：header允許換行、容器min-width:0、摘要重排；app小於22rem時更換職業另成一列，裝備只隱藏裝飾徽記，名稱／狀態／入口保留。
+- L2：close時同步清stack與返回焦點；延後close事件不清理已重開dialog；change/click另檢查有效任務。
+- L3：showModal後才focus標題（preventScroll）與body.scrollTop=0，新開／push都走同一重設。
+- L4：桌面須同時64rem寬和40rem高，移除32rem最小高度。
+- 相關Info I2/I4/I8：form關聯submit支援Enter；icon入口不縮小於44px；核對返回用預覽CTA穩定key找焦點。
+色彩／字型／試作數值／正式UI均未更改。Codex僅閱讀與修改，未跑build/typecheck/lint/格式檢查/靜態分析/測試/瀏覽器UI。
+
+隔離 clone 服務：
 python3 -m http.server 3045 --bind 127.0.0.1 --directory prototypes/phase33-mobile-redesign
-開 http://127.0.0.1:3045/ 。這是自含 HTML，沒有 npm／API／DB／LLM／外部字型依賴。舊版入口 3044 在未啟動原型 01 服務時不可用，不能把缺服務當成新原型程式缺陷；該原型 01 尚未提交，若遠端沒有它須明示新舊互動比較受阻，不推測舊版通過。可以比對 BASE 正式 UI 原始碼，但不能替代實際舊原型測試。不要改檔案、commit、push、安裝新本機軟體或碰正式 DB。
+開 http://127.0.0.1:3045/ 。自含HTML，無npm/API/DB/LLM/外部字型依賴。請做必要HTML／inline JS語法核對與 git diff --check BASE TARGET，再實際瀏覽器量測。不要改檔案、commit、push、安裝新軟體或碰正式DB。舊原型01仍未在遠端，3044比較受阻須明示，不能推測通過。
 
-Codex 未跑 build/typecheck/lint/格式檢查/自動化靜態分析/測試/瀏覽器UI；啟動靜態預覽服務不是驗證通過。請獨立實測，來源與版本寫清楚。
+複驗逐項要求：
+1. M1：先在BASE重現320×720文字200%→更換→魔術師→核對的887pxheader／CTA裁切，再在TARGET同案例量測header/body/footer/CTA bounds與可點性。320/375/390/430寬，文字100/125/150/175/200%、頁面zoom200%、短高568/667、橫向125/200%；全部Sheet含核對、屬性表單、技能詳情都須有可用body、長內容可達尾、header/CTA不蓋內容。文字不許強制縮小。Safe-area與虛擬鍵盤若無真設備只記推斷／未測。
+2. L1/L4：320寬150/175/200%的header、職業入口、導航不可橫向溢出。844×390橫向不套用高512px桌面；底部導航在viewport內。768/1280桌面及放大仍可操作；通常375–430正常文字主屏六格仍可看到，短高／大字允許內容捲動。注意新container query、44px圖示與長字串沒有新的重疊／裁切。
+3. L2：BASE雙Enter、Esc+Enter（0ms；6倍CPU慢速時33ms鍵盤重複）重現對照；TARGET大量重複開關後stack與目前route一致，radio可選、預覽能用、沒有console error／overlay殘留／背景焦點、未套用不變。也回歸mouse/touch快速取消／套用，不能用動畫輸入鎖或延遲掩蓋問題。
+4. L3：390×844裝備捲到底→關閉→完整數值，以及你上輪5個跨任務組合，TARGET新開body.scrollTop應為0、看到副標與第一筆；push新任務同樣從頂部。正常radio重建／篩選保留目前捲動，不回歸。Info I8：job/gear核對返回焦點回原CTA、預選保留；保存重建技能slot後仍回目前入口。9路由Tab／ShiftTab不出背景、radio方向鍵、Enter／Space／Esc需回歸。
+5. Info I2/I4：合法表單Enter與保存按鈕同樣保存一次；非法空值、小數、範圍外不部分保存，有第一錯誤焦點，取消草稿不保存。reset仍可達且明確。320寬右上更多及Sheet圖示實測至少44×44px。I1快速第二點背景庫、I3數字1e1/12.0、I5讀屏結構、I6對比邊界、I7舊版受阻仍保留，不冒稱已解決；有影響再分級。
+6. 數值／配置回歸：資格floor(固有×主要1.25)+有效裝備，技能不進門檻；初始全12劍士徽章+3力量資格18最終19，魔術師力量12智慧資格15最終16，徽章／重斬失效火球生效，取消不改、切回恢復。智慧13魔術師通用+2→18/19；非魔術師智慧14火球不自助。4職業×9裝備36組及六格保存／替換／清空／篩選、不重複暫定、失效保留／恢復。魔術師不自動賦予直接施法資格；獨立武器／施法條件是樣本假設，被動只有說明。
+7. 接受視覺的回歸：按鈕 #ffc39d／#bfd3dd／#3d5362 與狀態字對比、選取／停用／focus／pressed清楚；Heiti/Avenir備用字型實際情況、負號較小仍可讀、零不丟。220ms discrete退出、reduced-motion/contrast/transparency，Chrome與Safari分開寫實測／受阻。AAA完全不遮焦點不等同AA最低部分可見。未做真讀屏不能以AX結構宣告讀屏PASS。
+8. 隔離：零API/DB/storage/LLM/外部字型圖片請求，refresh重設；main同步、log20上限、loading手動樣式不假請求。正式state/Save/Canon/五族/CSS不變，無戰鬥HP/MP/敘事整合。瀏覽器Back／遊戲手把／拖曳Sheet未實作，未測正式遊玩。
 
-使用者其後回報氣氛可接受、按鈕功能沒問題，要求提高按鈕底色對比並換字體。TARGET 須包含此輪同原型調整：主要按鈕 #ffc39d／深字；次要 #bfd3dd／#15232d；其他可點入口 #3d5362、邊界 #a4bac9；導航與篩選選取 #a0ddd6／深字。標題/功能 Heiti TC 優先，數字 Avenir Next／Helvetica Neue 優先，缺字型有 fallback。並未改操作／數值程式。局部使用者回報不是工程 PASS；請測非 hover 普通狀態、停用區分、success/warning/metadata在新底色上的對比，以及實際字型/字重/負號/200%換行。純列出CSS fallback不代表字型已載入，不下載或安裝新字型。
-
-驗證重點：
-1. 數值：主要屬性 ×1.25、其他 ×1，先 floor 後加有效裝備。通用 +2、指定職業特化 +3，技能不進任何門檻；每個生效技能最終 +1。初始全固有12、劍士徽章、重斬／穿透箭／分身術／火球術，力量資格18最終19。魔術師預覽力量12、智慧資格15最終16，徽章失效、重斬停用、火球生效。取消完全不改，目前職業套用才變；切回劍士恢復徽章／重斬。智慧13魔術師+通用智慧護符→資格18最終19。非魔術師智慧14無智慧裝備，火球不能靠自己+1生效。
-2. 配置：轉職不刪失效技能/裝備；重算使用單一配置；技能庫最多六格、永久保留。點單格／從庫選空格／替換已有技能／清空；篩選全部生效未生效正確。暫定同技能不可重複配置，不可宣稱這成為正式規則。四職業與技能屬性對應沒有抄錯；切魔術師不賦予直接施法資格，相關武器／施法條件為樣本假設、沒有模擬全部需求。
-3. 原生 dialog 堆疊：job/gear 預選→核對→返回保留選擇，Esc/關閉丟棄未套用；技能詳情返回庫保留篩選/欄位；header/CTA 固定且 body 自己捲動。Tab/ShiftTab 焦點不能到背景、radio方向鍵/Enter/Space、關閉返回目前入口。尤其技能保存重建 slot DOM 後，焦點仍須回第幾格；不對舊 detached DOM focus。快速開關/套用/返回/連按無狀態污染、overlay不殘留；沒有動畫期間鎖操作。瀏覽器Back、遊戲手把與拖曳Sheet明列未實作，不冒稱PASS。
-4. 主畫面與手機：320/375/390/430×一般手機高度、短高568/667、橫向、768/1280桌面；100/125/150/175/200%字體及頁面zoom200%。逐文字/控件bounds核對沒有溢格、重疊、裁掉字；safearea不遮入口，主屏正常文字主要操作不需反覆捲頁，短高或大字允許內部捲動。Sheet header/footer不擠掉可用body、radio長列表能到尾、虛擬鍵盤可用若有真設備，沒有不要猜。桌面僅手機舞台與比較說明，功能不能只在desktop能用。
-5. 設計系統：全新色彩、字階、層次、按鈕、SVG圖示、卡片/技能/裝備樣式、Navigation/Sheet一致；pressed/selected/disabled/focus清楚。裝飾不搶閱讀，文字/控件對比與touch44px量測、圖示aria-hidden、status有文字不只顏色。負號比數字小且不可漏讀負值；數字含零完整。真讀屏未做須標DOM/AX結構而非讀屏PASS。
-6. 輸入/回饋：示範固有屬性1–99整數；空字串、小數、超範圍、非法值不部分保存，有欄位錯誤與第一錯誤焦點；草稿返回/取消不保存。成功即時同步所有摘要/數值，提示消失後狀態仍保留；log最多20且不持久。設計展示loading是手動樣式開關，沒有假資料請求；普通套用同步完成，沒有假wait。
-7. motion/accessibility：220msSheet、pressed即時、prefers-reduced-motion/contrast/transparency；CSS discrete display/overlay的Chrome/Safari可用性需分清實測與受阻。沒有drag/sliding把手，不要求不存在手勢；縮放/字型prefs不可強制縮小來隱藏溢出。
-8. 隔離：零 API/DB/storage/LLM/外部字型/圖像請求，除了靜態HTML與瀏覽器可能favicon。refresh重設，不改正式state/Save/Canon/五族/正式CSS；原型不是正式創角或戰鬥。被動是文字，沒有實際傷害/MP引擎，不當作完整玩法PASS。
-
-請報告完整BASE/TARGET、限定檔案diff、環境/瀏覽器、實際命令exit code、案例結果與證據位置，按High/Medium/Low/Info列新缺陷；工程PASS/FAIL；分清本輪實做、引用、推斷、未測、受阻。不要把舊結果或純程式閱讀寫成親測，也不要重新決定使用者對第一切片的既有接受或本次新視覺是否通過。
+請給出完整BASE/TARGET、限定diff、環境/瀏覽器/命令exit code、M1/L1–L4及I2/I4/I8逐項結果與新缺陷、重現／回歸矩陣、證據路徑、工程PASS/FAIL。分清本輪實做、引用、推斷、未測、受阻；BASE能重現與TARGET消失須有實測支持。外部工程通過不代替使用者最終階段驗收。
 ```
