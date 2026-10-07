@@ -1,6 +1,6 @@
 # Phase 33 第四切片：正式推導模組與唯讀樣本核對
 
-日期：2026-10-07（Asia/Hong_Kong）。使用者確認最新容量規則後，指示「進入下一切片」，批准正式計算模組與唯讀樣本畫面。實作已準備，工程驗證待 Grok、階段驗收待使用者；尚未 commit／push／送達。
+日期：2026-10-07（Asia/Hong_Kong）。使用者確認最新容量規則後，指示「進入下一切片」，批准正式計算模組與唯讀樣本畫面。限定 31 檔已提交／推送為 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`，並透過 Grok Bot Control 送達 AI TRPG Architecture Critic。Grok t47u 外部回報工程 PASS（限 Chrome）；6 項 Info 與未測限制保留，使用者已於 2026-10-07 明確回覆「通過」，第四切片已接受。Codex 沒有執行本輪工程測試。
 
 ## 單一目標與界線
 
@@ -46,9 +46,9 @@ resources 是明確提供的核對基準，不是讀取遊戲角色。原目前�
 | 必要測試 | tests/character-derivation.test.ts |
 | 文件 | 本文件、完整 Grok prompt、提案、Character／Classes、Phase 26 後續修訂、Manifest／Open Questions／Implementation Plan |
 
-獨立原型程式不改，保留修訂前比較；其 README 與歷史討論的最新狀態說明另同步。前一切片未提交的 ClassCatalogPanel／class-catalog.css／main.tsx 補修依舊存在，不冒稱本切片的新成果。
+獨立原型程式不改，保留修訂前比較；其 README 與歷史討論另同步。前一切片的 ClassCatalogPanel／class-catalog.css／main.tsx 補修與原型封存已隨 `bb93008` 提交，不冒稱本切片的新成果。
 
-## 手動核對清單（先等工程驗證）
+## 當時提供的手動核對清單（其後使用者已整體接受）
 
 1. 重建／重啟後，探索 → 系統 → 角色屬性核對。起始人類／劍士，力量 15、HP 40／55、MP 48／60；明細顯示先加人類 2 點再乘 1.25。
 2. 調整樣本 → 魔術師 → 預覽：智慧 12、MP 48／68。目前 MP 不增加；確認後才更新。改回劍士仍為 MP 48／60。
@@ -60,8 +60,50 @@ resources 是明確提供的核對基準，不是讀取遊戲角色。原目前�
 
 ## 工程狀態與下一步
 
-Codex 僅實作、閱讀程式／Git／文件及撰寫 8 項測試，沒有執行 build、typecheck、格式檢查、單元／整合／資料庫或 UI 測試。Grok 未送達、沒有本切片 PASS；舊原型的 9／9、60 組畫面與其他 build 結果不沿用。
+Codex 僅實作、閱讀程式／Git／文件及撰寫 8 項測試，沒有執行本輪 build、typecheck、格式檢查、單元／整合／資料庫或 UI 測試。其後依使用者限定授權完成提交／推送及交接，Grok t47u 的實測結果見下；舊原型的 9／9、60 組畫面與其他 build 結果不沿用。
 
-交接 prompt 見 [工程驗證要求](PHASE_33_CHARACTER_DERIVATION_GROK_REVIEW.md)。目前本地 HEAD 是 6dfa95e1d84cb1c7ef0a1aa64be13919f3cf8316，本切片仍在工作樹，未有 bot 可讀 TARGET。先依限定 Git 範圍取得授權／固定版本，送達後再等外部回報；最後是否通過仍由使用者決定。
+交接 prompt 見 [工程驗證要求](PHASE_33_CHARACTER_DERIVATION_GROK_REVIEW.md)。BASE 是 `6dfa95e1d84cb1c7ef0a1aa64be13919f3cf8316`，受測 TARGET 是 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`；TARGET 為已推送且已送達的固定版本。以下文件紀錄補正尚未提交，不是額外受測程式版本；使用者其後已明確回覆「通過」；接受範圍與來源見本文件。
 
 本切片接受後才討論正式角色／創角與持久狀態接入；初始資源、引用升版、不合格配裝等未定契約須另行確認。本文件不宣告 R05 或整個 Phase 33 完成。
+
+## 2026-10-07 Grok t47u 外部工程回報
+
+來源：Codex 透過 Grok Bot Control 讀取 AI TRPG Architecture Critic 當次 22:12:56／22:13:12／22:13:22 回覆。這是 Grok 的外部回報，不是 Codex 親測；本機未取得或驗證其證據檔案。結論是第四切片工程 PASS，限 Chrome，沒有 High／Medium／Low；不代替使用者驗收，不宣告 Phase 33 結案。
+
+Grok 核對遠端 HEAD 等於上述 TARGET、BASE 為祖先，中間一個 commit；31 檔、加 1683／刪 24，沒有混入排除範圍。環境：Node 24.21.0、npm 9.2.0、Chrome 154、playwright-core 1.63.0、隔離 PostgreSQL 17.11（127.0.0.1:55426）。
+
+| Grok 實際命令 | Exit | 外部結果 |
+|---|---|---|
+| TARGET／BASE 的 npm ci、npm run build | 0 | 成功 |
+| node --import tsx --test tests/character-derivation.test.ts tests/class-catalog.test.ts tests/content-catalog.test.ts | 0 | 20／20 通過 |
+| TARGET：env -u TEST_DATABASE_URL npm test | 0 | 426 項；385 pass、0 fail、41 skipped（略過不算通過） |
+| BASE：同一無 DB 測試命令 | 1 | 17 個 fail，對應 t46u D1 |
+| TARGET：migrate 後 TEST_DATABASE_URL=… npm test | 0 | 428／428 通過 |
+| git diff --check BASE TARGET（上述完整 SHA） | 0 | 無空白問題 |
+
+- HTTP 197／197 案例符合預期；五族 × 四職業 × 五種分配共 100 組，與 Grok 獨立計算一致。固定錯誤、4096／4097 bytes 邊界與 chunked 過大拒絕、非法舊資源拒絕及 no-store 符合要求。
+- 最新容量提高不補充、下降只截超出部分、零 HP／MP 維持零、MP 上限零合法，往返 1000 次沒有增加資源。純計算期間 PG log／對外連線為零；game-state、三存檔槽、DB dump hash 不變，300 次呼叫的 interpreter／narrator／combat／settlement spy 皆零。
+- 官方 dist 正常探索入口的 375px UI 48／48 PASS；預覽與確認分離、取消與焦點、Esc 層級及 100 次 Tab 符合預期。13 種初始失敗與 12 種預覽失敗保留原樣本，遲到回應不覆蓋草稿。133 組排版零溢出，控件至少 48 CSS px；CSS 根字級與模擬 zoom 分開記錄。對比最低 6.7。
+- 前置第二切片：本輪觀察 D1 不再崩潰、D2 焦點／Esc 正常、D3／D4 在 CSS 根字級下零裁切／溢出；職業名冊 zoom 未測。保留 t46u FAIL 與「沒有第二切片補修 Grok PASS」，不重新判定使用者既有驗收。
+
+新增 Info（未修正、不改標已解決）：
+
+1. I1：前端只核對結構、內部數學、sample／before／版本，沒有對照已讀取的正式名冊。Grok 偽造內部一致的名稱「TEST-人類」、倍率或體質修正 +4，前端仍接受顯示，HP 可成 40／67；正常伺服器輸出正確。Grok 列 Info；若要求前端嚴格核對正式名冊，可升 Low，但尚未由使用者裁定或實作。
+2. I2：文件仍有未提交／未執行與舊 HEAD 的現在式描述。成因為提交前紀錄是 Grok 推斷；本輪只補正文字的目前／歷史狀態，未修改程式。
+3. I3：錯誤摘要連結改 hash 並增加 history，與既有 anchor Info 同類。
+4. I4：JSON 重複 key 採最後值，UTF-8 BOM 被接受。
+5. I5：短橫向配 zoom 200% 時 body 只餘 56px，但仍可捲動。
+6. I6：缺少前端正式名冊核對的測試；本輪沒有 mutation testing。
+
+未測：真手機、OS 字體大小、讀屏器、正式遊玩、mutation testing；Safari／WebKit 受阻。AX 結構正確不代表讀屏 PASS。Grok 有兩次焦點判定 FAIL，推斷為腳本時序，重跑三次皆 PASS；假拒絕的兩張 harness-artifact-* 圖不能當產品缺陷證據。舊 t46u N1–N11、第一切片全部 Info、原型 02 N1–N5 均保留。
+
+Grok 報告本輪證據在其 `/workspace/p33j-evidence`，156 檔、78 截圖；服務已停、三個 DB／role 已刪、叢集停、隔離 checkout 已刪，5432／55426 無 listener，未 commit／push。重新安裝的 postgresql-17 套件仍留在 Grok 環境。Grok 另報告開工前舊 p33g／p33h／p33i 與 phase31 暫存證據已消失，原因未證實；舊結果來源保留，但不能再聲稱那些路徑目前可取用。
+
+
+## 2026-10-07 使用者接受第四切片
+
+在 Codex 讀取 Grok t47u 結果、提供正式探索頁「角色屬性核對」手動入口後，使用者明確回覆「通過」。依上下文記錄：Phase 33 第四切片「正式屬性／HP／MP 推導模組與唯讀樣本核對畫面」已由使用者接受。
+
+程式 HEAD 與 Grok 受測 TARGET 為 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`，是版本對照；使用者沒有另指定測試 SHA 或逐項結果，不補寫七項清單全數親測、真手機／讀屏／Safari 通過。Grok 外部工程 PASS 及六項 Info 保留各自來源；本次接受不將 I1／I3／I4／I5／I6 標成修正，I2 僅有未提交的文字狀態補正。
+
+接受範圍僅為本切片的正式來源計算與記憶體樣本工具，不代表 R05、整個 Phase 33、正式創角／轉職／配裝、持久角色或戰鬥接入已完成，也沒有批准未定初始資源／配裝政策。此輪只更新驗收文件，沒有改程式、跑測試或新增 commit／push。下一主要切片尚未開始，先確認範圍與未定契約。

@@ -1,0 +1,22 @@
+/* Accepted Design System 02. Existing derivation tokens/components are shared; all additions are scoped. */
+.creation-sheet { height: 100dvh; max-height: 100dvh; border-radius: 0; }
+.creation-sheet .creation-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none; padding: 0; gap: .5rem; margin: 0 0 1rem; font-size: .8125rem; color: var(--cd-muted); }
+.creation-sheet .creation-steps li { min-width: 0; overflow-wrap: anywhere; padding-bottom: .5rem; border-bottom: 2px solid var(--cd-line); }
+.creation-sheet .creation-steps [aria-current="step"] { color: var(--cd-accent); border-color: var(--cd-accent); font-weight: 650; }
+.creation-sheet .creation-helper { color: var(--cd-secondary); font-size: .875rem; overflow-wrap: anywhere; }
+.creation-sheet .creation-code { overflow-wrap: anywhere; font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.creation-sheet .creation-details { background: var(--cd-surface); border: 1px solid var(--cd-line); border-radius: var(--cd-radius);
+  padding: .75rem; margin-block: .75rem; min-width: 0; }
+.creation-sheet .creation-details summary { min-height: 48px; padding-block: .625rem; cursor: pointer; font-weight: 650; touch-action: manipulation; }
+.creation-sheet .creation-details p { font-size: .875rem; color: var(--cd-secondary); }
+.creation-sheet .derivation-header { padding-top: max(12px, env(safe-area-inset-top)); }
+.creation-sheet .derivation-body { padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)); }
+.creation-sheet .derivation-allocation { grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); }
+.creation-sheet .derivation-error { margin-bottom: .75rem; }
+.creation-sheet .derivation-error:empty { display: none; }
+@media (min-width: 64rem) and (min-height: 40rem) {
+  .creation-sheet { height: 88dvh; max-height: 88dvh; border-radius: 1.5rem; }
+  .creation-sheet .derivation-body { padding-inline: 1.5rem; }
+}
+@media (max-height: 28rem) { .creation-sheet .creation-steps { display: none; } }

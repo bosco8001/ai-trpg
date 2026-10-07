@@ -12,6 +12,7 @@ import { createCombatNarrationService } from "./combat/narration.js";
 import { FixtureCombatNarrationAdapter } from "./combat/narration-fixture-adapter.js";
 import { FixtureNarrationAdapter, type NarrationFixtureMode } from "./narration/fixture-adapter.js";
 import { PostgresSaveGameRepository } from "./save-game/postgres-repository.js";
+import { PostgresCreationRepository } from "./character-creation/postgres-repository.js";
 import { createPostgresDiagnosticsPool, createPostgresDiagnosticsReader } from "./postgres-data-diagnostics.js";
 import { createTestGameState } from "./test-game-state.js";
 import { backupMaxBytes } from "./raw-data-backup.js";
@@ -110,6 +111,7 @@ const app = await buildApp({
     : undefined,
   domainRepository: pool ? new PostgresGameStateRepository(pool) : undefined,
   saveGameRepository: pool ? new PostgresSaveGameRepository(pool) : undefined,
+  creationRepository: pool ? new PostgresCreationRepository(pool, () => logPgConnectionError("main", "borrowed")) : undefined,
   diagnosticsReader: diagnosticsPool ? createPostgresDiagnosticsReader(diagnosticsPool, createTestGameState().character.id) : undefined,
   backupReader: backupPool ? createPostgresBackupReader(backupPool, createTestGameState().character.id,
     () => logPgConnectionError("raw-backup", "borrowed")) : undefined,

@@ -38,6 +38,8 @@ import { ApplicationFailure } from "./repair-application-core.js";
 import { registerContentCatalogRoutes } from "./content-catalog.js";
 import { registerClassCatalogRoutes } from "./class-catalog.js";
 import { registerCharacterDerivationRoutes } from "./character-derivation.js";
+import { registerCharacterCreationRoutes } from "./character-creation/routes.js";
+import type { CreationRepository } from "./character-creation/contracts.js";
 
 export async function buildApp(options: {
   webRoot?: string;
@@ -56,6 +58,7 @@ export async function buildApp(options: {
   repairBackupMaxBytes?: number;
   repairArchiveMaxBytes?: number;
   storage?: "memory" | "postgres";
+  creationRepository?: CreationRepository;
   narrator?: ExplorationNarrator;
   saveGameRepository?: SaveGameRepository;
   combatSandbox?: boolean;
@@ -75,6 +78,7 @@ export async function buildApp(options: {
   registerClassCatalogRoutes(app);
   registerCharacterDerivationRoutes(app);
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
+  registerCharacterCreationRoutes(app, options.creationRepository, storage);
   const session = options.domainSession ?? (options.domainRepository
     ? createPersistedDomainSession(options.domainRepository, createTestGameState())
     : createDomainSession(createTestGameState()));

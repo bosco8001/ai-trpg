@@ -9,6 +9,7 @@ import { DataHealthPanel } from "./DataHealthPanel.js";
 import { ContentCatalogPanel } from "./ContentCatalogPanel.js";
 import { ClassCatalogPanel } from "./ClassCatalogPanel.js";
 import { CharacterDerivationPanel } from "./CharacterDerivationPanel.js";
+import { CharacterCreationPanel } from "./CharacterCreationPanel.js";
 import { RawDataBackupPanel } from "./RawDataBackupPanel.js";
 import { RepairPreviewPanel } from "./RepairPreviewPanel.js";
 import { executeExplorationAction, listSaveSlots, loadExplorationState, loadGame, saveGame } from "./api.js";
@@ -399,6 +400,7 @@ export function ExplorationPage({
                 <ContentCatalogPanel />
                 <ClassCatalogPanel />
                 <CharacterDerivationPanel />
+                <CharacterCreationPanel />
                 <DataHealthPanel />
                 <RawDataBackupPanel />
                 <RepairPreviewPanel currentState={authoritativeState?.state} />
