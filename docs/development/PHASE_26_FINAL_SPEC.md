@@ -59,6 +59,10 @@ party-defeat 不接受 settleCombat；不寫回戰鬥current resources、不清C
 
 ## 3. 永久 capacity 與資源驗證（#66 修訂）
 
+> 後續玩法修訂（截至 2026-10-07）：2026-10-07 使用者撤回保留缺少量與 B 方案，改採穿上裝備提高最大 HP／MP 時，目前值不變（40／40 → 40／54）。使用者其後回覆「確定」：卸下裝備或切換職業降低上限時，只有超出新上限的部分才截低；職業提高上限同樣不恢復目前值；不另存隱藏差額。第四切片已準備正式規則模組與唯讀樣本工具，待 Grok 驗證與使用者驗收；正式角色／存檔尚未接入，原型程式保留舊算法，舊驗證結果不涵蓋此修訂。 原子同步、生命狀態與合法資源驗證維持；不改寫暫時效果、Start／Load／Settlement 或復活規則。下方 Phase 26 契約仍保留作歷史追溯，不代表正式職業／裝備已接入。見 [最新角色規則](../gameplay/character_system.md#上限變化2026-10-07-使用者修訂)。
+
+以下為 Phase 26 當時接受與實作的契約，保留作版本追溯：
+
 永久Max HP/MP action在同一個authoritative transition中：
 1. 更新Persistent永久capacity。
 2. 必要时向下clamp Persistent current，維持record範圍合法。

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10161e">
+  <title>角色推導 · 獨立原型</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="top"><span class="eyebrow">PHASE 33 · 獨立原型</span><a href="http://127.0.0.1:3001/">正式畫面</a></header>
+  <div class="content">
+    <section class="hero" aria-labelledby="title">
+      <svg aria-hidden="true" class="ruin" viewBox="0 0 200 160"><path d="M40 160V62L58 35L73 20H127L160 62V160M64 160V64L91 43H110L137 65V160M88 160V104L101 85L113 104V160M23 143H58M137 118H179"/></svg>
+      <p class="eyebrow">角色演算 · Lv.1 樣本</p><h1 id="title">屬性與資源</h1>
+      <p id="identity" class="secondary"></p>
+      <p class="hint">樣本核對，不會改動角色或存檔。</p>
+    </section>
+    <section aria-label="目前樣本資源" class="resources">
+      <article class="resource"><p>生命 HP</p><p class="numeral"><strong id="hp"></strong><span id="max-hp"></span></p><progress id="hp-bar" aria-label="樣本生命"></progress><small id="hp-missing"></small></article>
+      <article class="resource"><p>魔力 MP</p><p class="numeral"><strong id="mp"></strong><span id="max-mp"></span></p><progress id="mp-bar" aria-label="樣本魔力"></progress><small id="mp-missing"></small></article>
+    </section>
+    <section aria-labelledby="attributes-title"><div class="section-head"><h2 id="attributes-title">最終屬性</h2><span class="hint">判定修正另列</span></div><div id="attributes" class="stats"></div></section>
+    <p class="note">上限變動時保留缺少的量；HP 為 0 時維持 0。</p>
+    <p id="change" class="change">起始樣本：HP 40／55，MP 48／60。</p>
+    <p id="feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+  </div>
+  <nav class="navigation" aria-label="原型操作"><button id="edit" class="primary">調整樣本</button><button id="details">計算明細</button></nav>
+</main>
+<dialog id="sheet" aria-labelledby="sheet-title">
+  <header class="sheet-header"><h2 id="sheet-title" tabindex="-1"></h2><button id="close" aria-label="關閉，保留原樣本"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+  <div id="sheet-body" class="sheet-body"></div>
+  <footer class="sheet-footer" id="sheet-footer"></footer>
+</dialog>
+<noscript><p>這份互動原型需要 JavaScript；尚未更改任何遊戲資料。</p></noscript>
+<script type="module" src="app.mjs"></script>
+</body>
+</html>

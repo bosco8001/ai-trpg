@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 import "./style.css";
+import "./class-catalog.css";
+import "./character-derivation.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("找不到網頁掛載位置。");

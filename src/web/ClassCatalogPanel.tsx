@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { CONTENT_ATTRIBUTES, CONTENT_ATTRIBUTE_LABELS } from "../shared/content-catalog.js";
 import type { InitialClassId, OfficialClassCatalog } from "../shared/class-catalog.js";
 import { readClassCatalog } from "./class-catalog-client.js";
-import "./class-catalog.css";
 
 function ClassGlyph({ id }: { id: InitialClassId }) {
   const paths = {
@@ -32,16 +31,21 @@ export function ClassCatalogPanel() {
     if (!dialog) return;
     const opener = openerRef.current;
     dialog.showModal();
-    // The surrounding system drawer has its own Tab / Escape handlers.
-    // Stop these keys at the native dialog; native Tab navigation stays intact.
+    // Keep Tab within the native dialog's event path. Escape is captured at
+    // window while this modal is open, including if the browser moves focus to BODY.
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "Tab" || event.key === "Escape") event.stopPropagation();
-      if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
+      if (event.key === "Tab") event.stopPropagation();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !dialog.open) return;
+      event.preventDefault(); event.stopPropagation(); setOpen(false);
     };
     dialog.addEventListener("keydown", keyboard);
+    window.addEventListener("keydown", escape, true);
     headingRef.current?.focus({ preventScroll: true });
     return () => {
       dialog.removeEventListener("keydown", keyboard);
+      window.removeEventListener("keydown", escape, true);
       if (dialog.open) dialog.close();
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
@@ -128,8 +132,11 @@ export function ClassCatalogPanel() {
         </div>
         <footer className="class-catalog__footer">
           {entry ? <button className="class-catalog__button class-catalog__button--secondary" type="button" onClick={() => setSelected(null)}>返回四職業</button>
-            : <button className="class-catalog__button class-catalog__button--primary" type="button" disabled={busy}
-              onClick={() => { lastViewedRef.current = null; lastRowRef.current = null; setCatalog(null); setError(""); setBusy(true); setAttempt(v => v + 1); }}>重新讀取名冊</button>}
+            : <button className="class-catalog__button class-catalog__button--primary" type="button" aria-disabled={busy}
+              onClick={() => {
+                if (busy) return;
+                lastViewedRef.current = null; lastRowRef.current = null; setCatalog(null); setError(""); setBusy(true); setAttempt(v => v + 1);
+              }}>重新讀取名冊</button>}
         </footer>
       </div>
     </dialog>, document.body) : null}
