@@ -1,8 +1,8 @@
 # 已批准的 Implementation Phase Plan
 
-## 當前小切片（2026-10-07）
+## 當前小切片（2026-10-08）
 
-**Phase 33 第五切片：角色建立與保存，已實作準備，待 Grok 與使用者驗收。** 使用者已逐項確認首次滿 HP／MP、所選職業、五族統一 1% 直接施法資格與未知血脈來源、龍息火／冰／雷各 1／3、保存後揭曉／安全重試及保留建立時名冊版本與結果，並以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)。已準備獨立 PostgreSQL 出生紀錄、建立／唯讀 API、手機分步 Sheet、18 項一般與 7 項隔離 PG 測試。Codex 未執行 build／測試／UI 驗證，已於 2026-10-08 取得限定 35 檔提交與送驗授權；提交前尚未推送或送 Grok，沒有第五切片工程結果或驗收。正式版必須支援多名獨立角色與列表；起始技能／裝備／熟練及正式冒險另分切片。完整檔案、契約與手動清單見 [第五切片交付](PHASE_33_CHARACTER_CREATION.md)。
+**Phase 33 第五切片：角色建立與保存，首版外部工程 FAIL、同切片補修待複驗，使用者待驗收。** 使用者以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)，並授權限定 35 檔提交及交接；已推送 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`。Grok t48u 回報 build exit 2（D1：測試型別）；全套隔離 PG 為 451 pass／2 fail（D2：期望值），新 7 個 PG 測試全部 pass；無 DB 401 pass／2 fail／48 skipped。診斷 dist 的 runtime／Chrome 結果不能代替正式 UI PASS；N2 短螢幕 Low、六項新 Info 與歷史限制保留。D1／D2／N2 補修已準備，使用者已於 2026-10-08 授權限定七檔 commit／push 與正式 build 複驗，提交前尚未推送或送達。Codex 未執行測試；遊戲規則／保存與 API 契約未改。正式版多角色與列表是後續必做，起始技能／裝備／熟練及正式冒險另分切片。完整結果、檔案與手動清單見 [第五切片交付](PHASE_33_CHARACTER_CREATION.md)。
 
 **2026-10-07 第四切片：正式推導模組與唯讀樣本核對，Grok t47u 外部工程 PASS（限 Chrome）、使用者已接受。** 使用者確認裝備／職業提高容量不恢復目前值、降低時只截超出部分後，指示「進入下一切片」，批准 [提案](PHASE_33_DERIVATION_IMPLEMENTATION_PROPOSAL.md) 的完整範圍。新增正式五族 v2／四職業 v1 推導、唯讀計算 API 與系統面板核對 Sheet，新增 8 項測試；已提交／推送並送達 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`。Grok 外部回報名冊／推導測試 20／20、無 DB 385 pass／0 fail／41 skipped、隔離 PG 428／428；6 項 Info 與未測限制保留。Codex 沒有執行本輪 build 或測試。正式角色／存檔／戰鬥不改接，原型保留修訂前算法與歷史結果。完整檔案、介面及手動清單見 [第四切片](PHASE_33_CHARACTER_DERIVATION.md)。
 

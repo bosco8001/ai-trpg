@@ -19,4 +19,24 @@
   .creation-sheet { height: 88dvh; max-height: 88dvh; border-radius: 1.5rem; }
   .creation-sheet .derivation-body { padding-inline: 1.5rem; }
 }
-@media (max-height: 28rem) { .creation-sheet .creation-steps { display: none; } }
+@media (max-height: 28rem) {
+  .creation-sheet .creation-steps { display: none; }
+  .creation-sheet .derivation-eyebrow { display: none; }
+  .creation-sheet .derivation-header {
+    padding-block: max(4px, env(safe-area-inset-top)) 4px;
+  }
+  .creation-sheet h2 { font-size: 1.125rem; }
+  .creation-sheet .derivation-footer {
+    padding-block: 4px max(4px, env(safe-area-inset-bottom));
+  }
+  .creation-sheet .derivation-footer .derivation-button {
+    padding-block: .375rem; line-height: 1.25;
+  }
+  /* Short viewports scroll the whole sheet: enlarged chrome must not squeeze
+     the readable body into a fixed strip. Keep all controls in normal flow. */
+  .creation-sheet .derivation-frame {
+    overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
+    scroll-padding-block: .5rem;
+  }
+  .creation-sheet .derivation-body { flex: none; overflow: visible; padding-block: .75rem; }
+}

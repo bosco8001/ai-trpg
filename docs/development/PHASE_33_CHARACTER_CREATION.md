@@ -1,6 +1,8 @@
 # Phase 33 第五切片：角色建立與保存
 
-更新：2026-10-08（Asia/Hong_Kong）。使用者以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)。本切片已實作準備，使用者已於 2026-10-08 授權限定 35 檔 commit／push 及 Grok 交接，提交前尚未推送或送達 Grok；**工程待驗證、使用者待驗收**。Codex 僅閱讀程式／文件／Git、實作與撰寫測試，沒有執行 build、typecheck、lint、格式檢查、單元／整合／資料庫或瀏覽器／UI 測試。
+更新：2026-10-08（Asia/Hong_Kong）。使用者以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)，並授權限定 35 檔 commit／push 及 Grok 交接。已提交及推送 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`；AI TRPG Architecture Critic 的 **t48u 外部工程結果為 FAIL**。D1／D2 與 N2 補修已準備，尚未提交、推送或送達複驗；**補修待工程驗證、使用者待驗收**。Codex 僅閱讀程式／文件／Git、實作與撰寫測試，沒有執行 build、typecheck、lint、格式檢查、單元／整合／資料庫或瀏覽器／UI 測試。
+
+本段交接狀態於 TARGET 提交後補記，尚未再次提交，不屬受測 TARGET 的內容。送出的審查訊息明確指定完整 BASE／TARGET；TARGET 中「提交前尚未推送或送達」是當時狀態。
 
 ## 單一交付目標
 
@@ -30,7 +32,7 @@
 
 探索 → 系統 →「角色建立與核對」，採已接受 Design System 02 的高對比按鈕、黑藍材質、青綠狀態、繁中文字體與短動畫。game-ui-ux 處理分步流程、原請求同步與焦點；ui-ux-pro-max 處理資料層級、響應式、標籤／錯誤／鍵盤；apple-design 處理字體、間距、按壓回饋與短過場。規則及已確認設計優先，沒有另造三套風格。
 
-選擇 → 分配 → 最後確認置於 Full-screen Sheet；只有當步操作，詳細名冊／計算放展開區。最後確認前不產生個別資質、資格、龍息或可反推資質的最終 MP。保存中阻止連按，未知結果提供查詢／重試；結果畫面唯讀。
+選擇 → 分配 → 最後確認置於 Full-screen Sheet；只有當步操作，詳細名冊／計算放展開區。最後確認前不產生個別資質、資格、龍息或可反推資質的最終 MP。保存中阻止連按，未知結果提供查詢／重試；結果畫面唯讀。N2 補修在可用高度不超過 28rem 時壓縮標題／操作列留白，改由整張 Sheet 內部捲動，標題、正文及操作列依正常順序流動；正常高度維持固定操作列，不縮小觸控目標或封鎖文字放大。此調整待 Grok 實測。
 
 原生 dialog 保持焦點在面板，步驟轉換聚焦標題，錯誤聚焦摘要並連到分配欄位；Esc 只關閉內層，返回入口。標籤、48px 操作區、安全邊距及 reduced-motion 延續共用規格。這些是實作目標，**沒有 Codex 瀏覽器測試結果**，仍由 Grok 核對實際行為與限制。
 
@@ -57,9 +59,50 @@
 
 7 項隔離 PG 測試：完整 migration、新池持久讀回、不同／相同識別競爭、異內容拒絕、真 COMMIT 後模擬遺失回覆、INSERT trigger 故障回滾、保存列損壞及等待鎖時取消。每例獨立 schema，清理自己資源，核對既有遊戲／槽位／修復資料保持不變。
 
-**上述測試全部尚未執行。** PG 未提供隔離 `TEST_DATABASE_URL` 時會略過，略過不算通過。真伺服器重新啟動、真 TCP／PG FATAL、斷網／晚回覆、手機尺寸／大字／鍵盤／讀屏與瀏覽器仍待外部驗證；新池重讀或合成遺失回覆不冒稱這些項目已通過。完整 prompt 見 [Grok 要求](PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md)。
+**Codex 沒有執行上述測試。** 首版由 Grok t48u 執行，結果與限制見下節；本次補修尚未執行。PG 未提供隔離 `TEST_DATABASE_URL` 時會略過，略過不算通過。新池重讀或合成遺失回覆不冒稱真故障已通過；診斷 dist 的 UI 結果不等於正式 build 的 UI PASS。完整複驗 prompt 見 [Grok 要求](PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md)。
 
 第四切片 t47u 是外部回報、受測版本 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`，不是第五切片結果。既有前端推導名冊核對、hash history、重複 JSON／BOM、極短畫面、測試缺口及未測平台等 Info 保留；新建立回應的名冊比對不代表舊工具 Info 已解決。
+
+## 首輪外部工程報告與同切片補修
+
+來源：AI TRPG Architecture Critic **t48u**，TARGET `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`，BASE `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`。以下為 Codex 從指定 Bot 介面讀取的外部回報，沒有取得或親自執行其證據檔。Grok 核對 35 檔、+1536／−29 與範圍一致。
+
+| 外部命令／範圍 | Exit／結果 |
+|---|---|
+| TARGET／BASE npm ci | 0／0 |
+| TARGET npm run build | 2，測試檔 7 個 TS 錯誤，Vite 未執行 |
+| BASE npm run build | 0 |
+| 指定五測試檔，無 DB | 1；36 pass／2 fail／7 skipped（45 項） |
+| 指定五測試檔，隔離 PG | 1；43 pass／2 fail（45 項）；新 7 個 PG 測試全部 pass |
+| TARGET npm test，無 DB | 1；401 pass／2 fail／48 skipped（451 項） |
+| TARGET npm test，隔離 PG | 1；451 pass／2 fail（453 項） |
+| BASE npm test，無 DB／隔離 PG | 0／0；385 pass／41 skipped；428／428 |
+| 完整 migration／完整 SHA diff --check | 0／0 |
+
+外部環境為 Node 24.21.0、PostgreSQL 17.11 的隔離叢集。因正式 build 失敗，Grok 另用跳過 typecheck、只執行 Vite 與 server tsc 的**診斷 dist**測 runtime；不能算正式 UI PASS。它回報 RNG 邊界與抽樣、20 組推導、冪等／雙 process 競爭、真 INSERT 失敗、真 TCP COMMIT 回覆遺失、延遲／鎖／取消、重啟與新池讀回、安全拒絕／固定回應及 LLM 隔離符合預期；HTTP 51／52 中一項是審查者預期誤寫，實際固定 400 可接受。Chrome 154 的 390×844 流程 62／62、版面 120 次及回歸資料核對為診斷結果。正式 dist UI 受阻，需補修後重做。
+
+| 問題 | t48u 外部觀察 | 本次補修／保留 |
+|---|---|---|
+| D1 High | `tests/character-creation.test.ts` L54、57、171、230、235、247、250：種族 fixture 的 aptitudeReveal 與 state 的 schemaVersion 等字面型別不符，build 失敗 | 測試改讀服務端已驗證的正式名冊快照；state 明確採 CreationState，沒有以斷言繞過型別。待複驗 |
+| D2 Medium | L59 的矮人／龍裔弓箭手感知錯寫 10；L214 的 /SQL/ 誤中 PostgreSQL，兩個測試提前失敗 | 兩組預期改為 floor(10×1.25)=12；SQL 使用單詞邊界，另核對完整固定 code／message。未刪除測試或放寬產品規則。待複驗 |
+| N2 Low | 矮橫屏配模擬 200% zoom 時，568×320／844×390 的正文只剩 32／59px；320×568 確認步驟為 107px；可捲至尾且按鈕可見 | 短螢幕壓縮留白並讓整張 Sheet 內部捲動，解除固定正文高度被標題／操作列擠壓。待複驗，不能只以能捲到底判通過 |
+| N1 Info | 未知種族／職業回 invalid-request；invalid-allocation 被前置驗證擋住，無法到達 | 保留，本次不改 API 語義 |
+| N3 Info | 等鎖時最多佔用共享池 5 條連線 3 秒，game-state 約等 2.7 秒 | 保留，本次不改 pool／交易 |
+| N4 Info | PG 不可用或角色不存在時連線失敗沒有日誌；推斷既有，未做 BASE 重現 | 保留推斷，未確認歸因；舊 FATAL query 缺日誌本輪未觸發 |
+| N5 Info | 首次與重播 JSON key 次序不同，內容一致 | 保留 |
+| N6 Info | 原生 modal Tab 先經 BODY，背景控制項無法到達 | 保留既有觀察，本次不改焦點程式 |
+| N7 Info | 文件描述提交前狀態 | 本次補寫目前／歷史狀態及固定版本，不宣告已經外部複驗 |
+
+Grok 重驗第四切片工具的 5 個偽造回應仍被接受，t47u I1–I6 全部保留；t46u、第一切片與原型 02 的歷史 Info 也保留。真瀏覽器縮放、真手機、讀屏器、OS 字體大小及 mutation testing 未測；Safari／WebKit 受阻。本輪診斷 UI 沒有取代這些限制。
+
+Grok 回報 server／proxy／Chrome、六個隔離 DB 與測試角色已清理、隔離叢集已停，沒有改檔／commit／push；證據保留於外部 `/workspace/p33k-evidence/`（SUMMARY.md、logs/exits.txt、json、scripts），合成 marker 已遮蔽，舊證據未改。外部 clone 停在 `771e7de` 是工作目錄描述，受測 TARGET 仍以報告核對的完整 SHA 為準。
+
+### 本次限定七檔補修
+
+- 程式／測試：`tests/character-creation.test.ts`、`src/web/character-creation.css`。
+- 狀態／外部結果／複驗要求：本文件、`PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md`、`CANONICAL_MANIFEST.md`、`IMPLEMENTATION_PLAN.md`、`OPEN_QUESTIONS.md`（均在 docs/development）。
+
+使用者已於 2026-10-08 以「授權」批准本次限定七檔 commit／push 並送 Grok 複驗；本段為提交前紀錄，尚未推送或送達複驗。前次 35 檔授權不自動視為新補修版本的提交授權。其他既有工作目錄改動不納入；本次沒有執行本地測試、資料庫操作或遊戲瀏覽器驗證。
 
 ## 工程通過後的手動核對
 

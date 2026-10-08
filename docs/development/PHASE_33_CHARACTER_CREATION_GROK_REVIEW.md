@@ -1,6 +1,10 @@
 # Phase 33 第五切片 Grok 工程驗證要求
 
-目前：實作與測試已準備，Codex 未執行工程驗證；使用者已於 2026-10-08 授權限定 35 檔 commit／push 及交接，提交前尚未推送或送達。TARGET 未填，不能寫成已送驗。使用者已授權本專案透過 Grok Bot Control 交接指定 **AI TRPG Architecture Critic**，這不包含自動 commit／push。
+目前：首版 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a` 已提交／推送／送達，**Grok t48u 外部工程 FAIL**；完整結果見 [交付報告](PHASE_33_CHARACTER_CREATION.md#首輪外部工程報告與同切片補修)。D1／D2／N2 同切片補修已準備，使用者已於 2026-10-08 授權限定七檔 commit／push 及複驗，提交前尚未推送或送達；Codex 沒有執行工程測試，使用者尚未驗收。請用本文最後的「補修複驗」要求，不重送首輪訊息。
+
+## 首輪歷史交接（已完成，以下指令不適用本次七檔補修）
+
+本次交接狀態於 TARGET 提交後補記，尚未再次提交，不屬受測 TARGET 的內容。送出訊息採以下完整 SHA；TARGET 文件中的提交前狀態及待填欄位是當時紀錄。訊息摘要 SHA-256：`b2d94bde6c9b9b02a46d595283184ad5c490c62acaa3356166794e3232efcb34`。本次只送出一次，不將前切片的報告當成第五切片結果。
 
 Repository：`https://github.com/bosco8001/ai-trpg.git`
 
@@ -8,7 +12,7 @@ Branch：`codex/phase27-mobile-ui`
 
 BASE：`bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`
 
-TARGET：`TARGET_PENDING_FULL_SHA`（限定檔案獲授權、commit／push 成功後才填入；不可用浮動 HEAD 或本地未提交檔當 TARGET）
+TARGET：`30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`（已核對推送後的遠端指定分支；不改測浮動 HEAD 或本地未提交檔）
 
 ## 限定提交指令（已獲本次授權，以下保留提交前指令）
 
@@ -58,7 +62,7 @@ git ls-remote origin refs/heads/codex/phase27-mobile-ui
 
 AGENTS、Phase 31 文件、mobile-redesign 文件及 profession-loadout 原型既有改動保留原狀，不包入本次。審查文件中的 TARGET 自我 SHA 無法在同一 commit 填寫；送交訊息須用提交後完整 SHA，之後另補送達／結果紀錄，不把未提交紀錄當新受測程式。
 
-## 可直接交指定 bot 的完整 prompt
+## 首輪完整 prompt（歷史紀錄，已送出）
 
 以下訊息送出前替換 TARGET，從當次 Grok 介面核對對話標題，讀回確認送達，只送一次。沒有可讀版本或工具受阻時保留待驗證，不冒稱送達。
 
@@ -68,7 +72,7 @@ AGENTS、Phase 31 文件、mobile-redesign 文件及 profession-loadout 原型�
 repository https://github.com/bosco8001/ai-trpg.git
 branch codex/phase27-mobile-ui
 BASE bb930080ac917a90fc2f6bdf0ecca888ebfcbe87
-TARGET TARGET_PENDING_FULL_SHA
+TARGET 30cf31fd3fba1d43c5e0c0428d01af20ac421e3a
 
 先核對遠端可讀、TARGET／BASE 完整 SHA、祖先關係與完整 diff；若遠端更新，不改測浮動 HEAD。範圍為第五切片獨立角色出生紀錄、PostgreSQL 保存／重試、分步手機畫面、Canon／必要測試與文件；限定 35 檔見 PHASE_33_CHARACTER_CREATION.md。五份前切片文件只記錄 t47u 外部結果／使用者接受／原型封存，不是第五切片程式變更或親測結果。排除 AGENTS、Phase31、mobile-redesign 及 profession-loadout 未提交變更。
 
@@ -96,4 +100,63 @@ TARGET TARGET_PENDING_FULL_SHA
 報告格式：工程總結 PASS／FAIL／受阻；版本與完整 diff；實際命令／exit code／測試數／略過；逐項 PASS／FAIL／未測／受阻；按 High／Medium／Low／Info 列問題（可定位 TARGET file:line、重現、實測或推斷、影響與最小補修）；本輪實際執行、引用舊結果及未測限制分開。保留第四切片 t47u 的 6 Info 與其他歷史限制，不能因新 client 加 catalog 比對就宣稱舊工具已修。工程 PASS 不宣告 Phase 33 第五切片或整個 Phase 33 已由使用者接受。
 
 提供證據所在位置與可取用方式，遮蔽合成敏感 marker；清理本輪 server／proxy／隔離 DB／schema／角色／process，保留本輪證據，不改舊證據或使用者工作目錄。若被環境或工具阻擋，說明已做項目、阻塞與未做項目，不虛構完成。
+```
+
+## 補修複驗（已獲七檔提交授權，以下為提交前紀錄）
+
+首輪來源 t48u，固定 BASE 為 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`。新 TARGET 在限定七檔取得 commit／push 授權並核對遠端後填入送交訊息，不能以本地未提交畫面或浮動 HEAD 代替。
+
+### 限定七檔提交指令（已獲本次授權）
+
+```sh
+git status --short
+git branch --show-current
+git rev-parse HEAD
+git diff --cached --name-only
+git add -- \
+  tests/character-creation.test.ts \
+  src/web/character-creation.css \
+  docs/development/PHASE_33_CHARACTER_CREATION.md \
+  docs/development/PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md \
+  docs/development/CANONICAL_MANIFEST.md \
+  docs/development/IMPLEMENTATION_PLAN.md \
+  docs/development/OPEN_QUESTIONS.md
+git diff --cached --name-only
+git diff --cached
+git commit -m "fix: correct character creation tests and short-screen layout"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+git ls-remote origin refs/heads/codex/phase27-mobile-ui
+```
+
+先確認沒有其他 staged 改動，保留 AGENTS、Phase 31、舊 mobile-redesign／profession-loadout 原型及其他既有工作。提交七檔之外的檔案需另確認範圍。前次 35 檔授權是已完成的首版提交，不能當本次新版本授權。
+
+### 可直接交指定 Bot 的完整複驗 prompt
+
+```text
+操作方：Codex。請 AI TRPG Architecture Critic 為 Phase 33 第五切片 t48u 的 D1／D2／N2 同切片補修做工程複驗。此處 TARGET 必須在取得限定七檔 commit／push 授權、核對遠端後替換；待填代表尚未送驗。請勿替使用者改檔、提交、推送、合併或開始下一切片，工程審查不代表使用者驗收。
+
+repository https://github.com/bosco8001/ai-trpg.git
+branch codex/phase27-mobile-ui
+BASE 30cf31fd3fba1d43c5e0c0428d01af20ac421e3a
+TARGET TARGET_PENDING_FIX_FULL_SHA
+首版的父版本 bb930080ac917a90fc2f6bdf0ecca888ebfcbe87 是回歸參考，不改測浮動 HEAD。
+
+先核對完整 SHA、遠端可讀、祖先關係與完整 diff。僅七檔：tests/character-creation.test.ts、src/web/character-creation.css，及 docs/development/{PHASE_33_CHARACTER_CREATION.md,PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md,CANONICAL_MANIFEST.md,IMPLEMENTATION_PLAN.md,OPEN_QUESTIONS.md}。排除 AGENTS、Phase31 及舊原型未提交變更。讀受測版本 AGENTS、上述文件、PHASE_33_CHARACTER_CREATION_PROPOSAL.md，以及 gameplay/character_system.md、classes.md、magic.md、world/races.md；不新增玩法。
+
+首輪 t48u 為外部工程 FAIL：官方 build exit2，測試 7 個 TS 錯誤；兩個必跑測試失敗；全套隔離 PG 451 pass／2 fail，無 DB 401 pass／2 fail／48 skipped；新 7 個 PG 測試 pass。診斷 dist 的 runtime／62項 Chrome UI 結果不能當正式 build UI PASS，本輪須用新 TARGET 正式 npm run build 產物重做。
+
+補修：D1 測試種族 fixture 改讀 createOfficialContentCatalog().catalog 的已驗證快照，state 明確採 CreationState，沒有以不安全型別斷言壓錯誤；D2 矮人／龍裔弓箭手的感知期望改 12（floor(10×1.25)），SQL 正規式用單詞邊界，另斷言完整固定 code/message，兩個 runtime 模式仍逐一覆蓋，不刪測試。N2 可用高度 <=28rem 壓縮 header/footer 留白、保留48px控制項，整張 Sheet 的 frame 捲動，body 不再作被固定上下列擠壓的捲動區；正常高度保留原固定操作列，沒有修改 TSX 的流程／focus／pending，也未改生成／保存／交易／名冊／API規則。
+
+由你執行並回報實際命令、exitcode、環境、測試數及略過：npm ci；npm run build；node --import tsx --test tests/character-creation.test.ts tests/character-creation-postgres.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts（分無DB與隔離PG）；env -u TEST_DATABASE_URL npm test；隔離 TEST_DATABASE_URL 的 npm test；git diff --check BASE TARGET。Codex 沒有執行補修驗證，略過不算pass；build若仍失敗，不跳過typecheck後宣告正式UI通過。
+
+D1：確認七個原錯誤消失、官方Vite/server產物可用。D2：20組預期逐項獨立核對，確認弓箭手兩組感知12且整個迴圈走完；固定PostgreSQL提示接受，但原始SQL token、URL、host/port、密碼、stack/path仍不可洩漏；memory與postgres分支都執行。不要為了通過修改遊戲公式或刪弱測試。
+
+N2：用官方 dist、真 index.ts、NODE_ENV=production、DOMAIN_STORAGE=postgres 與新建隔離DB，從探索→系統→角色建立與核對走全部步驟。重做320×568、375×667、390×844、568×320、844×390與desktop，分開100%／200%文字大小及瀏覽器zoom；真zoom和模擬zoom分開回報。至少記錄正文可讀的實際視窗面積、整張Sheet捲動、頂部關閉和最底確認／重試／完成能否操作。放大後不能只留下32/59px細縫、藏文字、水平溢出、雙捲動或焦點被截掉。短高度允許標題與操作列在Sheet內正常流動，捲到內容／操作，不要求它們同時固定；一般高度仍固定操作列。檢查錯誤摘要／連到輸入、details展開、Tab/ShiftTab/Enter/Esc、內層返回外層與入口焦點、步驟改變回到頂部、旋轉或放大後焦點與捲動位置、安全區48px、pressed/disabled/loading與reducedmotion。正式UI流程重做保存前不揭曉、sessionStorage先保留request、連按單POST、取消、未知／晚回覆、查詢與同次重試、重整／重啟讀回且結果唯讀；只引用t48u的項目須明列引用，不算本輪新做。
+
+必要回歸：既有探索、五族／四職業名冊、第四切片樣本工具、三槽存讀檔、診斷／備份／修復入口、SSR；新樣式只在creation-sheet生效，不改舊工具。使用隔離資源，不能碰5432或使用者的角色／存檔，不用重抽或刪正式資料測試。保留首次滿HP/MP、後續提高上限不補資源／下降只截超出部分、保存後揭曉、單角色暫行／正式版多角色後續必做等已確認契約。
+
+N1/N3/N4/N5/N6及歷史Info保留；N4既有歸因只有推斷，沒有BASE重現，舊FATAL缺log本輪未觸發，不宣告已修。N7補寫文件目前／歷史版本，讀新紀錄核對。t47u I1–I6、t46u、第一切片與原型02舊Info保留，第四切片偽造回應問題未在本輪修；真手機／讀屏器／OS字體／Safari/WebKit／mutation等未測或受阻如實標記。
+
+報告總結PASS/FAIL/受阻，逐項D1/D2/N2的證據與新問題，完整SHA/diff/命令/exit/統計；實做、舊結果引用、推斷、未測及受阻分開。提供可定位file:line、重現與最小修正，另提供遮蔽marker的證據位置。清理本次server/proxy/DB/schema/role/process，保留證據，不改舊證據。工程PASS不宣布第五切片或Phase33已由使用者接受。
 ```

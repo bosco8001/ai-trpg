@@ -1,4 +1,4 @@
-// 尚未執行；交 AI TRPG Architecture Critic 做工程驗證。
+// 首版 30cf31f 已由 Grok t48u 執行並回報失敗；本次補修尚未執行，交同一 bot 複驗。
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
@@ -6,7 +6,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { generateCreationRecord, CreationFailure } from "../src/domain/character-creation.js";
 import { isCreationRequest, isCreationRecord, isCreationState, CREATION_MESSAGES, creationRequestText } from "../src/shared/character-creation.js";
-import { OFFICIAL_RACES_V2 } from "../src/server/content/races-v2.js";
+import type { CreationState } from "../src/shared/character-creation.js";
+import { createOfficialContentCatalog } from "../src/server/content-catalog.js";
 import { OFFICIAL_CLASSES_V1 } from "../src/server/content/classes-v1.js";
 import { MemoryCreationRepository } from "../src/server/character-creation/memory-repository.js";
 import { createCharacterCreationService } from "../src/server/character-creation/service.js";
@@ -19,6 +20,9 @@ import { buildApp } from "../src/server/app.js";
 import { createDomainSession } from "../src/server/domain-session.js";
 import { createTestGameState } from "../src/server/test-game-state.js";
 import { birth, creationRequest, signal, characterId, date, secondRequestId, failure } from "./helpers/character-creation.js";
+
+// Read the same validated, typed snapshot used by the server; do not cast raw metadata.
+const OFFICIAL_RACES_V2 = createOfficialContentCatalog().catalog;
 
 function setup(repository: CreationRepository = new MemoryCreationRepository()) {
   let draws = 0, ids = 0;
@@ -60,9 +64,9 @@ test("出生屬性使用正式五族／四職業順序與向下取整；第一�
   const cases = [
     ["race.human",20,[[15,10,10,10,10,10],[12,10,10,10,12,10],[12,12,10,10,10,10],[12,10,10,12,10,10]]],
     ["race.elf",0,[[11,10,8,11,12,10],[9,10,8,11,15,10],[9,12,8,11,12,10],[9,10,8,13,12,10]]],
-    ["race.dwarf",0,[[13,9,12,10,10,8],[11,9,12,10,10,8],[11,11,12,10,10,8],[11,9,12,12,10,8]]],
+    ["race.dwarf",0,[[13,9,12,10,10,8],[11,9,12,10,12,8],[11,11,12,10,10,8],[11,9,12,12,10,8]]],
     ["race.orc",0,[[12,12,10,7,12,9],[10,12,10,7,15,9],[10,15,10,7,12,9],[10,12,10,8,12,9]]],
-    ["race.dragonborn",0,[[15,10,12,11,10,10],[12,10,12,11,10,10],[12,12,12,11,10,10],[12,10,12,13,10,10]]],
+    ["race.dragonborn",0,[[15,10,12,11,10,10],[12,10,12,11,12,10],[12,12,12,11,10,10],[12,10,12,13,10,10]]],
   ] as const;
   for (const [raceId, roll, expected] of cases) for (const [i, profession] of OFFICIAL_CLASSES_V1.classes.entries()) {
     const record = birth(creationRequest({ raceId, classId: profession.id }), [roll,99,0]);
@@ -210,8 +214,9 @@ test("HTTP repository 原始錯誤與 memory 提示不含 SQL／路徑／連線�
     registerCharacterCreationRoutes(app, { read: unsafe, create: unsafe }, storage);
     for (const method of ["GET", "POST"] as const) {
       const res = await app.inject({ method, url: "/api/character-creation", ...(method === "POST" ? { payload: creationRequest() } : {}) });
-      assert.equal(res.statusCode, 503); assert.equal(res.json().code, storage === "memory" ? "postgres-required" : "unavailable");
-      assert.doesNotMatch(res.body, /secret|127\.0\.0\.1|55426|SQL|node_modules|stack|postgres:\/\//);
+      const code = storage === "memory" ? "postgres-required" : "unavailable";
+      assert.equal(res.statusCode, 503); assert.deepEqual(res.json(), { code, message: CREATION_MESSAGES[code] });
+      assert.doesNotMatch(res.body, /secret|127\.0\.0\.1|55426|\bSQL\b|node_modules|stack|postgres:\/\//);
     }
   }
 });
@@ -221,7 +226,8 @@ function json(value: unknown, status = 200) {
   return new Response(text, { status, headers: { "Content-Type": "application/json", "Content-Length": String(Buffer.byteLength(text)) } });
 }
 test("前端回應須綁定本次輸入與名冊，超大／截斷／取消回應不顯示生成結果", async () => {
-  const request = creationRequest(), record = birth(request), state = { schemaVersion: 1, storage: "postgres", state: "created", record };
+  const request = creationRequest(), record = birth(request);
+  const state: CreationState = { schemaVersion: 1, storage: "postgres", state: "created", record };
   const fetcher: typeof fetch = async (url, options) => {
     assert.equal(url, "/api/character-creation"); assert.equal(options?.method, "POST"); assert.equal(options?.cache, "no-store");
     assert.deepEqual(JSON.parse(options!.body as string), request); return json(state);
