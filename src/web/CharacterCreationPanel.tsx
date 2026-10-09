@@ -21,6 +21,7 @@ export function CharacterCreationPanel() {
   const [loading, setLoading] = useState(false), [ready, setReady] = useState(false), [busy, setBusy] = useState(false);
   const [error, setError] = useState(""), [rejected, setRejected] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null), heading = useRef<HTMLHeadingElement>(null), body = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLButtonElement>(null), errorRef = useRef<HTMLDivElement>(null);
   const serial = useRef(0), operation = useRef<AbortController | null>(null), inFlight = useRef(false);
   const requestRef = useRef<CreationRequest | null>(null);
@@ -46,6 +47,8 @@ export function CharacterCreationPanel() {
   }, [open]);
   useLayoutEffect(() => {
     if (!open) return;
+    // Short screens scroll the frame; taller screens scroll the body.
+    if (frame.current) frame.current.scrollTop = 0;
     if (body.current) body.current.scrollTop = 0;
     heading.current?.focus({ preventScroll: true });
   }, [open, step, ready]);
@@ -137,7 +140,7 @@ export function CharacterCreationPanel() {
     {open ? createPortal(<dialog ref={dialog} className="derivation-sheet creation-sheet" aria-labelledby={titleId} aria-describedby={introId}
       onKeyDown={e => { if (e.key === "Tab") e.stopPropagation(); }}
       onCancel={e => { e.preventDefault(); e.stopPropagation(); setOpen(false); }}>
-      <div className="derivation-frame">
+      <div ref={frame} className="derivation-frame">
         <header className="derivation-header"><div><p className="derivation-eyebrow">角色卡 · PostgreSQL 保存</p>
           <h2 ref={heading} id={titleId} tabIndex={-1}>{ready ? title[step] : "角色建立與核對"}</h2></div>
           <button className="derivation-close" type="button" aria-label="關閉角色建立畫面" onClick={() => setOpen(false)}>

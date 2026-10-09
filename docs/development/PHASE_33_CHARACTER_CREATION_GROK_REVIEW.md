@@ -1,5 +1,17 @@
 # Phase 33 第五切片 Grok 工程驗證要求
 
+## 目前：M1 補修待複驗（2026-10-09）
+
+Grok 對 `efaa63625e46bfa0602699a8f9948bc69f91ac3f` 的外部複驗仍為工程 FAIL；D1／D2 PASS、N2 細縫消失、官方 build 成功及隔離 PG 453／453，但新增 M1 Medium：整張 Sheet 捲動後，步驟切換仍只重設正文，標題在畫面外。M1 TSX 補修與獨立瀏覽器案例已準備，尚未提交／推送／送達新複驗；使用者已於 2026-10-09 授權限定七檔 commit／push 並複驗，使用者待驗收，Codex 未執行測試。完整結果見 [交付](PHASE_33_CHARACTER_CREATION.md#第一次補修外部結果與-m1)。
+
+送驗時用本文最後的「M1 複驗」要求；以下交接紀錄與前兩版要求為歷史，不重送舊 TARGET，不把原七檔授權當新 TSX 範圍的授權。
+
+## 歷史複驗送達（2026-10-08，提交後補記）
+
+限定七檔已提交及推送為 `efaa63625e46bfa0602699a8f9948bc69f91ac3f`，BASE `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`；遠端指定分支已核對一致。完整複驗訊息已由 Grok Bot Control 送交 AI TRPG Architecture Critic，讀回新增送出訊息及空白輸入框；只送一次，工程結果待回覆、使用者待驗收。訊息 SHA-256 為 `27138c2770e8c3442a545cbcfecaec06602a4be5b45eeba772348b122274e602`。
+
+本段尚未另行提交，不屬受測 TARGET；以下為提交前與首輪歷史紀錄。送交訊息使用上述完整 SHA，已替換待填 TARGET；不以浮動 HEAD 或本地未提交文字當受測版本。Codex 未執行補修測試。
+
 目前：首版 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a` 已提交／推送／送達，**Grok t48u 外部工程 FAIL**；完整結果見 [交付報告](PHASE_33_CHARACTER_CREATION.md#首輪外部工程報告與同切片補修)。D1／D2／N2 同切片補修已準備，使用者已於 2026-10-08 授權限定七檔 commit／push 及複驗，提交前尚未推送或送達；Codex 沒有執行工程測試，使用者尚未驗收。請用本文最後的「補修複驗」要求，不重送首輪訊息。
 
 ## 首輪歷史交接（已完成，以下指令不適用本次七檔補修）
@@ -159,4 +171,58 @@ N2：用官方 dist、真 index.ts、NODE_ENV=production、DOMAIN_STORAGE=postgr
 N1/N3/N4/N5/N6及歷史Info保留；N4既有歸因只有推斷，沒有BASE重現，舊FATAL缺log本輪未觸發，不宣告已修。N7補寫文件目前／歷史版本，讀新紀錄核對。t47u I1–I6、t46u、第一切片與原型02舊Info保留，第四切片偽造回應問題未在本輪修；真手機／讀屏器／OS字體／Safari/WebKit／mutation等未測或受阻如實標記。
 
 報告總結PASS/FAIL/受阻，逐項D1/D2/N2的證據與新問題，完整SHA/diff/命令/exit/統計；實做、舊結果引用、推斷、未測及受阻分開。提供可定位file:line、重現與最小修正，另提供遮蔽marker的證據位置。清理本次server/proxy/DB/schema/role/process，保留證據，不改舊證據。工程PASS不宣布第五切片或Phase33已由使用者接受。
+```
+
+## M1 複驗（已獲七檔授權，以下為提交前紀錄）
+
+### 限定七檔指令（已獲本次授權）
+
+```sh
+git status --short
+git branch --show-current
+git rev-parse HEAD
+git diff --cached --name-only
+git add -- \
+  src/web/CharacterCreationPanel.tsx \
+  tests/browser/character-creation-scroll.mjs \
+  docs/development/PHASE_33_CHARACTER_CREATION.md \
+  docs/development/PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md \
+  docs/development/CANONICAL_MANIFEST.md \
+  docs/development/IMPLEMENTATION_PLAN.md \
+  docs/development/OPEN_QUESTIONS.md
+git diff --cached --name-only
+git diff --cached
+git commit -m "fix: reset character creation sheet scroll between steps"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+git ls-remote origin refs/heads/codex/phase27-mobile-ui
+```
+
+只包含上述七檔，保留 AGENTS、Phase 31、舊原型及其他既有工作。前次七檔已提交，沒有涵蓋本次 TSX 與新增瀏覽器案例；尚未送出下列訊息，不以待填 TARGET 宣告送達。
+
+### M1 完整複驗要求
+
+```text
+操作方：Codex。請 AI TRPG Architecture Critic 工程複驗第五切片 M1 最小補修；這不是使用者驗收。送出前須取得限定七檔 commit／push 授權、填入完整新 TARGET 並核對遠端。不要替使用者改檔、提交、推送、合併或開始下一切片。
+repository https://github.com/bosco8001/ai-trpg.git
+branch codex/phase27-mobile-ui
+BASE efaa63625e46bfa0602699a8f9948bc69f91ac3f
+TARGET TARGET_PENDING_M1_FULL_SHA
+回歸參考 30cf31fd3fba1d43c5e0c0428d01af20ac421e3a、bb930080ac917a90fc2f6bdf0ecca888ebfcbe87，不改測浮動 HEAD。
+
+先核對固定 SHA、遠端可讀、祖先及完整 diff。僅 src/web/CharacterCreationPanel.tsx、tests/browser/character-creation-scroll.mjs，以及 docs/development/{PHASE_33_CHARACTER_CREATION.md,PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md,CANONICAL_MANIFEST.md,IMPLEMENTATION_PLAN.md,OPEN_QUESTIONS.md} 七檔。讀 AGENTS、上述文件、完整創角提案及 Character/Classes/Magic/Race Canon；排除既有 AGENTS、Phase31、舊原型未提交改動。Codex 未執行本地測試，不能預先假設新案例可用。
+
+前次官方 build／typecheck成功、隔離PG453/453、無DB403pass/48skip，D1/D2 PASS及N2窄條消失，但工程FAIL：M1短螢幕轉步驟未回頂，焦點標題在外。最小產品補修只加frame ref，在既有[open,step,ready] useLayoutEffect重設frame和body的scrollTop，再focus標題；沒有改CSS、旋轉事件、流程順序、pending、生成／保存／交易／API／名冊或遊戲規則。N9旋轉焦點問題未在此修復，不沿用M1通過宣告它已解決。
+
+由你執行npm ci、npm run build、指定五檔node --import tsx --test tests/character-creation.test.ts tests/character-creation-postgres.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts（無DB與隔離PG）、env -u TEST_DATABASE_URL npm test、隔離TEST_DATABASE_URL npm test、git diff --check BASE TARGET。回報環境、實際命令、exitcode、測試數／skip；略過不算PASS。build若失敗不得跳過typecheck判正式UI通過。
+
+核心M1：官方dist、真index.ts、production/postgres、新隔離DB。844×390、100%字，選擇與分配各捲到底再下一步，最後確認應從頂顯示身份／六屬性，標題焦點完整可見；返回分配再前進也回頂。重做568×320的真200%瀏覽器縮放，及844×390、320×568模擬縮放的原8項FAIL，BASE同操作應重現M1、TARGET消失；真與模擬縮放分開記錄。320×568、375×667、390×844與desktop核對正常正文捲動仍回頂、footer固定；短模式保留整張Sheet捲動，不能退回原32/59px窄條。
+
+新增瀏覽器案例不是npm test glob的一部分。請以你現有Playwright環境匯入tests/browser/character-creation-scroll.mjs的checkCreationStepScroll(page)，先在隔離空角色／無pending的Sheet開到「種族與職業」再呼叫。案例選精靈弓箭手、各2點，只操作草稿；三次transition各先assert真的有scrollTop>4，再檢查frame/body<=1、焦點與標題完整可見，不按確認保存。至少844×390的100%字、568×320真200%zoom、320×568模擬200%zoom執行；另記錄所有before/after數值，核對POST數0。沒有捲動距離的樣本不當M1重現成功；helper若不可用報實際錯誤，不默默略過。請另外用人類另2點與鍵盤Enter操作獨立重驗，不能只靠這個helper或讀碼判通過。新案例只檢查草稿轉步驟，保存／重開／ready與pending/result仍需下面的真流程核對。
+
+正式UI流程回歸：保存前不揭曉、sessionStorage先保留原request、連按／Enter單POST、取消／Esc／外層返回、未知或晚回覆仍查詢與同ID重試、關閉再開、重整／服務重啟同結果唯讀；切換至pending/result及重新讀取ready時標題／捲動正確，失敗焦點落在錯誤摘要而非被新回頂覆蓋，錯誤連結能見到input。旋轉／root200%／真zoom／reducedmotion／48px／details／安全區另核對，但N9–N11既有缺口不預設已修。既有探索／名冊／第四切片工具／三槽／診斷備份修復／SSR必要回歸；不必因單一ref改動將所有舊結果冒稱本次新做。
+
+N8 regex與完整body比對界線、N9 BASE三項與TARGET新增轉回直向項、N10大字錯誤框、N11左右safe-area未接全部保留；N1/N3/N4/N5/N6引用保留，N4既有歸因只是推斷，FATAL缺日誌未觸發。t47u I1偽造回應仍未修、I2–I6及t46u／第一切片／原型02 Info保留。真手機／讀屏／OS字體／真safe-area／全面mutation未測、Safari/WebKit受阻如實標記。
+
+只能用新隔離資源，不碰5432或使用者角色／存檔，不刪資料重抽。保留所有已確認創角、初始滿資源／容量、固定結果／同次重試及單角色暫行／正式多角色後續必做契約。報告PASS/FAIL/受阻、完整SHA/diff/命令/exit/統計、M1逐項證據；實做、舊引用、推斷、未測分開，新問題含file:line／重現／影響與最小修正。提供遮蔽marker證據，清理本次server/proxy/DB/schema/role/process，保留新舊證據。工程PASS不宣布第五切片或Phase33已由使用者接受。
 ```

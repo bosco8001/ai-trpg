@@ -76,7 +76,7 @@ Agent 遇到 unresolved 項目時：
 
 ## 後續工程規劃
 
-- [Phase 33 第五切片：角色建立與保存](PHASE_33_CHARACTER_CREATION.md)：使用者以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)。限定 35 檔已獲授權並提交／推送 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`，Grok t48u 外部工程 FAIL：D1 測試型別阻擋 build、D2 兩項測試預期錯誤，另有 N2 短螢幕可讀性 Low。三項補修已準備，使用者已於 2026-10-08 授權限定七檔提交與複驗，提交前尚未推送或送達；Codex 未執行 build／測試／UI 驗證，使用者尚未驗收。正式版多角色是後續必做，起始技能／裝備／熟練與正式冒險另分切片；新舊 Info 及未測限制見交付，不以診斷 dist 代替正式 UI PASS。完整複驗 prompt 見 [工程驗證要求](PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md)。
+- [Phase 33 第五切片：角色建立與保存](PHASE_33_CHARACTER_CREATION.md)：使用者已批准完整範圍；首版 `30cf31f` 的 t48u 外部工程 FAIL 保留。補修 `efaa63625e46bfa0602699a8f9948bc69f91ac3f` 已授權提交／推送／送達，2026-10-09 Grok 外部複驗確認 D1／D2 PASS、N2 細縫消失、build 成功與隔離 PG 453／453，但仍工程 FAIL：新增 M1 Medium，短螢幕步驟切換沒有回頂、焦點標題在畫面外。M1 最小 TSX 補修與瀏覽器案例已準備，使用者已於 2026-10-09 授權限定七檔 commit／push 及複驗；提交前尚未推送或送達新複驗。Codex 未執行測試、使用者未驗收；新 N8–N11、舊 Info 與未測限制保留。正式版多角色必做、起始行囊與正式冒險另分切片，完整結果及要求見交付與 [複驗要求](PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md)。
 
 - [Phase 33 第四切片：正式推導與唯讀樣本核對](PHASE_33_CHARACTER_DERIVATION.md)：使用者於 2026-10-07 指示「進入下一切片」，批准正式推導模組、唯讀計算介面及手機核對畫面；採最新裝備／職業容量政策。已提交／推送並送達 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`；Grok t47u 外部工程 PASS（限 Chrome），名冊核對等 6 項 Info 與未測限制保留，使用者已於 2026-10-07 接受第四切片。Codex 未執行本輪工程測試。不是正式創角／轉職／配裝或存檔整合，不沿用原型 PASS。
 

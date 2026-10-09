@@ -1,5 +1,17 @@
 # Phase 33 第五切片：角色建立與保存
 
+## 最新結果與 M1 補修（2026-10-09）
+
+AI TRPG Architecture Critic 對 `efaa63625e46bfa0602699a8f9948bc69f91ac3f` 的外部複驗結果仍為 **工程 FAIL**。D1／D2 已 PASS、N2 細縫消失，但整張 Sheet 捲動後，步驟切換只重設正文，新增 M1 Medium：標題獲焦點卻在畫面外，最後確認停在底部。M1 同切片補修與瀏覽器回歸案例已準備，尚未執行；使用者已於 2026-10-09 授權限定七檔 commit／push 並複驗，提交前尚未推送或送達新複驗；使用者待驗收。Codex 沒有執行本地工程測試。
+
+下列各版送達及待送紀錄為當時狀態；目前以本節及「第一次補修外部結果與 M1」為準。
+
+## 歷史補修交接（2026-10-08，提交後補記）
+
+使用者已授權限定七檔 commit／push 並複驗；提交及推送成功，新 TARGET 為 `efaa63625e46bfa0602699a8f9948bc69f91ac3f`，BASE 為 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`，遠端指定分支與 TARGET 一致。已透過 Grok Bot Control 向 AI TRPG Architecture Critic 送出完整 D1／D2／N2 複驗要求，讀回確認新訊息與空白輸入框。**補修工程結果待回覆，使用者待驗收**；Codex 沒有執行本地工程測試。
+
+本段於補修 TARGET 提交後補寫，尚未另行提交，不屬受測 TARGET；以下「提交前」與「尚未送達複驗」為各版本當時紀錄。首版 t48u FAIL 保留，不沿用診斷 dist 宣告正式 UI PASS。
+
 更新：2026-10-08（Asia/Hong_Kong）。使用者以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)，並授權限定 35 檔 commit／push 及 Grok 交接。已提交及推送 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`；AI TRPG Architecture Critic 的 **t48u 外部工程結果為 FAIL**。D1／D2 與 N2 補修已準備，尚未提交、推送或送達複驗；**補修待工程驗證、使用者待驗收**。Codex 僅閱讀程式／文件／Git、實作與撰寫測試，沒有執行 build、typecheck、lint、格式檢查、單元／整合／資料庫或瀏覽器／UI 測試。
 
 本段交接狀態於 TARGET 提交後補記，尚未再次提交，不屬受測 TARGET 的內容。送出的審查訊息明確指定完整 BASE／TARGET；TARGET 中「提交前尚未推送或送達」是當時狀態。
@@ -103,6 +115,59 @@ Grok 回報 server／proxy／Chrome、六個隔離 DB 與測試角色已清理�
 - 狀態／外部結果／複驗要求：本文件、`PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md`、`CANONICAL_MANIFEST.md`、`IMPLEMENTATION_PLAN.md`、`OPEN_QUESTIONS.md`（均在 docs/development）。
 
 使用者已於 2026-10-08 以「授權」批准本次限定七檔 commit／push 並送 Grok 複驗；本段為提交前紀錄，尚未推送或送達複驗。前次 35 檔授權不自動視為新補修版本的提交授權。其他既有工作目錄改動不納入；本次沒有執行本地測試、資料庫操作或遊戲瀏覽器驗證。
+
+## 第一次補修外部結果與 M1
+
+來源：2026-10-09 從指定 AI TRPG Architecture Critic 介面讀取的複驗回覆，TARGET `efaa63625e46bfa0602699a8f9948bc69f91ac3f`，BASE `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`。以下仍是外部回報，Codex 沒有取得或親測其證據檔；未另替報告編造審查識別。Grok 核對七檔限定範圍、父版本與祖先關係正確，沒有混入其他系統改動。
+
+| 外部命令／範圍 | 結果 |
+|---|---|
+| npm ci／npm run build／npx tsc --noEmit | 均 exit 0，官方 Vite／server 產物可用 |
+| 指定五測試檔，無 DB | exit 0，38 pass／0 fail／7 skipped（45 項） |
+| 指定五測試檔，隔離 PG | 45／45 pass |
+| 無 DB npm test | exit 0，403 pass／0 fail／48 skipped（451 項） |
+| 隔離 PG npm test | 453／453 pass |
+| 六支 migration／完整 SHA diff --check | 均 exit 0 |
+| BASE build 重現 | exit 2，原七個 TS 錯誤仍在 |
+
+外部環境為 Node 24.21.0、PG 17.11 隔離叢集（55426）。453 個測試名稱與 BASE 相同，沒有刪測試；略過不算 PASS。D1 七個 TS 錯誤已消失。D2 的 20 組獨立公式／期望／產品輸出吻合；審查者在隔離副本以最後一組改值、產品修正改值、迴圈及分支計數等定點改動證明覆蓋有效，兩模式 GET／POST 均執行，固定 PostgreSQL 字眼可接受，原始 err／額外欄位被完整 body 比對攔住。
+
+N2 已用**官方 dist**、真 index.ts／production／postgres 重做：144 個畫面量測與 headed 真縮放 36 個；BASE 用診斷 dist 對照 144 個，其中 34 個有問題。真縮放經 Chrome profile 設定並核對 innerWidth／DPR，與模擬縮放分開；沒有將頁面收到 Ctrl+Plus 當成真縮放。
+
+| 確認畫面 | BASE → TARGET 可讀高度 |
+|---|---|
+| 568×320，200% 真／模擬縮放 | 33 → 160px |
+| 844×390，200% 縮放 | 61 → 195px |
+| 320×568，200% 縮放 | 109 → 284px |
+| 568×320／844×390，100% | 186 → 320px／256 → 390px |
+
+整張 Sheet 捲動沒有雙捲動、橫向溢出、藏文字；控制項至少 48px，關閉／底部操作可達。正常高度仍固定操作列；縮放進入短螢幕模式時隨內容流動。錯誤連結、details、Tab／Shift+Tab／Esc、pressed／disabled／reduced-motion 通過。但**步驟切換仍有 M1，不能宣告整體工程 PASS**。
+
+M1 Medium（本次補修引入）：844×390、100% 字，捲到底後前進，frame 保持約 396／199px 的原位置；最後確認的身分與屬性在畫面外。568×320 真縮放、844×390 及 320×568 模擬縮放合計 8 項 FAIL，BASE 同方法 PASS。位置為受測版 `CharacterCreationPanel.tsx` L47–51：只重設 body.scrollTop，CSS 卻讓 frame 成為捲動區。
+
+本次最小補修：為 `.derivation-frame` 增加 ref，在既有 `[open, step, ready]` layout effect 中同時重設 frame／body 的 scrollTop，再保持既有標題焦點。不改 CSS、旋轉事件、生成、保存、API 或 pending 契約，也不為 Info 自動擴大修補。
+
+新增 `tests/browser/character-creation-scroll.mjs`，匯出 `checkCreationStepScroll(page)`，交 Grok 使用其現有 Playwright Page 執行；不新增套件或本地瀏覽器。先以隔離、空創角 Sheet 開在「種族與職業」，案例選精靈／弓箭手、六項各 2 點，從真的有捲動距離的底部前進到分配、再到確認、返回分配，共三次檢查 frame／body 回頂及標題焦點／完整可見。沒有按確認保存、建立或刪除角色；呼叫方另核對 POST 為零並清理。這是獨立瀏覽器案例，不在現有 npm test glob 內，尚未執行；不能把假 DOM 或只讀碼當實測。短螢幕依 M1 三組設定執行，正常高畫面另核對；若畫面沒有捲動距離，不能當 M1 重現成功。
+
+| 新 Info | 外部結果與本次界線 |
+|---|---|
+| N8，本次測試補修 | SQL regex 本身未涵蓋 SELECT、SQLSTATE、MySQL、無 stack 字眼的 stack 行／路徑；完整固定 body 的 deepEqual 仍守住，風險低。本次保留，不宣稱 regex 已完整涵蓋 |
+| N9，既有及新增觀察 | 旋轉／縮放／字體改變後焦點 input 不保持可見；BASE 三項 FAIL，TARGET 新增一項轉回直向 FAIL。保留混合歸因，M1 補修不代表 N9 已修 |
+| N10，兩版相同 | 320×568、CSS root 200% 的確認畫面可讀區約 198px；錯誤摘要可能高過視窗，焦點框部分在外。保留 |
+| N11，首版 | header／footer 左右留白未使用 safe-area-inset-left/right，真瀏海 inset 未測。保留 |
+
+官方 dist 重做流程 62／62、真 TCP proxy 6／6：COMMIT 後斷線已保存但 UI 顯示未知、12 秒延遲後約 10.4 秒未知／同 ID 重播、鎖逾時不寫 row，三次建立只生成三次；服務重啟唯讀且新 process RNG 零次。回歸 computed style、兩名冊 byte、第四切片樣本、容量規則、三槽存讀檔、診斷／備份／修復與 SSR 符合預期。以上通過沒有蓋過 M1。
+
+N1／N3／N4／N5／N6 為引用保留，N4 既有歸因仍只有推斷，未做 BASE 重現；舊 FATAL 缺日誌未觸發。N7 文件的目前／歷史狀態核對正確。第四切片 t47u I1 五個偽造回應重驗仍被接受；t47u I2–I6、t46u、第一切片與原型 02 的 Info 保留。真手機、讀屏器、OS 字體、真 safe-area 與全面 mutation testing 未測；Safari／WebKit 受阻。
+
+外部證據 `/workspace/p33l-evidence/` 包含 SUMMARY、exit codes、定點改動／獨立計算／版面／無障礙紀錄、95 張 PNG 與 scripts，marker 已遮蔽。Grok 回報 server／proxy／五個隔離 DB／測試角色／55426 叢集與工作目錄已清理，沒有改檔／commit／push，未碰 5432 或舊證據；受測 SHA 以上述版本為準。
+
+### M1 限定七檔（2026-10-09 已獲本次授權）
+
+- `src/web/CharacterCreationPanel.tsx`、`tests/browser/character-creation-scroll.mjs`。
+- 本文件、`PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md`、`CANONICAL_MANIFEST.md`、`IMPLEMENTATION_PLAN.md`、`OPEN_QUESTIONS.md`（均在 docs/development）。
+
+前次七檔授權的提交已完成；本次新增 TSX 與瀏覽器案例，使用者已於 2026-10-09 明確授權下列限定七檔 commit／push 並複驗。此為提交前紀錄，尚未推送／送達 M1 複驗，沒有執行本地 build／測試／UI／資料庫驗證。Grok 工程通過後再由使用者核對；尚未開始下一切片。
 
 ## 工程通過後的手動核對
 

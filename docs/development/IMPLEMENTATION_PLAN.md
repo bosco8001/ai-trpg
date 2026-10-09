@@ -1,8 +1,8 @@
 # 已批准的 Implementation Phase Plan
 
-## 當前小切片（2026-10-08）
+## 當前小切片（2026-10-09）
 
-**Phase 33 第五切片：角色建立與保存，首版外部工程 FAIL、同切片補修待複驗，使用者待驗收。** 使用者以「對」批准 [完整實作確認稿](PHASE_33_CHARACTER_CREATION_PROPOSAL.md)，並授權限定 35 檔提交及交接；已推送 `30cf31fd3fba1d43c5e0c0428d01af20ac421e3a`。Grok t48u 回報 build exit 2（D1：測試型別）；全套隔離 PG 為 451 pass／2 fail（D2：期望值），新 7 個 PG 測試全部 pass；無 DB 401 pass／2 fail／48 skipped。診斷 dist 的 runtime／Chrome 結果不能代替正式 UI PASS；N2 短螢幕 Low、六項新 Info 與歷史限制保留。D1／D2／N2 補修已準備，使用者已於 2026-10-08 授權限定七檔 commit／push 與正式 build 複驗，提交前尚未推送或送達。Codex 未執行測試；遊戲規則／保存與 API 契約未改。正式版多角色與列表是後續必做，起始技能／裝備／熟練及正式冒險另分切片。完整結果、檔案與手動清單見 [第五切片交付](PHASE_33_CHARACTER_CREATION.md)。
+**Phase 33 第五切片：角色建立與保存，M1 補修待複驗／使用者待驗收。** 已授權提交／推送／送達的 `efaa63625e46bfa0602699a8f9948bc69f91ac3f` 於 2026-10-09 獲 Grok 外部複驗：build／typecheck 成功，無 DB 403 pass／0 fail／48 skipped，隔離 PG 453／453；D1／D2 PASS、N2 細縫消失。但整體工程 FAIL：短螢幕切換步驟仍停在底部，焦點標題在外，新增 M1 Medium。新增 frame ref、同步重設兩個捲動區與獨立瀏覽器回歸案例已準備，使用者已於 2026-10-09 授權限定七檔 commit／push 及複驗；提交前尚未推送或送達新複驗。Codex 未執行本輪測試；N8–N11 與既有 Info／未測限制保留，首版 t48u FAIL 不改寫。已確認生成／保存／資源契約維持，正式多角色及起始行囊／正式冒險另分切片。完整報告、範圍與手動清單見 [第五切片交付](PHASE_33_CHARACTER_CREATION.md)。
 
 **2026-10-07 第四切片：正式推導模組與唯讀樣本核對，Grok t47u 外部工程 PASS（限 Chrome）、使用者已接受。** 使用者確認裝備／職業提高容量不恢復目前值、降低時只截超出部分後，指示「進入下一切片」，批准 [提案](PHASE_33_DERIVATION_IMPLEMENTATION_PROPOSAL.md) 的完整範圍。新增正式五族 v2／四職業 v1 推導、唯讀計算 API 與系統面板核對 Sheet，新增 8 項測試；已提交／推送並送達 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`。Grok 外部回報名冊／推導測試 20／20、無 DB 385 pass／0 fail／41 skipped、隔離 PG 428／428；6 項 Info 與未測限制保留。Codex 沒有執行本輪 build 或測試。正式角色／存檔／戰鬥不改接，原型保留修訂前算法與歷史結果。完整檔案、介面及手動清單見 [第四切片](PHASE_33_CHARACTER_DERIVATION.md)。
 
