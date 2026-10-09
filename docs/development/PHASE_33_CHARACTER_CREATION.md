@@ -1,5 +1,41 @@
 # Phase 33 第五切片：角色建立與保存
 
+## 最新：M1 畫面通過，T1 案例補修待複驗（2026-10-09）
+
+透過 Grok Bot Control 讀取指定 AI TRPG Architecture Critic 2026-10-09 20:06:37／20:06:42 的回覆及 20:28:35／20:28:41 的 PG 補報。對應送驗 TARGET `b7f723fa73d59c018cefd6fe901276226f93aebe`、BASE `efaa63625e46bfa0602699a8f9948bc69f91ac3f`；**外部整體工程仍為 FAIL，唯一阻擋項為 T1**。M1 的產品畫面已通過；本地只閱讀報告與程式，沒有親測外部證據或執行工程命令。
+
+| PG 補報實際執行項目 | 外部結果 |
+|---|---|
+| TARGET／BASE npm ci、npm run build | exit 0 |
+| TARGET／BASE 六支 migration，55426 隔離 PG 17.11 | exit 0 |
+| 指定五測試檔，加隔離 PG | exit 0，45／45，0 skip |
+| 隔離 PG npm test | exit 0，453／453，0 skip |
+| 正式 dist／真 index.ts／production／postgres 的 M1 | 四組尺寸／縮放 × 四次切換，TARGET 16／16 回頂、焦點標題可見；BASE 16／16 FAIL，POST 均 0 |
+| 正式保存 UI／焦點捲動 | 62／62、32／32 通過 |
+| 真 TCP proxy | 6／6 通過，COMMIT 後斷線查得原紀錄、12 秒晚回覆同 ID 重播／單 row、鎖逾時無 row |
+
+PG 原先因缺套件受阻，首批只在 memory 模式回應空角色、以審查者記憶體 repository 核對 UI，不能當 PG 契約通過；其後使用者直接在 bot 回答同意補裝 PostgreSQL，PG 補報已解除此項受阻。審查者回報安裝 exit 0、設定 create_main_cluster=false，5432 從未有 listener／未連入；套件及該設定保留，只清理本次隔離資源。Codex 沒有在使用者 Mac 安裝或操作 DB。
+
+M1 首批獨立人類／魔術師、鍵盤 Enter 與原腳本重驗：原八項失敗在 BASE 重現、TARGET 消失；正常高畫面正文回頂、footer 固定，144 個可讀高度與前版相同，最小 160px，沒有恢復窄條。真縮放量到 innerWidth 284／DPR 2，與模擬縮放分開。PG 補報再做四組設定：844×390 100%、568×320 真 200%、844×390／320×568 模擬 200%。
+
+**T1，Low–Medium（新增案例）**：`tests/browser/character-creation-scroll.mjs` L49–50 的 getByLabel exact 選不到種族／初始職業下拉選單，Playwright 1.59.1 五組設定均逾時 30000ms，POST 0，尚未進入捲動斷言；PG 模式也重現。Grok 說明 label 包住 select 時包含 option 文字，建議按 combobox 角色與可存取名稱定位。審查者只在隔離副本改這兩行，TARGET 四組 4／4 通過、BASE 四組首步失敗，沒有改 repository；副本結果不能替本次正式新版本宣告 PASS。
+
+本次最小同切片補修只將兩行改為 getByRole("combobox", { name, exact: true })，保持三次 transition、實際 scrollTop>4、回頂／焦點／可見斷言及不按保存。案例未包含「返回分配再前進」第四次；正常高度沒有捲動距離時前置斷言會失敗，兩項限制保留，另交獨立流程核對。不改 TSX／CSS／API／DB／生成或玩法。
+
+PG 補報也核對重啟首個 GET 與原唯讀紀錄、RNG 0，固定 503 的回應／app log 無 marker、密碼、port、SQL。刻意觸發三槽存檔 409 出現兩條既有帶路徑 stack，與創角無關，不擴大「無洩漏」結論；探測新增的隔離測試角色已清理。三槽存讀正常，創角紀錄保持 HP 61／61、MP 52／52，診斷／備份／修復 200，與 BASE 一致。
+
+Info 與限制：首批重測 N9 在 TARGET／BASE 均四項 FAIL，N10 大字錯誤焦點部分在外，t47u I1 五份偽造回應仍被接受。N11 因 CSS 未變仍是推斷、真 inset 未測；PG 補報引用首批這些觀察。名冊 byte、容量及 N8 引用 efaa636；N1／N3／N4／N5／N6、I2–I6、t46u／第一片／原型 Info 保留，N4 的既有歸因仍只推斷。真手機／讀屏器／OS 字體／真 safe-area／全面 mutation 未測，Safari／WebKit 仍受阻。未讀到的首批命令摘要不補寫成這次實測。
+
+外部證據：`/workspace/p33m-evidence/`（首批 158 張 PNG）及 `pg-supplement/`（補報 51 張 PNG）。Grok 回報本次 server／proxy／隔離 DB／role／55426 叢集已清理，舊證據 hash 沒變，沒有改檔、commit／push；Codex 沒有自行驗證這些遠端檔案。
+
+**T1 新補修尚未執行與送驗，使用者待驗收。** 沿用本次已批准七檔內的六檔範圍：瀏覽器案例與五份 Phase 33 文件；產品 TSX 不再改。先提交／推送限定檔案並核對新完整 SHA，再送固定版本複驗；不開始下一切片。
+
+## M1 複驗已送達（2026-10-09，提交後補記）
+
+使用者已授權限定七檔 commit／push 並複驗，已提交及推送 `b7f723fa73d59c018cefd6fe901276226f93aebe`；BASE 為 `efaa63625e46bfa0602699a8f9948bc69f91ac3f`，遠端指定分支完整 SHA 已核對一致。2026-10-09 19:46:27（Asia/Hong_Kong）透過 Grok Bot Control 向 AI TRPG Architecture Critic 送出完整 M1 複驗要求，讀回新增訊息與空白輸入框，只送一次。訊息 SHA-256：`e69310625a2e7f180aa9a6eb539b2404fb04ea75d5cdb69a61508857a5f2589a`。
+
+**工程結果待回覆，使用者待驗收。** Codex 未執行本地測試；既有 FAIL、Info 與未測限制保留。此送達紀錄於 TARGET 提交後補寫，尚未另行提交，不屬受測 TARGET；下面的提交前或待填 TARGET 是當時紀錄。未開始下一切片。
+
 ## 最新結果與 M1 補修（2026-10-09）
 
 AI TRPG Architecture Critic 對 `efaa63625e46bfa0602699a8f9948bc69f91ac3f` 的外部複驗結果仍為 **工程 FAIL**。D1／D2 已 PASS、N2 細縫消失，但整張 Sheet 捲動後，步驟切換只重設正文，新增 M1 Medium：標題獲焦點卻在畫面外，最後確認停在底部。M1 同切片補修與瀏覽器回歸案例已準備，尚未執行；使用者已於 2026-10-09 授權限定七檔 commit／push 並複驗，提交前尚未推送或送達新複驗；使用者待驗收。Codex 沒有執行本地工程測試。

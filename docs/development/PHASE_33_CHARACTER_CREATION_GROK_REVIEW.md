@@ -1,5 +1,15 @@
 # Phase 33 第五切片 Grok 工程驗證要求
 
+## 最新：T1 定位補修待複驗（2026-10-09）
+
+b7f723fa73d59c018cefd6fe901276226f93aebe 的外部 M1 畫面與 PG 補報均通過，但整體工程仍 FAIL：T1 新瀏覽器案例的兩個 getByLabel exact 定位逾時。本次只改這兩行為 combobox 角色／名稱定位及五份結果文件，範圍在已授權七檔內；尚未執行／送達新複驗。完整外部結果、首批 PG 受阻及其後解除、引用／推斷／未測分類見交付文件最新節。使用者待驗收，既有 FAIL 與 Info 保留。以下 M1 待回覆紀錄均為當時狀態；新送驗用本文最後 T1 prompt。
+
+## M1 複驗已送達（2026-10-09，提交後補記）
+
+使用者已授權限定七檔 commit／push 並複驗，已提交及推送 `b7f723fa73d59c018cefd6fe901276226f93aebe`；BASE 為 `efaa63625e46bfa0602699a8f9948bc69f91ac3f`，遠端指定分支完整 SHA 已核對一致。2026-10-09 19:46:27（Asia/Hong_Kong）透過 Grok Bot Control 向 AI TRPG Architecture Critic 送出完整 M1 複驗要求，讀回新增訊息與空白輸入框，只送一次。訊息 SHA-256：`e69310625a2e7f180aa9a6eb539b2404fb04ea75d5cdb69a61508857a5f2589a`。
+
+**工程結果待回覆，使用者待驗收。** Codex 未執行本地測試；既有 FAIL、Info 與未測限制保留。此送達紀錄於 TARGET 提交後補寫，尚未另行提交，不屬受測 TARGET；下面的提交前或待填 TARGET 是當時紀錄。未開始下一切片。
+
 ## 目前：M1 補修待複驗（2026-10-09）
 
 Grok 對 `efaa63625e46bfa0602699a8f9948bc69f91ac3f` 的外部複驗仍為工程 FAIL；D1／D2 PASS、N2 細縫消失、官方 build 成功及隔離 PG 453／453，但新增 M1 Medium：整張 Sheet 捲動後，步驟切換仍只重設正文，標題在畫面外。M1 TSX 補修與獨立瀏覽器案例已準備，尚未提交／推送／送達新複驗；使用者已於 2026-10-09 授權限定七檔 commit／push 並複驗，使用者待驗收，Codex 未執行測試。完整結果見 [交付](PHASE_33_CHARACTER_CREATION.md#第一次補修外部結果與-m1)。
@@ -225,4 +235,31 @@ TARGET TARGET_PENDING_M1_FULL_SHA
 N8 regex與完整body比對界線、N9 BASE三項與TARGET新增轉回直向項、N10大字錯誤框、N11左右safe-area未接全部保留；N1/N3/N4/N5/N6引用保留，N4既有歸因只是推斷，FATAL缺日誌未觸發。t47u I1偽造回應仍未修、I2–I6及t46u／第一切片／原型02 Info保留。真手機／讀屏／OS字體／真safe-area／全面mutation未測、Safari/WebKit受阻如實標記。
 
 只能用新隔離資源，不碰5432或使用者角色／存檔，不刪資料重抽。保留所有已確認創角、初始滿資源／容量、固定結果／同次重試及單角色暫行／正式多角色後續必做契約。報告PASS/FAIL/受阻、完整SHA/diff/命令/exit/統計、M1逐項證據；實做、舊引用、推斷、未測分開，新問題含file:line／重現／影響與最小修正。提供遮蔽marker證據，清理本次server/proxy/DB/schema/role/process，保留新舊證據。工程PASS不宣布第五切片或Phase33已由使用者接受。
+```
+
+## T1 複驗要求（已授權七檔範圍內的六檔補修，提交前紀錄）
+
+本次僅 tests/browser/character-creation-scroll.mjs 與 docs/development 的 PHASE_33_CHARACTER_CREATION.md、PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md、CANONICAL_MANIFEST.md、IMPLEMENTATION_PLAN.md、OPEN_QUESTIONS.md；不新增授權範圍，既有 AGENTS／Phase31／原型工作不納入。
+
+```text
+操作方：Codex。請 AI TRPG Architecture Critic 工程複驗第五切片 T1 最小補修。使用者已授權本次七檔 commit／push 及複驗，本輪限定其中六檔；不改產品程式或 Canon，不代表使用者驗收。送出前填入完整新 TARGET 並核對遠端；不要改 repository、commit／push、合併或開始下一切片。
+repository https://github.com/bosco8001/ai-trpg.git
+branch codex/phase27-mobile-ui
+BASE b7f723fa73d59c018cefd6fe901276226f93aebe
+TARGET TARGET_PENDING_T1_FULL_SHA
+M1 故障對照 efaa63625e46bfa0602699a8f9948bc69f91ac3f；已接受第四切片 bb930080ac917a90fc2f6bdf0ecca888ebfcbe87。
+
+先核對完整固定 SHA、遠端可讀、祖先及 diff：只 tests/browser/character-creation-scroll.mjs 和 docs/development/{PHASE_33_CHARACTER_CREATION.md,PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md,CANONICAL_MANIFEST.md,IMPLEMENTATION_PLAN.md,OPEN_QUESTIONS.md} 六檔。案例只改兩行 getByLabel exact 為 getByRole("combobox", { name: "種族"／"初始職業", exact: true })；TSX／CSS／API／資料庫／生成／保存／遊戲規則不改。讀 TARGET AGENTS、上述交付與創角提案，遵守既有 Canon 及隔離界線。提交前及待填文字是當時紀錄；固定受測版本以本訊息完整 TARGET 為準。Codex 未執行任何 build／測試或 UI 驗證。
+
+你的前次 b7f723f 回覆：M1 產品修正成功，原八項失敗消失；PG 補報 M1 16／16、正式流程 62／62、焦點 32／32、真 TCP 6／6、隔離 PG 453／453、build 成功。工程仍 FAIL，T1 原 helper 在 selectOption 逾時且尚未做捲動斷言。你在副本改兩行後四組通過，故障版 efaa636 首步失敗。這次要執行新 TARGET 原檔，不用副本取代或預先宣告 PASS。
+
+核心 T1：以你的現有 Playwright 1.59.1／正式 dist／真 index.ts／production／postgres、新隔離空角色及無 pending 的 Sheet 匯入 checkCreationStepScroll(page)。四組：844×390 100% 字、568×320 真 profile 200% zoom、844×390 和320×568模擬200%。先從正式探索→系統→角色建立核對入口開到「種族與職業」再呼叫。每組原檔三次 transition 均要跑到 scrollTop>4 的前置斷言與回頂／焦點／標題可見斷言，回報完整 before/after、POST 0、無 selectOption 逾時。真／模擬縮放分開，核對真 zoom 的 innerWidth／DPR。沒有捲動距離的390×844不算M1重現，不弱化斷言使正常高度虛假通過。
+
+反向證明：把同一新 helper 放到隔離 efaa636 故障版執行，能選到下拉選單並因第一次切換未回頂而失敗；不能把定位逾時算有捕捉M1。b7f723f 的原 helper 對照應重現T1逾時，可選代表設定而不重做全部慢逾時。另獨立人類魔術師、12點及另2種族點、鍵盤Enter，核對四次切換含返回分配後再前進；helper仍只三次的界線保留。正常高畫面及原144項版面結果可引用b7f723f，引用不得當新做。
+
+必要命令由你執行：npm ci、npm run build、git diff --check BASE TARGET。五測試檔（character-creation／character-creation-postgres／content-catalog／class-catalog／character-derivation）及全套無DB／隔離PG若重跑則列實際命令、exitcode、pass/fail/skip；若因產品完全未變沿用b7f723f PG補報，明確列引用來源，不能冒稱這次重跑。案例不在npm test glob內，要另實做，不以全套453通過抵銷helper未執行。
+
+保存／同次ID重試／未知結果／晚回覆／重啟唯讀／生成次數等可引用b7f723f PG補報；若發現新問題才擴大相關實測。N9兩版4項／N10／t47u I1、N11 CSS未改推斷／真safe-area未測、N8／歷史Info、真手機／讀屏／OS字體／全面mutation未測、Safari/WebKit受阻都保留。保留初始滿資源、容量升不補／降只截超量、固定保存結果與正式多角色後續必做契約，不增加玩法。
+
+使用新隔離資源，不碰5432或使用者角色／存檔、不刪資料重抽。報告PASS/FAIL/受阻、完整SHA／diff／環境／命令／exit／統計，逐項T1及反向證據；新問題給file:line／重現／影響。實做、引用、推斷、未測分開。提供遮蔽marker證據，清理本次server／proxy／DB／role／process、保留新舊證據；不用重新安裝你已補裝的PG。工程PASS不宣布第五切片或Phase33已由使用者接受。
 ```

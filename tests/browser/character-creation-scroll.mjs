@@ -46,8 +46,8 @@ export async function checkCreationStepScroll(page) {
     metrics.push({ from, to, before, after });
   }
 
-  await sheet.getByLabel("種族", { exact: true }).selectOption("race.elf");
-  await sheet.getByLabel("初始職業", { exact: true }).selectOption("class.archer");
+  await sheet.getByRole("combobox", { name: "種族", exact: true }).selectOption("race.elf");
+  await sheet.getByRole("combobox", { name: "初始職業", exact: true }).selectOption("class.archer");
   await transition("種族與職業", "下一步", "分配屬性");
   const fields = sheet.locator('input[type="number"]');
   assert.equal(await fields.count(), 6);
