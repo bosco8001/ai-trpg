@@ -1,17 +1,19 @@
-// 初版 13 項由 Grok 外部回報通過；本輪新增案例尚未執行，交由指定 bot 複驗。
+// 80d5f32 的 18 項由 Grok 外部回報通過；本輪配點變更與新增案例未執行。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { initialDraft, allocationErrors, previewStarter, createSample, evaluate, previewAction,
+import { initialDraft, allocationBudget, allocatedPoints, changePoint, chooseRace, allocationErrors, previewStarter, createSample, evaluate, previewAction,
   loadTestLibrary, resourceFixture, capacity, limits, races, professions, kits, items } from './model.mjs';
 const changeClass = (state,id) => previewAction(state,{ type:'class',id });
 const equip = (state,position,id) => previewAction(state,{ type:'equipment',position,id });
 const configure = (state,position,entry) => previewAction(state,{ type:'skill',position,entry });
-const mageDraft = () => ({ ...initialDraft(),classId:'class.mage',allocation:[2,2,1,3,2,2],human:[2,0,0,0,0,0] });
+// 明確測試配點，不再把 UI 的空白初始草稿當成完成樣本。
+const completedDraft = () => ({ ...initialDraft(),allocation:[2,2,2,2,2,2],human:[2,0,0,0,0,0] });
+const mageDraft = () => ({ ...completedDraft(),classId:'class.mage',allocation:[2,2,1,3,2,2],human:[2,0,0,0,0,0] });
 
 test('五族 × 四職業：先加種族再乘職業，起始取得固定配套，資料不重發', () => {
   for (const race of races) for (const profession of professions) {
-    const draft = { ...initialDraft(),raceId:race.id,classId:profession.id,human:race.free ? [2,0,0,0,0,0] : [0,0,0,0,0,0] };
+    const draft = { ...completedDraft(),raceId:race.id,classId:profession.id,human:race.free ? [2,0,0,0,0,0] : [0,0,0,0,0,0] };
     const state = createSample(draft), calculated = evaluate(state), kit = kits[profession.id];
     calculated.rows.forEach((row,i) => {
       assert.equal(row.intrinsic,10+race.bonuses[i]+draft.human[i]);
@@ -26,13 +28,13 @@ test('五族 × 四職業：先加種族再乘職業，起始取得固定配套�
   }
 });
 test('配點未完成可預覽；建立阻擋少分、多分、小數、單項超限與錯誤種族點', () => {
-  const draft = initialDraft(); draft.allocation[0] = 1;
+  const draft = completedDraft(); draft.allocation[0] = 1;
   assert.doesNotThrow(() => previewStarter(draft)); assert.throws(() => createSample(draft));
-  for (const bad of [[7,1,1,1,1,1],[2.5,1.5,2,2,2,2],[3,2,2,2,2,2],[-1,3,3,3,2,2]]) assert.ok(allocationErrors({ ...initialDraft(),allocation:bad }).length);
-  assert.throws(() => createSample({ ...initialDraft(),raceId:'race.elf' }));
+  for (const bad of [[7,1,1,1,1,1],[2.5,1.5,2,2,2,2],[3,2,2,2,2,2],[-1,3,3,3,2,2]]) assert.ok(allocationErrors({ ...completedDraft(),allocation:bad }).length);
+  assert.throws(() => createSample({ ...completedDraft(),raceId:'race.elf' }));
 });
 test('不合格配套保留持有及已學，紅字資料包含當前值、門檻、差額與來源', () => {
-  const draft = { ...initialDraft(),allocation:[0,3,3,2,2,2],human:[0,0,0,0,0,2] };
+  const draft = { ...completedDraft(),allocation:[0,3,3,2,2,2],human:[0,0,0,0,0,2] };
   const p = previewStarter(draft), state = createSample(draft);
   assert.equal(p.planned.slots[0].active,false); assert.equal(p.planned.slots[0].check.missing,4);
   assert.match(p.planned.warnings.find(w => w.name === '重斬').reasons.join(' '),/需要力量 15，目前 11，還差 4 點/);
@@ -42,7 +44,7 @@ test('不合格配套保留持有及已學，紅字資料包含當前值、門�
   assert.ok(weak.planned.slots[0].reasons.some(r => r.includes('需要生效的弓類')));
 });
 test('自己的裝備加成、其他裝備及技能加成都不能支撐裝備門檻', () => {
-  let state = loadTestLibrary(createSample({ ...initialDraft(),classId:'class.mage',allocation:[1,3,2,2,2,2],human:[0,0,0,2,0,0] }));
+  let state = loadTestLibrary(createSample({ ...completedDraft(),classId:'class.mage',allocation:[1,3,2,2,2,2],human:[0,0,0,2,0,0] }));
   assert.equal(evaluate(state).rows[0].equipmentBase,9);
   assert.throws(() => equip(state,'weapon','sword'),/目前 9，還差 1/);
   assert.throws(() => equip(state,'armor','chainmail'),/目前 9，還差 1/);
@@ -51,7 +53,7 @@ test('自己的裝備加成、其他裝備及技能加成都不能支撐裝備�
   assert.equal(e.equipment.find(g => g.item.id === 'fire-book').active,false);
 });
 test('所有技能加成都不能支撐自身或其他技能門檻', () => {
-  const state = loadTestLibrary(createSample({ ...initialDraft(),allocation:[3,2,2,1,2,2],human:[0,2,0,0,0,0] }));
+  const state = loadTestLibrary(createSample({ ...completedDraft(),allocation:[3,2,2,1,2,2],human:[0,2,0,0,0,0] }));
   const next = equip(equip(state,'armor','leather'),'weapon','dagger');
   assert.equal(evaluate(next).rows[1].qualification,14);
   assert.throws(() => configure(next,1,{ skillId:'stab',source:'learned' }),/目前 14，還差 1/);
@@ -75,7 +77,7 @@ test('職業切換保留停用書本與技能格，恢復來源後自動生效�
   assert.equal(back.resources.currentMp,Math.min(oldResources.currentMp,off.resources.maxMp));
 });
 test('合法武器替換停用原技能；恢復武器重新生效，不刪熟練', () => {
-  const swordsman = loadTestLibrary(createSample(initialDraft()));
+  const swordsman = loadTestLibrary(createSample(completedDraft()));
   const off = equip(swordsman,'weapon','staff');
   assert.equal(evaluate(off).slots[0].active,false); assert.equal(evaluate(off).rows[0].skill,0);
   assert.deepEqual(off.configuration.slots,swordsman.configuration.slots);
@@ -94,15 +96,15 @@ test('容量提高不補充，降低只截超出，重新提高不補回，HP0�
   const low = capacity({ currentHp:50,maxHp:54,currentMp:50,maxMp:54 },{ maxHp:40,maxMp:40 });
   assert.deepEqual(capacity(low,{ maxHp:54,maxMp:54 }),raised);
   assert.equal(capacity({ currentHp:0,maxHp:40,currentMp:0,maxMp:40 },{ maxHp:54,maxMp:54 }).currentHp,0);
-  assert.equal(equip(resourceFixture(createSample(initialDraft()),'zero'),'armor',null).resources.currentHp,0);
+  assert.equal(equip(resourceFixture(createSample(completedDraft()),'zero'),'armor',null).resources.currentHp,0);
   assert.throws(() => capacity({ currentHp:41,maxHp:40,currentMp:0,maxMp:40 },{ maxHp:54,maxMp:54 }));
 });
 test('起始資源先按無配套出生推導初始化，配套與技能增加容量不補滿', () => {
-  const sword = createSample(initialDraft()); assert.equal(sword.resources.currentHp,55); assert.equal(sword.resources.maxHp,58);
+  const sword = createSample(completedDraft()); assert.equal(sword.resources.currentHp,55); assert.equal(sword.resources.maxHp,58);
   const mage = createSample(mageDraft()); assert.equal(mage.resources.currentMp,72); assert.equal(mage.resources.maxMp,84);
 });
 test('六格上限、未持有書本、未學技能、重複技能／書本與直接施法邊界', () => {
-  const state = createSample(initialDraft());
+  const state = createSample(completedDraft());
   assert.throws(() => configure(state,6,null));
   assert.throws(() => configure(state,1,{ skillId:'heavy',source:'learned' }),/已配置/);
   assert.throws(() => configure(state,1,{ skillId:'flame',source:'book',bookId:'fire-book' }),/持有/);
@@ -115,14 +117,14 @@ test('六格上限、未持有書本、未學技能、重複技能／書本與�
   assert.equal(evaluate(configure({ ...learnedMage,directCasting:true },0,{ skillId:'flame',source:'direct' })).slots[0].active,true);
 });
 test('測試庫是明確額外樣本，不自動配置、補血或重發物品', () => {
-  const state = createSample(initialDraft()), next = loadTestLibrary(state);
+  const state = createSample(completedDraft()), next = loadTestLibrary(state);
   assert.deepEqual(next.configuration,state.configuration); assert.deepEqual(next.resources,state.resources);
   assert.equal(next.mode,'loadout'); assert.deepEqual(next.inventory,items.map(i => i.id));
   assert.deepEqual(loadTestLibrary(next).inventory,next.inventory); assert.equal(next.initialClass,state.initialClass);
 });
 
 test('停用防具保留位置但不提供屬性，恢復後才再加入', () => {
-  const state = createSample({ ...initialDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
+  const state = createSample({ ...completedDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
   assert.equal(evaluate(state).rows[2].final,9);
   const off = changeClass(state,'class.mage'), result = evaluate(off);
   assert.equal(result.equipment.find(g => g.position === 'armor').active,false);
@@ -133,7 +135,7 @@ test('停用防具保留位置但不提供屬性，恢復後才再加入', () =>
   assert.equal(evaluate(changeClass(off,'class.swordsman')).rows[2].final,9);
 });
 test('停用防具不提供護甲，恢復後才再加入', () => {
-  const state = createSample({ ...initialDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
+  const state = createSample({ ...completedDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
   assert.equal(evaluate(state).armor,3);
   const off = changeClass(state,'class.mage');
   assert.equal(evaluate(off).armor,0);
@@ -176,4 +178,71 @@ test('普通資質轉職的 MP 包含 +20，並分開未截低與滿值截低案
   assert.equal(clipped.resources.currentMp,72); assert.equal(clipped.resources.maxMp,72);
   const back = changeClass(clipped,'class.mage');
   assert.equal(back.resources.currentMp,72); assert.equal(back.resources.maxMp,84);
+});
+
+
+test('配點從零開始：人類一組14點，其他種族12點；空草稿可預覽不能建立', () => {
+  for (const race of races) {
+    const draft = chooseRace(initialDraft(),race.id);
+    assert.deepEqual(allocatedPoints(draft),[0,0,0,0,0,0]);
+    assert.deepEqual(draft.human,[0,0,0,0,0,0]);
+    assert.equal(allocationBudget(draft),race.free ? 14 : 12);
+    assert.doesNotThrow(() => previewStarter(draft));
+    assert.throws(() => createSample(draft),/完成合法/);
+  }
+  const first = initialDraft(), second = initialDraft(); first.allocation[0] = 1;
+  assert.equal(second.allocation[0],0,'初始草稿不能共用可變陣列');
+});
+test('人類單一額度加減：逐點分完14、阻擋第15點、可回退再分配', () => {
+  const original = initialDraft(); let draft = original;
+  for (let i = 0; i < 6; i++) for (let n = 0; n < (i === 0 ? 4 : 2); n++) draft = changePoint(draft,i,1);
+  assert.deepEqual(allocatedPoints(original),[0,0,0,0,0,0]);
+  assert.deepEqual(allocatedPoints(draft),[4,2,2,2,2,2]);
+  assert.deepEqual(allocationErrors(draft),[]);
+  assert.deepEqual(createSample(draft).resources,createSample(completedDraft()).resources);
+  assert.deepEqual(evaluate(createSample(draft)).rows,evaluate(createSample(completedDraft())).rows);
+  assert.throws(() => changePoint(draft,1,1));
+  draft = changePoint(draft,0,-1);
+  assert.ok(allocationErrors(draft).length);
+  assert.throws(() => createSample(draft));
+  draft = changePoint(draft,1,1);
+  assert.deepEqual(allocatedPoints(draft),[3,3,2,2,2,2]);
+  assert.deepEqual(allocationErrors(draft),[]);
+  assert.throws(() => changePoint(initialDraft(),0,-1));
+  for (const [i,delta] of [[6,1],[-1,1],[0,0],[0,2],[0,0.5]]) assert.throws(() => changePoint(draft,i,delta));
+});
+test('合併額度保持原單項上限：人類+8、其他+6；人類7+7亦能完成', () => {
+  let human = initialDraft();
+  for (let n = 0; n < 8; n++) human = changePoint(human,0,1);
+  assert.throws(() => changePoint(human,0,1));
+  for (let n = 0; n < 6; n++) human = changePoint(human,1,1);
+  assert.deepEqual(allocatedPoints(human),[8,6,0,0,0,0]);
+  assert.deepEqual(allocationErrors(human),[]);
+  human = changePoint(changePoint(human,0,-1),1,1);
+  assert.deepEqual(allocatedPoints(human),[7,7,0,0,0,0]);
+  assert.deepEqual(allocationErrors(human),[]);
+  for (const race of races.filter(r => !r.free)) {
+    let draft = chooseRace(initialDraft(),race.id);
+    for (let n = 0; n < 6; n++) draft = changePoint(draft,0,1);
+    assert.throws(() => changePoint(draft,0,1));
+    for (let n = 0; n < 6; n++) draft = changePoint(draft,1,1);
+    assert.deepEqual(allocationErrors(draft),[]);
+    assert.throws(() => changePoint(draft,2,1));
+  }
+});
+test('同族保持合併點數；換族移除舊種族點，切回人類多2點待玩家分配', () => {
+  let human = initialDraft();
+  for (let i = 0; i < 6; i++) for (let n = 0; n < (i === 0 ? 4 : 2); n++) human = changePoint(human,i,1);
+  assert.deepEqual(chooseRace(human,'race.human'),human);
+  const elf = chooseRace(human,'race.elf');
+  assert.deepEqual(elf.allocation,human.allocation);
+  assert.deepEqual(elf.human,[0,0,0,0,0,0]);
+  assert.equal(allocatedPoints(elf).reduce((a,b) => a+b,0),12);
+  const back = chooseRace(elf,'race.human');
+  assert.deepEqual(allocatedPoints(back),allocatedPoints(elf));
+  assert.equal(allocationBudget(back) - allocatedPoints(back).reduce((a,b) => a+b,0),2);
+  assert.throws(() => createSample(back));
+  const finished = changePoint(changePoint(back,0,1),0,1);
+  assert.deepEqual(allocatedPoints(finished),allocatedPoints(human));
+  assert.deepEqual(allocationErrors(finished),[]);
 });

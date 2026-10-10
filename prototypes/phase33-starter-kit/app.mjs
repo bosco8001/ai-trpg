@@ -1,5 +1,5 @@
 import { attributes, labels, races, professions, aptitudes, items, skills, kits, findItem, findSkill,
-  findRace, findProfession, initialDraft, allocationErrors, previewStarter, createSample, evaluate,
+  findRace, findProfession, initialDraft, allocationBudget, allocatedPoints, changePoint, chooseRace, allocationErrors, previewStarter, createSample, evaluate,
   previewAction, loadTestLibrary, resourceFixture } from './model.mjs';
 
 // 正式狀態、保存及 AI 不參與此頁。草稿／計算與 DOM 呈現分開。
@@ -8,7 +8,7 @@ const feedback = document.querySelector('#feedback'), dialog = document.querySel
 const sheetHeader = document.querySelector('#sheet-header'), sheetBody = document.querySelector('#sheet-body');
 const sheetFooter = document.querySelector('#sheet-footer');
 const app = document.querySelector('.app'), masthead = document.querySelector('.masthead');
-let draft = initialDraft(), character = null, view = 'allocation', pointGroup = 'allocation', submitted = false;
+let draft = initialDraft(), character = null, view = 'allocation', submitted = false;
 let stack = [], returnFocus = null;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sum = a => a.reduce((s,n) => s+n,0);
@@ -59,18 +59,17 @@ const requirementText = definition => `${labels[definition.attribute]} ${definit
 function entryText(entry) { return entry.source === 'book' ? `魔法書來源 · ${findItem(entry.bookId).name}` : entry.source === 'direct' ? '永久已學 · 直接施法' : '永久已學 · 物理技能'; }
 function renderAllocation() {
   const race = findRace(draft.raceId), profession = findProfession(draft.classId);
-  const planned = previewStarter(draft), group = pointGroup === 'human' && race.free ? 'human' : 'allocation';
-  const remaining = (group === 'human' ? 2 : 12) - sum(draft[group]);
+  const planned = previewStarter(draft), points = allocatedPoints(draft), budget = allocationBudget(draft);
+  const remaining = budget - sum(points);
   const errors = submitted ? allocationErrors(draft) : [];
   return `<span class="eyebrow">01 / 02 · 決定起點</span><h1 id="screen-title" tabindex="-1">準備你的旅人</h1><p class="hint">先看配套需求，再分配屬性。職業是起點，技能仍看自身條件。</p>
     <div class="select-pair">${button(`<span class="small">種族</span><strong>${race.name}</strong><span class="small">查看固定加成 ›</span>`, 'race', 'race')}${button(`<span class="small">初始職業</span><strong>${profession.name}</strong><span class="small">${labels[profession.primary]} ×1.25 ›</span>`, 'birth-class', 'birth-class')}</div>
-    <section class="section" aria-labelledby="allocation-heading"><div class="section-head"><h2 id="allocation-heading">分配屬性</h2><span id="point-budget" class="point-tally">${group === 'human' ? '種族' : '自由'}剩餘 ${remaining} 點</span></div>
-      ${race.free ? `<div class="segmented" aria-label="分配點數類別">${button('自由 12 點', 'point-group', 'group-allocation', `data-group="allocation" aria-pressed="${group === 'allocation'}"`)}${button('人類另 2 點', 'point-group', 'group-human', `data-group="human" aria-pressed="${group === 'human'}"`)}</div>` : ''}
-      <p id="point-hint" class="small">基礎 8，自由單項最多 +6；先加種族，再乘職業。${race.free ? `自由已分 ${sum(draft.allocation)}/12、人類已分 ${sum(draft.human)}/2。` : `自由已分 ${sum(draft.allocation)}/12。`}</p>
+    <section class="section" aria-labelledby="allocation-heading"><div class="section-head"><h2 id="allocation-heading">分配屬性</h2><span id="point-budget" class="point-tally">剩餘 ${remaining} 點</span></div>
+      <p id="point-hint" class="small">基礎 8，可分配 ${budget} 點，單項最多 +${6 + race.free}；先加種族，再乘職業。已分 ${sum(points)}/${budget}。</p>
       ${errors.length ? `<div id="allocation-errors" class="error-summary" tabindex="-1" role="alert">${errors.map(escape).join('<br>')} <a href="#attribute-0">返回屬性分配</a></div>` : ''}
       <div>${attributes.map((_,i) => {
-        const row = planned.actual.rows[i], n = draft[group][i], max = group === 'human' ? 2 : 6;
-        return `<div class="attribute-row" id="attribute-${i}"><div><strong>${labels[i]}</strong><span id="point-detail-${i}" class="readout">自由 +${draft.allocation[i]} · 種族 ${signed(race.bonuses[i] + draft.human[i])}<br>裝備判定 ${row.equipmentBase} · 技能資格 ${row.qualification}</span></div><div class="stepper">${button(icon('minus'), 'point', `minus-${i}`, `data-index="${i}" data-delta="-1" aria-label="減少${labels[i]}${group === 'human' ? '種族' : '自由'}點數" aria-describedby="point-hint point-detail-${i}" ${n === 0 ? 'disabled' : ''}`)}<span class="number" aria-label="此類已分配 ${n} 點">${n}</span>${button(icon('plus'), 'point', `plus-${i}`, `data-index="${i}" data-delta="1" aria-label="增加${labels[i]}${group === 'human' ? '種族' : '自由'}點數" aria-describedby="point-hint point-detail-${i}" ${n >= max || remaining === 0 ? 'disabled' : ''}`)}</div></div>`;
+        const row = planned.actual.rows[i], n = points[i], max = 6 + race.free;
+        return `<div class="attribute-row" id="attribute-${i}"><div><strong>${labels[i]}</strong><span id="point-detail-${i}" class="readout">分配 +${n} · 種族 ${signed(race.bonuses[i])}<br>裝備判定 ${row.equipmentBase} · 技能資格 ${row.qualification}</span></div><div class="stepper">${button(icon('minus'), 'point', `minus-${i}`, `data-index="${i}" data-delta="-1" aria-label="減少${labels[i]}點數" aria-describedby="point-hint point-detail-${i}" ${n === 0 ? 'disabled' : ''}`)}<span class="number" aria-label="${labels[i]}已分配 ${n} 點">${n}</span>${button(icon('plus'), 'point', `plus-${i}`, `data-index="${i}" data-delta="1" aria-label="增加${labels[i]}點數" aria-describedby="point-hint point-detail-${i}" ${n >= max || remaining === 0 ? 'disabled' : ''}`)}</div></div>`;
       }).join('')}</div>
     </section><section id="kit-warning" class="section" aria-label="起始配套啟用提醒">${warnings(planned.planned)}</section><p class="hint">原型門檻可調；個別資質、施法資格與龍息不在配點時揭曉。</p>`;
 }
@@ -150,7 +149,7 @@ function renderSheet(fresh = false) {
   const key = focusedKey(), scroll = (dialog.classList.contains('reflow') ? dialog : sheetBody).scrollTop;
   let title = '', body = '', footer = button('完成','close-sheet','sheet-done','','secondary');
   if (task.kind === 'race') {
-    title = '選擇種族'; body = catalogChoices(races,draft.raceId,'choose-race',r => r.free ? '人類另有 2 點自由種族加成。' : r.bonuses.map((n,i) => `${labels[i]} ${signed(n)}`).join('、'));
+    title = '選擇種族'; body = catalogChoices(races,draft.raceId,'choose-race',r => r.free ? '可分配 14 點屬性點。' : `可分配 12 點；${r.bonuses.map((n,i) => `${labels[i]} ${signed(n)}`).join('、')}`);
   } else if (task.kind === 'birth-class') {
     title = '選擇初始職業'; body = catalogChoices(professions,draft.classId,'choose-birth-class',p => { const kit = kits[p.id]; return `${labels[p.primary]} ×1.25 · ${findItem(kit.weapon).name}、${findItem(kit.armor).name}、${findSkill(kit.skill).name}`; });
   } else if (task.kind === 'class') {
@@ -203,19 +202,15 @@ function chooseCandidate(index, control) {
 function run(command, control) {
   const task = stack[stack.length-1];
   if (command === 'point') {
-    const i = Number(control.dataset.index), delta = Number(control.dataset.delta), group = pointGroup === 'human' ? 'human' : 'allocation';
-    const next = structuredClone(draft); next[group][i] += delta;
-    if (allocationErrors(next,false).length) return;
-    draft = next; renderMain();
-    const p = previewStarter(draft); announce(`${labels[i]}${group === 'human' ? '種族' : '自由'}分配 ${draft[group][i]} 點。${p.planned.warnings.length ? `${p.planned.warnings.length} 項無法啟用，詳見紅字配套提醒。` : '起始配套全部符合啟用條件。'}`);
-  } else if (command === 'point-group') {
-    pointGroup = control.dataset.group; renderMain();
+    const i = Number(control.dataset.index), delta = Number(control.dataset.delta);
+    draft = changePoint(draft,i,delta); renderMain();
+    const points = allocatedPoints(draft), p = previewStarter(draft);
+    announce(`${labels[i]}分配 ${points[i]} 點，剩餘 ${allocationBudget(draft) - sum(points)} 點。${p.planned.warnings.length ? `${p.planned.warnings.length} 項無法啟用，詳見紅字配套提醒。` : '起始配套全部符合啟用條件。'}`);
   } else if (command === 'race' || command === 'birth-class') openSheet({ kind:command },control);
   else if (command === 'choose-race') {
     const race = findRace(control.dataset.id);
-    if (race.id !== draft.raceId) draft.human = race.free ? [2,0,0,0,0,0] : [0,0,0,0,0,0];
-    draft.raceId = race.id; pointGroup = 'allocation';
-    closeSheet(`已選${race.name}，請核對種族點與配套提醒。`);
+    draft = chooseRace(draft,race.id);
+    closeSheet(`已選${race.name}，剩餘 ${allocationBudget(draft) - sum(allocatedPoints(draft))} 點。切換種族會移除舊種族額外點，請核對分配與紅字提醒。`);
   } else if (command === 'choose-birth-class') {
     draft.classId = control.dataset.id; closeSheet(`已選${findProfession(draft.classId).name}，請核對配套提醒。`);
   } else if (command === 'review') {
@@ -240,7 +235,7 @@ function run(command, control) {
   else if (command === 'resource-fixture') push({ kind:'fixture-confirm',fixture:control.dataset.kind,description:control.dataset.kind === 'zero' ? '載入 HP 0、MP 0，核對上限變更不使 HP 復活或補魔。' : control.dataset.kind === 'full' ? '把測試目前值設為目前上限，以核對卸裝時截低、再穿回時不補回。' : '把測試目前 HP／MP 設為各 40（若上限低於 40，採該上限），核對換裝提高上限不補滿。' },control);
   else if (command === 'restart') push({ kind:'fixture-confirm',fixture:'restart',description:'清除本頁角色樣本並返回配點；正式角色與存檔不受影響。' },control);
   else if (command === 'apply-fixture' && task?.kind === 'fixture-confirm') {
-    if (task.fixture === 'restart') { character = null; draft = initialDraft(); pointGroup = 'allocation'; submitted = false; view = 'allocation'; }
+    if (task.fixture === 'restart') { character = null; draft = initialDraft(); submitted = false; view = 'allocation'; }
     else character = task.fixture === 'library' ? loadTestLibrary(character) : resourceFixture(character,task.fixture);
     closeSheet('已載入本頁測試情境。正式角色與存檔未變更。');
     if (view === 'allocation') renderMain({ fresh:true });

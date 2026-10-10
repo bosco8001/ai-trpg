@@ -53,13 +53,39 @@ const total = a => a.reduce((sum, n) => sum + n, 0);
 const points = (a, max) => Array.isArray(a) && a.length === 6 && Object.keys(a).length === 6 && a.every(n => Number.isSafeInteger(n) && n >= 0 && n <= max);
 function need(condition, message) { if (!condition) throw new Error(message); }
 export function initialDraft() {
-  return { raceId: 'race.human', classId: 'class.swordsman', allocation: [2,2,2,2,2,2], human: [2,0,0,0,0,0] };
+  return { raceId: 'race.human', classId: 'class.swordsman', allocation: [0,0,0,0,0,0], human: [0,0,0,0,0,0] };
+}
+export const allocationBudget = draft => 12 + findRace(draft.raceId).free;
+export const allocatedPoints = draft => draft.allocation.map((n,i) => n + draft.human[i]);
+// 單一點數額度映射到既有計算來源；玩家不必分開操作自由／人類點數。
+export function changePoint(draft, index, delta) {
+  need(allocationErrors(draft, false).length === 0, '配點樣本不合法。');
+  need(Number.isInteger(index) && index >= 0 && index < 6 && (delta === 1 || delta === -1), '配點操作不合法。');
+  const race = findRace(draft.raceId), combined = allocatedPoints(draft);
+  combined[index] += delta;
+  need(points(combined, 6 + race.free) && total(combined) <= allocationBudget(draft), '點數不足或超出單項上限。');
+  const human = combined.map(n => Math.max(0,n - 6));
+  need(total(human) <= race.free, '超出種族可用加成。');
+  const allocation = combined.map((n,i) => n - human[i]);
+  let excess = Math.max(0,total(allocation) - 12);
+  for (let i = 0; i < 6 && excess; i++) {
+    const moved = Math.min(allocation[i],excess);
+    allocation[i] -= moved; human[i] += moved; excess -= moved;
+  }
+  return { ...structuredClone(draft), allocation, human };
+}
+export function chooseRace(draft, raceId) {
+  need(findRace(raceId), '種族樣本不存在。');
+  // 同族保持全部點數；換族保留自由分配，額外種族點不預先分配。
+  return { ...structuredClone(draft), raceId, human: raceId === draft.raceId ? [...draft.human] : [0,0,0,0,0,0] };
 }
 export function allocationErrors(draft, complete = true) {
   const errors = [], race = findRace(draft.raceId);
   if (!race || !findProfession(draft.classId)) errors.push('請選擇五族及四初階職業中的一項。');
-  if (!points(draft.allocation, 6) || (complete ? total(draft.allocation) !== 12 : total(draft.allocation) > 12)) errors.push('自由分配須合共 12 點，每項最多加 6 點。');
-  if (!points(draft.human, 2) || (race && (complete ? total(draft.human) !== race.free : total(draft.human) > race.free))) errors.push('人類另分配 2 點；其他種族不用人類加成。');
+  const validAllocation = points(draft.allocation,6) && total(draft.allocation) <= 12;
+  const validHuman = points(draft.human,2) && race && total(draft.human) <= race.free;
+  if (!validAllocation || !validHuman) errors.push('分配點數須為合法整數，且不能超出總額或單項上限。');
+  else if (complete && total(draft.allocation) + total(draft.human) !== 12 + race.free) errors.push(`請分完 ${12 + race.free} 點屬性點，目前還有 ${12 + race.free - total(draft.allocation) - total(draft.human)} 點。`);
   return errors;
 }
 function baseRows(draft, classId) {
