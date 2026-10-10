@@ -102,13 +102,15 @@ TARGET：6436313ddc979d7518ffcf7f2c60f70dfd3952a8
 
 ---
 
-## L-3 閱讀位置與安全區補修完整複驗要求（尚未送達）
+## L-3 閱讀位置與安全區補修完整複驗要求（已送達；外部 FAIL 見交付紀錄）
+
+2026-10-11 香港時間 00:02:14 已透過 Grok Bot Control 送指定 Critic 一次，讀回完整新 outgoing 及空 composer，確認送達。完整 TARGET 與本段狀態為提交後補入的本地文字，尚未另行提交。
 
 請指定 AI TRPG Architecture Critic 複驗Phase33第七切片同切片L-3補修。Operator：Codex。
 Repository：https://github.com/bosco8001/ai-trpg
 Branch：codex/phase27-mobile-ui
 BASE：6436313ddc979d7518ffcf7f2c60f70dfd3952a8
-TARGET：待填：本次限定七檔提交推送後完整 SHA
+TARGET：9f2b3e2cc1a1cac9b931dedcbf98a8baa4929397
 
 先讀TARGET的AGENTS／CANONICAL_MANIFEST／OPEN_QUESTIONS、正式starter_kits／character_system／classes／magic Canon及PHASE_33_STARTER_KIT_CATALOG中的最新外部結果與限定七檔範圍。6436313外部工程PASS、L-2已修，但新增L-3與模擬安全區Info；使用者尚未接受第七切片，前版結果不當本次PASS。只改起始配套TSX焦點可見性記錄／scroll處理與CSS底部scroll-padding，加五份交付文；不改名冊數值／server／shared／API／創角／發放／配裝／Run／Save／DB／LLM／原型／職業名冊外殼。Codex未親測，沒有新增自動化測試，以下交由指定bot執行。
 
@@ -123,3 +125,29 @@ TARGET：待填：本次限定七檔提交推送後完整 SHA
 7. 文件保留首版49f23f9、16c322c、6436313完整SHA、各自外部工程PASS含Low、PG461／461與無DB48skip，不將新補修標通過，不代使用者驗收。TARGET待填為提交前模板，實際版本以送出prompt完整SHA為準。
 
 回報工程PASS/FAIL與全部新High/Medium/Low/Info，完整TARGET、位置／重現／預期實際／影響、命令exitcode、環境、pass/fail/skip、實做／引用／推斷／未測／受阻、證據路徑。勿修改／commit／push repo，不替使用者驗收UI／平衡／第七切片，不傳其他bot或開始下一主要階段。清理本次隔離server／DB／role，保留證據，5432／舊證據不動。
+
+
+---
+
+## L-4／L-5 捲動來源補修完整複驗要求（尚未送達）
+
+請指定AI TRPG Architecture Critic複驗Phase33第七切片L-4／L-5補修。Operator：Codex。
+Repository：https://github.com/bosco8001/ai-trpg
+Branch：codex/phase27-mobile-ui
+BASE：9f2b3e2cc1a1cac9b931dedcbf98a8baa4929397
+TARGET：待填：本次限定七檔提交推送後完整 SHA
+
+先讀TARGET AGENTS／CANONICAL_MANIFEST／OPEN_QUESTIONS、正式starter_kits／character_system／classes／magic Canon、PHASE_33_STARTER_KIT_CATALOG最新9f2b3e2工程FAIL與七檔補修範圍。前版L-3一般案例已修、L-4字級還原失焦／L-5同幀scroll-resize吸回尚未解決；全套PG461／461不能蓋過UI FAIL。使用者尚未接受第七切片，Codex未親測，沒有新增自動化測試。只改起始配套TSX／CSS及五份交付文；數值／API／名冊／創角／發放／Run／Save／DB／LLM／原型／職業名冊不改。
+
+工程選擇：只在starter frame/body停用overflow-anchor，避免原生錨定與焦點捲動互相干擾。scroll處理不再靠viewport幾何判斷；記scrollTop，若舊位置超出新scrollHeight-clientHeight且已落到最大值（小於1px取整誤差）才保留reflow前基準，其餘scroll含同幀resize都更新當前可見性。focusin、resize合併rAF、同一原可見焦點nearest、close清理保留。footer真實底部padding取原間距與safe-bottom＋8px較大值，給6px焦點框餘量，inset0保留原間距；safe scroll-padding仍保留。這不是已驗證算法，請獨立找退化，不只量名義值。
+
+1. 核對完整BASE／TARGET、遠端HEAD、祖先及精確七檔。npm ci、npm run build、完整SHA git diff --check，記命令exitcode。五指定檔 node --import tsx --test tests/starter-kit-catalog.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts；再npm test，新隔離PG／role／DB／非5432，skip不能當PASS。
+2. 真production dist＋postgres重現BASE L-4：568×320正常、真zoom844×390，規則summary／職業列焦點，CSSOM root200%再還原，5次；TARGET同樣檢查並跑六尺寸320／375／390／430及568×320／844×390，normal／CSSOM200%／真zoom、七停點882矩陣或等效充分覆蓋。BASE AA867／882的15失敗不可在TARGET重現；焦點同一且AA部分／完整可見分開，超大元件別假報完整。量rect／viewport／scrollTop及事件順序，實測overflow-anchor生效，不只讀CSS。
+3. L-5：同rAF先scrollTop300再window844×389／843×390，各5次，再反向順序、scrollTo/smooth途中、wheel同幀／一格、觸控慣性／scrollbar、只visualViewport、details切換；TARGET不吸回、不scrollIntoView／額外GET。scroll事件與resize回調交錯、連續微尺寸變化及同幀多次scroll都測；程式scroll仍是受支持的閱讀移動，不能只靠有wheel標記才放行。方法與受阻分開記。
+4. L-3一般案例與L-2其他案例都保留：可見返回／標題／關閉／物品summary／規則／重讀／職業列轉向、640→620及反向、36rem±1px、body-frame切6次、連續尺寸5次／載入高度／details；手動捲離後再resize不吸回，重新Tab或捲回後再reflow焦點可見。停用錨定後新增的details展開收起、內容高度改變、讀到中段／尾段再縮字、焦點在附近或遠處都核對閱讀位置與可預期性。
+5. 專測clamp：舊scrollTop1440→新max799等resize／字級還原及content收縮，確認合法截限不讓L-2失焦；同時手動scroll剛好到新max／新max−1／0、舊viewport換成body或frame、fractional scroll／真zoom／huge字體，避免將真閱讀移動錯判clamp而又吸回。不出現observer循環／震盪／page error／持續輪詢。
+6. 安全區模擬top47／bottom34及0，844×390／620高度、normal／CSSOM200%／真zoom；量返回按鈕與完整焦點環（3px outline＋3px offset）到安全區邊界，前輪約5px侵入應消失，scroll到底也可見。footer真實捲動餘量、inset0舊間距、frame／body可讀高度、無雙扣／遮住內容／橫向溢出／44px控制。CDP不是真安全區，pinch、網址列、真手機未做必須保留未測／受阻。
+7. Tab／Shift+Tab留上層、返回原列、重開reset、Esc焦點回入口；所有observer／focusin／scroll／window／visualViewport關閉清零、重開5次不累積，排rAF與scroll立即關閉不動背景。兩名冊完整成功、19故障／慢回應取消重開／重試，只GET且production出生／state／三槽／DB table md5不變。
+8. 配套L-1可讀區、按鈕逐幀contrast至少4.5（上輪4.8）、M4b/M4c/M6a守衛、四職業內容與舊UI四尺寸57畫面必要回歸。15caught／3等價引用t66u、1–3格延遲引用t68u；職業L-1／原型N1／favicon404／I-1／validator分工及真機／讀屏／Safari／系統字級未測不改標通過。文件保留各輪完整SHA／來源／9f2b3e2 FAIL／Low與PG結果，TARGET待填僅提交前模板，實際SHA以送出prompt為準。
+
+報工程PASS/FAIL、全部新High/Medium/Low/Info、完整TARGET、位置／重現／預期實際／影響、命令exitcode、環境、pass/fail/skip、實做／引用／推斷／未測／受阻與證據路徑。不要修改或commit/push repo，不替使用者驗收第七切片／UI／平衡，不傳其他bot或開下一階段；清理本輪隔離server／DB／role，保留證據，5432與舊證據不動。

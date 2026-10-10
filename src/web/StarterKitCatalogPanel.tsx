@@ -64,20 +64,21 @@ export function StarterKitCatalogPanel() {
       const style = window.getComputedStyle(viewport);
       const top = layout.top + Math.max(8, Number.parseFloat(style.scrollPaddingTop) || 0);
       const bottom = layout.bottom - Math.max(8, Number.parseFloat(style.scrollPaddingBottom) || 0);
-      return { active, viewport, layout,
+      return { active, viewport, scrollTop: viewport.scrollTop,
         visible: bounds.bottom > top && bounds.top < bottom && bounds.right > layout.left && bounds.left < layout.right,
         contained: bounds.top >= top && bounds.bottom <= bottom && bounds.left >= layout.left && bounds.right <= layout.right };
     };
     let previousFocus = measureFocus();
     const recordFocus = () => { previousFocus = measureFocus(); };
     const recordScroll = (event: Event) => {
-      if (event.target !== frameRef.current && event.target !== bodyRef.current) return;
-      const next = measureFocus();
-      // Record reading moves, but do not mistake a new scroll layout for manual scrolling.
-      if (!next || !previousFocus || next.active !== previousFocus.active
-        || (next.viewport === previousFocus.viewport && next.layout.top === previousFocus.layout.top
-          && next.layout.bottom === previousFocus.layout.bottom && next.layout.left === previousFocus.layout.left
-          && next.layout.right === previousFocus.layout.right)) previousFocus = next;
+      const scroller = event.target;
+      if (!(scroller instanceof HTMLElement) || (scroller !== frameRef.current && scroller !== bodyRef.current)) return;
+      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      // Anchoring is disabled in this sheet. Only an out-of-range position clamped by
+      // reflow preserves the old focus baseline; reading moves count even during resize.
+      if (previousFocus?.viewport === scroller && previousFocus.scrollTop > maximum
+        && Math.abs(scroller.scrollTop - maximum) < 1) return;
+      previousFocus = measureFocus();
     };
     const keepFocusVisible = () => {
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);

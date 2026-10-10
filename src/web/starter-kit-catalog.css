@@ -1,5 +1,13 @@
 /* Shares the accepted class-catalog design tokens and modal shell. */
-.starter-catalog__sheet { padding-top: env(safe-area-inset-top); container: starter-sheet / size; }
+.starter-catalog__sheet { --starter-footer-gap: .75rem; padding-top: env(safe-area-inset-top); container: starter-sheet / size; }
+/* Browser anchoring must not compete with the sheet's focus and reading-position policy. */
+.starter-catalog__sheet .class-catalog__frame,
+.starter-catalog__sheet .class-catalog__body { overflow-anchor: none; }
+/* Leave real scroll range for the 6px focus outline beyond the home-indicator inset. */
+.starter-catalog__sheet .class-catalog__footer {
+  padding-bottom: max(var(--starter-footer-gap), calc(env(safe-area-inset-bottom) + 8px));
+}
+@media (max-height: 28rem) { .starter-catalog__sheet { --starter-footer-gap: .5rem; } }
 /* Keep one useful scroll area when fixed chrome would consume the available height. */
 @container starter-sheet (max-height: 36rem) {
   .starter-catalog__sheet .class-catalog__frame {

@@ -197,3 +197,47 @@ git ls-remote origin refs/heads/codex/phase27-mobile-ui
 ```
 
 BASE `6436313ddc979d7518ffcf7f2c60f70dfd3952a8`；TARGET待限定七檔提交推送後填入。不把本輪外部PASS當成新補修PASS，待使用者最終驗收，未開始下一主要切片。
+
+
+## L-3 補修交接紀錄
+
+2026-10-11 使用者明確授權限定上述七檔 commit／push 並複驗。已提交並推送 `9f2b3e2cc1a1cac9b931dedcbf98a8baa4929397`，BASE 為 `6436313ddc979d7518ffcf7f2c60f70dfd3952a8`，遠端讀回一致。香港時間 00:02:14 經 Grok Bot Control 將完整七檔複驗要求送交 AI TRPG Architecture Critic 一次；讀回完整新 outgoing、完整 BASE／TARGET 及空 composer，確認送達。工程結果待回覆，Working 不當 PASS；Codex 未執行 build／測試／UI 驗證，其他既有 dirty 未納入。前文待提交／TARGET 待填屬提交前狀態；此紀錄及 prompt 完整 TARGET 是提交後新增的本地文字，尚未另行提交。第七切片仍待使用者最終驗收，未開始下一主要切片。
+
+
+## 9f2b3e2 外部複驗回報（2026-10-11）
+
+指定 AI TRPG Architecture Critic 於香港時間 00:38:02／00:38:09／00:38:14 回覆；BASE `6436313ddc979d7518ffcf7f2c60f70dfd3952a8`、TARGET `9f2b3e2cc1a1cac9b931dedcbf98a8baa4929397`，遠端頂端及上一個commit、精確七檔一致。外部結論 **工程 FAIL**、無 High／Medium，L-3一般案例已修但新增Low L-4／L-5，第2／3項UI標準未過。Codex經Grok Bot Control讀回與對照程式，未執行測試／UI驗證，未下載遠端證據，亦未代使用者接受第七切片。
+
+- 外部 TSX +35／−10、CSS +4／−1，加五份文件；server／shared／migration／prototype／tests／職業名冊／AGENTS／四份Canon未改。Node24、Chrome154、Playwright1.59.1、PG17隔離55426，真index.ts／production／postgres dist。npm ci、build、完整SHA diff --check與三個migration均exit0。
+- 五指定檔無DB及隔離PG均46／46、0skip；全套無DB459項、411pass／0fail／48skip，隔離PG461／461。productionHTTP125／125、主流程20／20、故障19／19；出生紀錄、state、三槽與八table md5不變。這些通過不能覆蓋UI FAIL。
+- L-3：390×844魔術師頁返回焦點，轉844×390再捲走；wheel／程式scroll／觸控後window1px、visualViewport／details變動，BASE捲回1440或1228，TARGET位置保持、scrollIntoView0次、無多餘GET／震盪。smooth途中、觸控慣性、wheel後一格resize亦保持；合法clamp1440→799／anchoring900→743另記，無scrollIntoView。觸控用CDP dispatchTouchEvent；scrollbar用Xvfb有頭Chrome，拖動將焦點交dialog，BASE相同，非真手機。
+- **L-4，新Low／L-2字級回歸**：568×320正常或真縮放844×390，焦點在規則summary／職業列，root200%再還原。TARGET例rect−157至−113、viewport1至194完全不可見；BASE17至61可見。外部診斷：anchoring scroll先於rAF，viewport幾何未變，被誤判讀者捲走。TARGET矩陣AA867／882、完整846；BASE AA882／882、完整864。15次失敗全為字級還原停點，重跑5次重現；TSX L73–81及L88。
+- **L-5，新Low／同幀捲動尺寸競爭**：同一rAF設scrollTop300再改844×389或843×390，5次均被拉回1440／1441；間隔至少一格、只visualViewport或同格details均0／5。外部診斷：尺寸已改，使真正捲動未記入基準；TSX L77–80及L88。手機轉向／網址列剛好同格的影響為推斷，未真機驗證。Grok提出輸入意圖或rect／scroll關係作修正方向，明標推斷／未驗證；不視為已證明算法。
+- L-2其他案例仍成立：844×390返回rect337–381、640→620及反向、628→625→628逐1px共26／26可見；連續5次尺寸／body-frame切6次／可見焦點details＋resize均完整，無loop／震盪；手動捲後Shift+Tab換焦點或捲回，下一reflow可見；慢載入標題正常。真zoom為Chrome profile3.8018＋CDP截圖，root200%另記。
+- 模擬top47／bottom34或0：scroll-padding-bottom正常／真zoom50px、大字66px，inset0為16／32px。返回底部355.2／安全邊界356，前輪17px侵入已修，BASE今輪17.2px；**Info：焦點框3px＋offset3px仍約5px侵入**，最大scrollTop使scroll-padding無法再推，其他三邊可辨。frame/body可讀高度與BASE相同、無雙扣安全區，職業名冊未改。非真安全區。
+- window／visualViewport／observer／focusin／scroll開啟各1、關閉各0、重開5次無累積；排rAF／scroll／resize立即Esc取消且焦點回入口、背景不動；dialog外／關閉無動作。載入、失敗重試、選職業→resize→返回、取消交錯正常，只GET無page error。
+- 必要回歸：配套L-1最小可讀158px，按鈕逐幀最低4.8，M4b／M4c／M6a被抓、還原正常；四尺寸×57舊畫面computed style與BASE只有時間戳差異，底部padding無新回歸。15caught／3等價引用t66u；L-2原始重現及1–3格延遲Info引用t68u，不改寫本輪實做。職業L-1、原型N1、favicon404、I-1及validator結構／數值分工仍open。
+- 未測真機／讀屏／Safari／系統字級／真安全區／Chrome Android網址列；真pinch與headless觸控手勢API受阻。證據由Grok留在 `/workspace/p33u-evidence/`／SUMMARY.md，L-5 `logs/l3-race.log`、L-4 `logs/l3-font-diag.log`。server／三DB／role／叢集已清理，PG套件保留；5432及舊證據未動、舊audit仍771e7de，repo無修改／commit／push。本段只記外部結果。
+
+## L-4／L-5 捲動來源補修（尚未提交／複驗）
+
+沿用game-ui-ux焦點／閱讀位置、ui-ux-pro-max可見性／安全區及apple-design立即回饋，維持已接受視覺。本次只修起始配套TSX／CSS及五份交付文，未新增玩法／名冊／API／資料狀態或其他畫面改動。
+
+- 起始配套frame與body局部設定overflow-anchor:none，讓瀏覽器錨定不與既有焦點／閱讀位置政策同時移動viewport，其他遊戲UI不受此選擇影響。這項工程選擇仍待外部驗證，沒有採用Grok推斷作已驗證結論。
+- scroll記錄不再看viewport幾何是否改變，同幀scroll／resize亦讀當前焦點可見性。baseline改存當時scrollTop；只有原位置超出新最大可捲值、且已截到該最大值（容許小於1px的捲動值取整誤差）才保留reflow前的焦點基準。合法clamp不當使用者捲離，其餘scroll均更新閱讀位置。
+- 保留focusin重新建立焦點基準、observer／window／visualViewport合併rAF及close清理。變動前可見的同一焦點才會nearest維持，已捲離不吸回；重新Tab／捲回後可再次維持。未加入輸入攔截、定時輪詢、focus替換、名冊重載或state寫入。
+- 返回footer在原有底部間距與「safe-area底部＋8px」取較大值，給6px焦點框真實捲動餘量；短高保留原.5rem、一般.75rem基礎間距，inset0不額外增加。不只增加scroll-padding，原本safe-area scroll-padding仍保留。
+- Codex未執行build／typecheck／測試／browser／UI驗證，未新增自動化測試；同幀／字級回歸、clamp、手動與程式捲動及安全區焦點框案例交由Grok，不能先宣告修好。
+
+限定七檔：`src/web/StarterKitCatalogPanel.tsx`、`src/web/starter-kit-catalog.css`、`docs/development/PHASE_33_STARTER_KIT_CATALOG.md`、`docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md`、`docs/development/CANONICAL_MANIFEST.md`、`docs/development/IMPLEMENTATION_PLAN.md`、`docs/development/OPEN_QUESTIONS.md`。含前輪送達紀錄與本輪外部FAIL；其他既有dirty不納入。前次七檔授權已完成，本次補修commit／push尚待限定授權。完整prompt見GROK_REVIEW最末段。
+
+```sh
+git add -- src/web/StarterKitCatalogPanel.tsx src/web/starter-kit-catalog.css docs/development/PHASE_33_STARTER_KIT_CATALOG.md docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md docs/development/CANONICAL_MANIFEST.md docs/development/IMPLEMENTATION_PLAN.md docs/development/OPEN_QUESTIONS.md
+git diff --cached --name-only
+git commit -m "fix: separate starter sheet reading scroll from reflow"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+git ls-remote origin refs/heads/codex/phase27-mobile-ui
+```
+
+BASE `9f2b3e2cc1a1cac9b931dedcbf98a8baa4929397`；TARGET待限定七檔提交推送後填入。新補修未送達，工程結果待複驗，使用者尚未接受第七切片；下一主要切片未開始。
