@@ -1,5 +1,13 @@
 /* Shares the accepted class-catalog design tokens and modal shell. */
-.starter-catalog__sheet { padding-top: env(safe-area-inset-top); }
+.starter-catalog__sheet { padding-top: env(safe-area-inset-top); container: starter-sheet / size; }
+/* Keep one useful scroll area when fixed chrome would consume the available height. */
+@container starter-sheet (max-height: 36rem) {
+  .starter-catalog__sheet .class-catalog__frame { overflow: auto; overscroll-behavior: contain; scroll-padding: 1rem; }
+  .starter-catalog__sheet .class-catalog__body { flex: none; overflow: visible; }
+}
+/* Background and foreground must change together when loading finishes. */
+.starter-catalog-entry .class-catalog__button,
+.starter-catalog__sheet .class-catalog__button { transition: transform 100ms ease-out; }
 .starter-catalog__sheet .starter-catalog__row { grid-template-columns: minmax(0, 1fr); }
 .starter-catalog__item { border: 1px solid var(--cc-border); background: var(--cc-bg); border-radius: .75rem; margin-top: .75rem; min-width: 0; }
 .starter-catalog__item summary { min-height: 2.75rem; padding: .75rem; cursor: pointer; overflow-wrap: anywhere; }
@@ -16,4 +24,8 @@
 .starter-catalog__item summary:active { background: var(--cc-elevated); }
 @media (hover: hover) { .starter-catalog__item summary:hover { background: var(--cc-elevated); } }
 @container (max-width: 22rem) { .starter-catalog__facts > div { grid-template-columns: minmax(0, 1fr); gap: .125rem; } }
-@media (prefers-reduced-motion: reduce) { .starter-catalog__item summary { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .starter-catalog__item summary,
+  .starter-catalog-entry .class-catalog__button,
+  .starter-catalog__sheet .class-catalog__button { transition: none; }
+}

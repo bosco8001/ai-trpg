@@ -1,4 +1,4 @@
-// 尚未由開發代理執行；交 AI TRPG Architecture Critic 驗證。
+// 首版 49f23f9 已獲 Grok 外部工程 PASS；本次新增案例待複驗，Codex 未親測。
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
@@ -59,6 +59,16 @@ test("未知、錯種類、TEST、特殊物件名稱與不支援版本均拒絕�
   for (const [kind, id] of [["item", "TEST-sword"], ["item", "constructor"], ["kit", "__proto__"],
     ["skill", "spell.fire-arrow"], ["spell", "skill.heavy-slash"], ["item", "skill.heavy-slash"], ["race", "race.human"]])
     assert.throws(() => service.resolve(kind!, id!, 1), (e: unknown) => e instanceof StarterKitCatalogFailure && e.code === "unknown-content");
+  const definitions = [
+    ...service.catalog.items.map(i => ({ kind: "item", id: i.id })),
+    ...service.catalog.abilities.map(a => ({ kind: a.kind === "spell" ? "spell" : "skill", id: a.id })),
+    ...service.catalog.kits.map(k => ({ kind: "kit", id: k.id })),
+  ];
+  for (const definition of definitions) for (const kind of ["item", "skill", "spell", "kit"]) {
+    if (kind === definition.kind) continue;
+    assert.throws(() => service.resolve(kind, definition.id, 1),
+      (e: unknown) => e instanceof StarterKitCatalogFailure && e.code === "unknown-content", `${kind}: ${definition.id}`);
+  }
   for (const version of [0, 2, NaN]) assert.throws(() => service.resolve("item", "item.dagger", version),
     (e: unknown) => e instanceof StarterKitCatalogFailure && e.code === "unsupported-version");
 });
@@ -83,6 +93,7 @@ test("格式、完整性與交叉引用失效即拒絕整份名冊", () => {
     v => { Reflect.set(v.items[4]!, "armor", -1); },
     v => { Reflect.set(v.items[7]!, "spellId", "spell.unknown"); },
     v => { Reflect.deleteProperty(v.abilities, "3"); },
+    v => { Reflect.set(v.abilities, "length", 3); },
     v => { Reflect.set(v.abilities[1]!, "id", "skill.heavy-slash"); },
     v => { Reflect.set(v.abilities[0]!.source, "weaponFamily", "staff"); },
     v => { Reflect.set(v.abilities[3]!.source, "spellbookId", "item.dagger"); },
@@ -90,6 +101,7 @@ test("格式、完整性與交叉引用失效即拒絕整份名冊", () => {
     v => { Reflect.set(v.abilities[0]!, "combatRules", "ready"); },
     v => { Reflect.set(v.abilities[3]!, "mpCost", 0); },
     v => { Reflect.deleteProperty(v.kits, "0"); },
+    v => { Reflect.set(v.kits, "length", 3); },
     v => { Reflect.set(v.kits[0]!, "classId", "class.unknown"); },
     v => { Reflect.set(v.kits[0]!.itemIds, "0", "item.chainmail"); },
     v => { Reflect.set(v.kits[0]!.itemIds, "1", "item.cloth-robe"); },
@@ -98,6 +110,17 @@ test("格式、完整性與交叉引用失效即拒絕整份名冊", () => {
     v => { Reflect.set(v.kits[3]!.ability, "acquisition", "learned"); },
     v => { Reflect.set(v.kits[0]!.ability, "id", "skill.swift-thrust"); },
   ];
+  for (const index of [0, 1, 2]) {
+    for (const kind of ["spell", "weapon", "physical", "", null])
+      variants.push(v => { Reflect.set(v.abilities[index]!, "kind", kind); });
+    variants.push(v => { Reflect.deleteProperty(v.abilities[index]!, "kind"); });
+  }
+  // Completeness is independent of per-entry shape and of kit cross references.
+  for (const field of ["items", "abilities", "kits"] as const) {
+    variants.push(v => { Reflect.set(v, field, []); });
+    variants.push(v => { Reflect.set(v, field, [...v[field], v[field][0]]); });
+    variants.push(v => { Reflect.set(v, field, v[field].map(() => v[field][0])); });
+  }
   for (const change of variants) {
     const value = structuredClone(OFFICIAL_STARTER_KITS_V1); change(value);
     assert.equal(isOfficialStarterKitCatalog(value), false);
@@ -135,6 +158,7 @@ test("HTTP 唯讀與嚴格版本／種類查詢，固定錯誤不回傳原始資
     ["/api/starter-kit-catalog/resolve?kind=class&id=class.mage&version=1", 400],
     ["/api/starter-kit-catalog/resolve?kind=item&id=TEST-private&version=1", 404],
     ["/api/starter-kit-catalog/resolve?kind=skill&id=spell.fire-arrow&version=1", 404],
+    ["/api/starter-kit-catalog/resolve?kind=item&id=starter-kit.mage&version=1", 404],
     ["/api/starter-kit-catalog/resolve?kind=item&id=item.dagger&version=2", 409],
   ] as const) {
     const bad = await app.inject(url); assert.equal(bad.statusCode, status);

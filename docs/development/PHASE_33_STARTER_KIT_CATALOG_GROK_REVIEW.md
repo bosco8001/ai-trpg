@@ -1,6 +1,6 @@
 # Phase 33 第七切片工程審查要求
 
-尚未送達；Codex 未執行 build／測試／UI 驗證。以下為完整待送 prompt，TARGET 必須在限定提交及遠端讀回後填寫，不能用 BASE 當本次 TARGET。
+2026-10-10 香港時間 21:39:03 已透過 Grok Bot Control 送達指定 AI TRPG Architecture Critic，已讀回新訊息與空 composer；首版 49f23f9 於 22:07 獲外部工程 PASS，L-1／五項 Info 保留；同切片補修待提交及複驗。Codex 未執行 build／測試／UI 驗證。以下第一份為首版實際送出的完整 prompt；本狀態與 TARGET 為提交後補入的本地文字紀錄，尚未另行提交。
 
 ---
 
@@ -9,7 +9,7 @@
 Repository：https://github.com/bosco8001/ai-trpg
 Branch：codex/phase27-mobile-ui
 BASE：72d804335d6f9aa32fbddddd9b93fe7c72228f27
-TARGET：待填：本次限定提交推送後的完整 SHA
+TARGET：49f23f9aa6e627012063b8d3cf5d754557d6886e
 Operator：Codex
 
 ## 來源與授權
@@ -47,3 +47,26 @@ Operator：Codex
 請報 PASS／FAIL、High／Medium／Low 新缺陷與 Info，逐項附 TARGET 完整 SHA、位置、可重現步驟、預期／實際、影響與建議；列完整命令、環境、pass／fail／skip、瀏覽器／尺寸／放大方法、實測／引用／推斷／未測／受阻及證據路徑。若說沒有缺陷，說明檢查範圍與限制，不宣告正式遊玩已通過。
 
 不要修改或 commit／push repository，不替使用者驗收第七切片，不開始配套發放／保存或下一主要階段，不傳給其他 bot。清理本次隔離 server／DB／角色，保留證據與摘要，不碰 5432 或舊證據。
+
+
+---
+
+## 同切片補修完整複驗要求（尚未送達）
+
+請指定 AI TRPG Architecture Critic 複驗 Phase 33 第七切片同切片補修。Operator：Codex。Repository：https://github.com/bosco8001/ai-trpg；branch：codex/phase27-mobile-ui。
+BASE：49f23f9aa6e627012063b8d3cf5d754557d6886e
+TARGET：待填：本次限定八檔提交推送後的完整 SHA
+
+先讀 TARGET 的 AGENTS、CANONICAL_MANIFEST、OPEN_QUESTIONS、正式 starter_kits／character_system／classes／magic Canon、PHASE_33_STARTER_KIT_CATALOG.md 的首版外部結果、補修八檔範圍與未測界線。首版 49f23f9 工程 PASS 不當成本次結果，使用者尚未接受第七切片。未提交遠端不得開始本次審查，不回退 BASE 冒稱 TARGET。
+
+只改起始配套 Sheet 滾動／返回列焦點、按鈕同步狀態顏色、三類守衛測試與五份交付狀態文件；正式內容／門檻／API／創角／發放／Run／Save／DB schema／LLM／職業名冊 CSS／原型未改。勿修改、commit、push repo；勿傳其他 bot，勿開始發放或下一階段。
+
+1. 核對完整 BASE／TARGET、遠端 HEAD、祖先及精確八檔；npm ci、npm run build、完整 SHA git diff --check，命令／exit code 分開記錄。
+2. 跑五個指定測試：node --import tsx --test tests/starter-kit-catalog.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts；再 npm test，DB 用新隔離 PostgreSQL／角色／DB／非5432連接埠，skip 不算 PASS，保留環境與證據。
+3. Info 1 反向驗證：逐個還原「物理技能 kind 不驗證」「kind=item 誤回 kit」「移除 shared complete()」非等價 mutation，證明新增案例均失敗；再原版通過。確認全部正式 ID 跨種類拒絕、空／少／多／重複集合及 HTTP 返回安全404，測試不靠原版跨引用偶然捕捉。前輪其餘 14 個 caught／3 個外部比對等價仍分開記錄，不改玩法為了捕捉等價 mutation。
+4. 本次目標 L-1 限起始配套 Sheet：以真 production build 重現 BASE，再測 TARGET 320／375／390／430、568×320／844×390，normal、CSSOM200%、真browser zoom，說明方法。普通高畫面保留分段；短畫面／大字會有一個完整 scroll viewport，header/body/footer 可依序讀取，不再擠成 36–80px 內容條；關閉／返回按鈕及所有數值可捲到，觸控至少44px，無橫向溢出／裁字。測界線前後、放大／旋轉後已有焦點是否可見；Tab／Shift+Tab 留上層，自動焦點捲動不被阻擋，返回四職業定位原列，重開 reset，Esc只關上層回入口。新 size container 不得破壞 facts 的窄寬 container query、安全區或正常高畫面佈局。
+5. Info 5：在 busy→成功、busy→失敗、手動重試以及 hover／pressed／focus 逐幀量按鈕前景／背景對比，驗證不再出現1.61混合顏色；不是只量穩定終點，reduced-motion 跟普通都測。
+6. 兩份名冊整份成功才顯示、503／錯版／截斷／64KiB超限／慢回應／abort／關閉重開的19類必要回歸；四職業正確書本智慧12／技能15及未永久已學語意，只GET、無儲存或LLM。必要 production state／出生／三槽不變、舊名冊與系統疊層不退化；既有職業名冊 L-1、原型 N1、favicon404、validator結構/數值分工仍保留，不冒稱已修。
+7. 文件當前狀態與歷史來源分清：首版完整 SHA、461／461 隔離PG與無DB48skip都是外部報告，Codex未親測仍為真；補修TARGET待填只屬模板，commit內不能自我引用尚未生成SHA，評價狀態以送出prompt/後續紀錄為準。未測真手機／讀屏／Safari／系統字級不可改成通過。
+
+回報工程 PASS／FAIL、High／Medium／Low／Info、完整TARGET、精確位置／重現／預期實際／影響、命令exitcode、pass/fail/skip、實做／引用／推斷／未測／受阻。保留證據路徑並清理本次隔離server／DB／role，不碰5432／舊證據。不替使用者接受第七切片或UI手感／平衡。

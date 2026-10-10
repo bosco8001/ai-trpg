@@ -32,6 +32,7 @@ export function StarterKitCatalogPanel() {
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [attempt, setAttempt] = useState(0);
   const dialogRef = useRef<HTMLDialogElement>(null), headingRef = useRef<HTMLHeadingElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null), openerRef = useRef<HTMLButtonElement>(null);
   const lastViewedRef = useRef<StarterKitId | null>(null), lastRowRef = useRef<HTMLButtonElement | null>(null);
   const kit = catalogs?.starter.kits.find(k => k.id === selected);
@@ -60,16 +61,19 @@ export function StarterKitCatalogPanel() {
   }, [open]);
   useLayoutEffect(() => {
     if (!open) return;
-    const body = bodyRef.current;
+    const frame = frameRef.current, body = bodyRef.current;
+    if (frame) frame.scrollTop = 0;
     if (body) body.scrollTop = 0;
+    // Short or enlarged layouts scroll the whole sheet instead of a squeezed body.
+    const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame : body;
     if (selected) headingRef.current?.focus({ preventScroll: true });
     else if (lastRowRef.current?.isConnected) {
       const row = lastRowRef.current;
       row.focus({ preventScroll: true });
-      if (body) {
-        const bounds = row.getBoundingClientRect(), viewport = body.getBoundingClientRect();
-        if (bounds.bottom > viewport.bottom) body.scrollTop += bounds.bottom - viewport.bottom + 8;
-        else if (bounds.top < viewport.top) body.scrollTop -= viewport.top - bounds.top + 8;
+      if (viewport) {
+        const bounds = row.getBoundingClientRect(), visible = viewport.getBoundingClientRect();
+        if (bounds.bottom > visible.bottom) viewport.scrollTop += bounds.bottom - visible.bottom + 8;
+        else if (bounds.top < visible.top) viewport.scrollTop -= visible.top - bounds.top + 8;
       }
     }
   }, [selected, open]);
@@ -101,7 +105,7 @@ export function StarterKitCatalogPanel() {
     {open ? createPortal(<dialog ref={dialogRef} className="class-catalog__sheet starter-catalog__sheet"
       aria-labelledby={titleId} aria-describedby={introId}
       onCancel={event => { event.preventDefault(); event.stopPropagation(); setOpen(false); }}>
-      <div className="class-catalog__frame">
+      <div className="class-catalog__frame" ref={frameRef}>
         <header className="class-catalog__header">
           <div><p className="class-catalog__eyebrow">起始配套 · 唯讀</p>
             <h2 id={titleId} ref={headingRef} tabIndex={-1}>{kit ? `${className(kit.classId)}配套` : "起始配套"}</h2></div>
