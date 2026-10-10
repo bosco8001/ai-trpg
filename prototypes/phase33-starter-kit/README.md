@@ -1,6 +1,6 @@
 # 出發之前：起始配套與換裝手機原型
 
-2026-10-10（Asia/Hong_Kong）。使用者已確認完整原型製作範圍，並明確授權限定本次十檔 commit／push 及送交 Grok。程式與案例已準備；**尚未執行 build、測試或瀏覽器驗證，工程與原型驗收仍待回報**。實作不是工程 PASS；固定受測 SHA 以本次實際送出要求為準。
+2026-10-10（Asia/Hong_Kong）。初版限定十檔已依授權提交／推送為 `342edfbe2341408c47804663b1e7be3ce65ad112`，並確認送達指定 Critic。Grok 外部工程結果為 **FAIL**：D2 Medium、D1／D3 Low，規則核對通過。下面八檔補修已準備且已獲本次限定 commit／push 與複驗授權，**提交與送達以實際讀回為準；Codex 未執行 build、測試或瀏覽器驗證**。原型仍待使用者接受，初版規則通過不代表補修通過。
 
 ## 開啟
 
@@ -44,9 +44,9 @@ python3 -m http.server 3047 --bind 127.0.0.1 --directory prototypes/phase33-star
 4. 樣本設定 → 載入換裝測試庫 → 確認。從武器改成木杖，重斬仍保留且停用；熟練仍為劍類，不重發其他職業的配套。
 5. 樣本設定 → 載入目前上限值樣本，然後卸下鎖甲：HP 58／58 應降到 55／55；再穿回為 55／58。取消預覽不應截低任何資源。
 6. 回到配點，選人類／魔術師；自由點數依力量／敏捷／體質／智慧／感知／魅力分為 `2／2／1／3／2／2`，人類 2 點放力量。智慧裝備判定應為 13、技能資格 15、最終 16；出生 MP 72，配套後上限 84，目前仍 72。卸下木杖不影響火焰箭。
-7. 此魔術師切成劍士：書本需求智慧 12，而裝備判定只有 11，書本與火焰箭停用但仍保留第 1 格；布袍 +2 不能支撐書本門檻。MP 降到 52／52，轉回魔術師應為 52／84，火焰箭恢復，不能補回被截的資源。
+7. 此魔術師切成劍士：書本需求智慧 12，而裝備判定只有 11，書本與火焰箭停用但仍保留第 1 格；布袍 +2 不能支撐書本門檻。技能資格及最終智慧為 13，普通資質仍加 20，所以 MP 是 72／72，轉回魔術師為 72／84；這條路線沒有截低目前值。另從魔術師載入「目前上限值」樣本（84／84），再轉劍士應為 72／72，轉回魔術師應為 72／84，才是截低且不補回的案例。火焰箭停用／恢復時都保留原格。
 8. 載入零 HP／MP 樣本，再換裝／轉職；HP 與 MP 應維持 0。重新整理才回到原型初始畫面，不影響正式角色。
-9. 用手機、鍵盤與放大文字核對：主操作能到達，Sheet 清單在內部捲動；返回／取消／Esc 焦點回到入口；快速關閉再開啟不被舊 close 事件清空。真手機與讀屏須另回報實際測試環境。
+9. 用手機、鍵盤與放大文字核對：主操作能到達。一般大小保留主內容／Sheet 清單內部捲動；大字或低矮畫面空間不足時，標題、內容及操作改在同一容器捲動，不縮字或裁字。Sheet 捲到底後 Esc／遮罩／完成關閉，再打開數值或設定都應回頂；返回／取消焦點回到入口，快速關閉再開啟不被舊 close 事件清空。真手機與讀屏須另回報實際測試環境。
 
 上述數字為規則閱讀後的預期，不能寫成親測結果。
 
@@ -57,22 +57,46 @@ python3 -m http.server 3047 --bind 127.0.0.1 --directory prototypes/phase33-star
 | `model.mjs` | 名冊鏡像、樣本內容、資格／來源、起始配套、容量與不可變樣本操作 |
 | `app.mjs` | 畫面／Sheet 堆疊、返回焦點、草稿預覽與單一已套用樣本 |
 | `index.html`／`style.css` | 獨立入口、接受的 Design System 02、響應式／安全區與 reduced-motion |
-| `model.test.mjs` | 資格、配套、20 組名冊組合、停用／恢復、容量及保存邊界案例，尚未執行 |
-| `catalog.test.ts` | 對照正式五族 v2／四職業 v1 原檔，尚未執行 |
-| `GROK_REVIEW.md` | 完整待送驗要求；TARGET 尚待限定提交，未送達 |
+| `model.test.mjs` | 資格、配套、20 組名冊組合、停用／恢復、容量及保存邊界；初版 13 項外部通過，補修輪 18 項待驗證 |
+| `catalog.test.ts` | 對照正式五族 v2／四職業 v1 原檔；初版 2 項外部通過，補修輪待回歸 |
+| `GROK_REVIEW.md` | 補修複驗模板；BASE 為初版，TARGET 待補修限定提交，不是送達證明 |
+| `favicon.svg` | 本機靜態圖示；避免瀏覽器請求缺少的 favicon.ico |
 
-三個 UI skill 共同沿用 [Design System 02](../phase33-mobile-redesign/DESIGN_SYSTEM.md)；使用者配點紅字要求優先於舊系統的一般黃色警告建議。功能層有即時按壓與狀態文字；沒有新增手勢拖曳、外部字型、音效或震動。尚未宣稱對比、焦點或手機排版通過。
+三個 UI skill 共同沿用 [Design System 02](../phase33-mobile-redesign/DESIGN_SYSTEM.md)；使用者配點紅字要求優先於舊系統的一般黃色警告建議。功能層有即時按壓與狀態文字；沒有新增手勢拖曳、外部字型、音效或震動。初版 Chrome 的外部對比與一般操作結果見下節；補修後對比、焦點或手機排版未驗證。
 
-## 已授權的限定 Git 範圍（指令備存）
+## 初版 Grok 外部工程回報
 
-本次限定十個檔案：本目錄八檔及兩份起始配套討論／原型範圍文件。不包含工作樹其他既有修改。
+來源：指定 **AI TRPG Architecture Critic**，2026-10-10 16:37–16:38（本機介面時間）；Codex 讀回回報，沒有親自重跑。BASE `7dddce1a02c7171986666b6ea0b06c656a2a2873`；TARGET `342edfbe2341408c47804663b1e7be3ce65ad112`。工程 **FAIL**，不重新判定已接受的第五切片，也不代表使用者原型驗收。
+
+- **D2 Medium**：CSSOM 將 root 字級設為 200% 時，固定頂／底欄擠壓主內容。390×844 配點區只剩 121px，角色總覽只剩 80px；320×568、844×390 也無法完整顯示任何技能格。真 zoom 的直向正常；極低高度橫向 zoom 歸 Info。這是字級模擬，不能當成系統 Dynamic Type 實測。
+- **D3 Low**：Sheet 未顯示時重設 scrollTop 無效；數值捲到底後重開仍在 441px（320 寬時 761px），換到設定仍可停在 293px。Grok 以隔離請求注入試過先 showModal 再 renderSheet，兩例回到 0；不是正式補修的測試結果。
+- **D1 Low**：本文件及審查要求把轉職 MP 寫成 52／52、52／84，漏算普通資質 +20；正確為 72／72、72／84。實作符合正式公式。
+
+Grok 回報 Node 24.21.0、Chrome 154、Playwright 1.59.1，桌面 headless 模擬。npm ci／build、13 項 model、2 項 catalog、38 項指定前置案例及 diff --check 全部 exit 0；另跑全套 451 項，403 pass、48 個需 DB 的 skip、0 fail。skip 不當 PASS。正式推導與五族／四職業獨立對照 65,226 個斷言零失敗，規則 1–8 及 12 類非法配點邊界符合；README 九步除 D1 預期值外符合。
+
+初版 Chrome 鍵盤、來源失效／恢復、取消、零資源及快速關開正常；32 組文字對比最低 4.8、7 組未達 AAA，焦點框至少 6.8；按鈕至少 44×44 CSS px。指定尺寸沒有橫向溢出，焦點 AA 未完全遮住通過；D2 情境焦點完整可見 AAA 不過。靜態網路未呼叫 API／DB／LLM，也未用 localStorage／sessionStorage。
+
+Info：favicon 404、四項測試缺口（其他技能加成支撐資格／停用裝備仍給屬性／停用裝備仍給護甲／高資質自動有直接施法資格）、錯誤摘要行內小連結、紅字「目前值」未區分裝備判定與技能資格。八件裝備／四能力只供樣本，未評平衡。Safari 按鈕點擊焦點差異是 Grok 推斷；真手機、讀屏、Safari／WebKit、系統字級及真瀏海 safe-area 未測，受阻無。
+
+外部證據位於 Grok 環境 `/workspace/p33o-evidence/`（SUMMARY、logs、json、scripts、73 張截圖）；此路徑不是本機下載或已核對的證據副本。Grok 回報其新增服務及工作資料夾已清理，未開 PG、未碰 5432／舊證據、未 commit／push。
+
+## 本次八檔補修（已授權限定提交與複驗）
+
+- `app.mjs`／`style.css`：依實際字體及剩餘空間切換容器捲動；大字的欄位改直排，不降低文字大小。Sheet 先顯示才更新內容／回頂；返回焦點及 aria-expanded 用實際觸發按鈕，不依賴瀏覽器點擊焦點。
+- `model.test.mjs`：新增停用防具屬性／護甲、高與極高資質資格、其他技能跨屬性加成及 MP 預期回歸案例。跨屬性案例只在測試的記憶體模組給火焰箭敏捷 +2，讓資格 13、最終 15 仍不能裝需求 15 的迅刺；不改正式／原型內容或 UI。本檔現在準備 18 項案例，補修輪尚未執行。
+- `index.html`／`favicon.svg`：本機 SVG 圖示；沒有新增外部資源或放寬 CSP。
+- 本 README／`GROK_REVIEW.md`／`../../docs/development/PHASE_33_STARTER_KIT_PROTOTYPE_PROPOSAL.md`：保存外部回報、改正 MP 路線與複驗範圍。原型接受與工程結果維持分開。
+
+以上為待驗證的實作，不宣告 D1–D3 或 Info 已通過。正式程式、規則名冊與既有出生紀錄未改。
+
+使用者已明確回覆「授權限定 8 檔 commit／push 並複驗」。以下僅限本輪八檔，不包含其他既有修改；新增 favicon.svg 已納入這次授權。指令備存如下，不作已提交／送達證明：
 
 ```sh
-git add -- prototypes/phase33-starter-kit/index.html prototypes/phase33-starter-kit/style.css prototypes/phase33-starter-kit/app.mjs prototypes/phase33-starter-kit/model.mjs prototypes/phase33-starter-kit/model.test.mjs prototypes/phase33-starter-kit/catalog.test.ts prototypes/phase33-starter-kit/README.md prototypes/phase33-starter-kit/GROK_REVIEW.md docs/development/PHASE_33_STARTER_KIT_DISCUSSION.md docs/development/PHASE_33_STARTER_KIT_PROTOTYPE_PROPOSAL.md
+git add -- prototypes/phase33-starter-kit/app.mjs prototypes/phase33-starter-kit/style.css prototypes/phase33-starter-kit/model.test.mjs prototypes/phase33-starter-kit/index.html prototypes/phase33-starter-kit/favicon.svg prototypes/phase33-starter-kit/README.md prototypes/phase33-starter-kit/GROK_REVIEW.md docs/development/PHASE_33_STARTER_KIT_PROTOTYPE_PROPOSAL.md
 git diff --cached --name-only
-git commit -m "feat: prototype starter kits and mobile loadout flow"
+git commit -m "fix: reflow starter prototype and restore sheet scroll"
 git push origin codex/phase27-mobile-ui
 git rev-parse HEAD
 ```
 
-使用者已明確授權這次限定十檔 commit／push 並送驗。以上指令保留供範圍核對，不代表需要重複執行。取得遠端完整 TARGET SHA 後，主動使用 Grok Bot Control 送交 AI TRPG Architecture Critic，讀回確認後才記錄送達。工程結果與最終使用者接受分開；本原型接受後才討論正式接入切片。
+取得補修的完整遠端 SHA 後，以 GROK_REVIEW 模板填入 TARGET，主動送交指定 Critic 並讀回確認。未提交時不得把初版 TARGET 當成補修版本送驗。其他 dirty 檔案保留，不能整包 add 或 commit。

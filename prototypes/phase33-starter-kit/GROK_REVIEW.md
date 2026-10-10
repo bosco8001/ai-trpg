@@ -1,6 +1,6 @@
-# 待送交 AI TRPG Architecture Critic：Phase 33 起始配套原型
+# 待送交 AI TRPG Architecture Critic：Phase 33 起始配套原型補修複驗
 
-交接模板：2026-10-10，使用者已授權限定十檔 commit／push 並送驗；Codex 尚未執行本輪工程驗證。以下保留提交前模板，實際送出時以 Git 取得的真實完整 SHA 取代 TARGET 欄位；本檔模板不作即時送達證明。不得把未執行案例或舊 Phase 33 PASS 當成本輪通過。
+交接模板：2026-10-10。初版 `342edfbe2341408c47804663b1e7be3ce65ad112` Grok 外部工程 FAIL；D1–D3 與 Info 的八檔補修已準備，本次限定 commit／push 與複驗已獲使用者授權，可讀取遠端 TARGET 仍依實際提交後取得。Codex 未執行補修輪工程驗證。實際送出時填入真實完整 SHA；本檔不作送達證明。不得沿用初版的部分 PASS。
 
 ---
 
@@ -10,10 +10,10 @@
 
 - Repository：https://github.com/bosco8001/ai-trpg
 - 分支：`codex/phase27-mobile-ui`
-- BASE：`7dddce1a02c7171986666b6ea0b06c656a2a2873`
-- TARGET：`【待限定十檔 commit／push 後填入完整 SHA；未填不可送驗】`
+- BASE：`342edfbe2341408c47804663b1e7be3ce65ad112`
+- TARGET：`【待八檔補修限定 commit／push 後填入完整 SHA；未填不可送驗】`
 - 本次目標：獨立記憶體手機原型，配點 → 起始配套 → 角色總覽 → 戰鬥外配置。正式 UI、角色建立／保存 API、不可暗改的出生紀錄及存檔不接入。
-- 限定十檔：`prototypes/phase33-starter-kit/{index.html,style.css,app.mjs,model.mjs,model.test.mjs,catalog.test.ts,README.md,GROK_REVIEW.md}`，`docs/development/PHASE_33_STARTER_KIT_DISCUSSION.md`，`docs/development/PHASE_33_STARTER_KIT_PROTOTYPE_PROPOSAL.md`。
+- 限定八檔：`prototypes/phase33-starter-kit/{index.html,style.css,app.mjs,model.test.mjs,favicon.svg,README.md,GROK_REVIEW.md}`，`docs/development/PHASE_33_STARTER_KIT_PROTOTYPE_PROPOSAL.md`。模型規則 `model.mjs` 與正式程式／內容名冊沒有修改。
 - 工作樹另有前置驗收紀錄、AGENTS、舊 UI 原型與 `phase33-profession-loadout` 未提交內容，不在本次；以固定版本真正 diff 為準。若範圍不吻合請回報。
 
 ## 必讀資料與規則優先順序
@@ -32,11 +32,21 @@ npm run build
 node --test prototypes/phase33-starter-kit/model.test.mjs
 node --import tsx --test prototypes/phase33-starter-kit/catalog.test.ts
 node --import tsx --test tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts
-git diff --check 7dddce1a02c7171986666b6ea0b06c656a2a2873 TARGET_FULL_SHA
+git diff --check 342edfbe2341408c47804663b1e7be3ce65ad112 TARGET_FULL_SHA
 python3 -m http.server 3047 --bind 127.0.0.1 --directory prototypes/phase33-starter-kit
 ```
 
 最後一項是你隔離環境的 UI 服務，測完停止；不要碰使用者現有服務／5432。瀏覽器使用 `http://127.0.0.1:3047/`，收集實際請求與錯誤。全套回歸若另跑，分開列出；不要求建立資料庫，若自行測 DB 必須新隔離 cluster，不能沿用正式資料。
+
+## 初版缺陷與本輪必須複驗
+
+外部初版回報為 2026-10-10 Critic `/workspace/p33o-evidence/`：工程 FAIL（D2 Medium、D1／D3 Low），規則 1–8 通過，不代表本輪補修通過。
+
+1. **D2**：root 字級 200%（CSSOM 模擬，非系統字級）、真 zoom 200%、320×568／390×844／844×390，從配點、確認、角色總覽到所有 Sheet。ResizeObserver 依實際字體與剩餘空間調整捲動區，CSS container query 依相對文字寬度換行；請確認可以完整捲到每個技能格及操作，鍵盤焦點完整可見、大字標題不逐字擠成細柱、內外捲動不衝突、沒有 observer loop 錯誤。一般尺寸仍保留精簡流程。字級 100%→200%→100%／橫直向切換也要行，不能靠隱藏字或禁 zoom 解決。
+2. **D3**：數值 Sheet 捲到底，分別 Esc、完成、遮罩關閉再打開；320×568 數值→設定；Sheet 各層返回及快速關開。先 showModal 再 renderSheet(true)，dialog 與 body 都回頂，確認修後實際 scrollTop=0，不沿用初版隔離注入結果。一般／reflow 模式都行。
+3. **D1**：README 第 7 步與本 prompt 的 MP 已更正，普通資質 +20 不可漏。分開初始72／84→72／72→72／84與滿值84／84→72／72→72／84；新增 MP 案例須抓到錯值。
+4. **四個測試缺口**：model.test 共準備18項。新增停用防具屬性、護甲、高／極高資質不可自動直接施法、跨技能屬性加成。最後一項在測試記憶體載入原模型，僅給火焰箭敏捷+2測試值；不改 UI 或 model.mjs。請核對仍由相同規則邏輯判資格，若再將相應規則反轉，測試能攔下。反向驗證限隔離副本，需還原，不能改遠端。
+5. **Info**：紅字現在分裝備判定／技能資格；錯誤摘要連結擴大觸控；新增本機favicon SVG，確認CSP及網路只多這個靜態資源，無favicon404。觸發按鈕直接記錄返回焦點及aria-expanded，根層與巢狀Sheet都核對；Safari 真實未跑仍標未測，不能用Chrome修後PASS推斷Safari通過。
 
 ## 規則／資料案例
 
@@ -53,10 +63,10 @@ python3 -m http.server 3047 --bind 127.0.0.1 --directory prototypes/phase33-star
 
 - 按 README 九步完整操作，記錄前後值；配點畫面與確認頁紅字列物品／技能、目前判定值、門檻、差額和來源。合法分配帶警告可繼續；不能提前揭曉資質／資格／龍息或呼叫 RNG。確認後才出現固定結果文字，不能誤寫正式抽取。
 - 預設人類劍士：HP 55／58、MP 60／60。載入目前上限測試值後，卸鎖甲降到55／55，穿回55／58；取消不變。卸劍使重斬停用，原第1格保留，還劍恢復。
-- 人類魔術師，自由 `2／2／1／3／2／2`、人類力量 +2：智慧裝備判定13、技能資格15、最終16，MP72／84。卸木杖法術仍生效；轉劍士裝備判定智慧11、布袍不能支撐書門檻，書／火焰箭停用，MP52／52；轉回52／84恢復但不補回。
+- 人類魔術師，自由 `2／2／1／3／2／2`、人類力量 +2：智慧裝備判定13、技能資格15、最終16，MP72／84。卸木杖法術仍生效；轉劍士裝備判定智慧11、布袍不能支撐書門檻，書／火焰箭停用，技能資格及最終智慧13，加普通資質20，MP72／72；轉回72／84（沒有截低目前值）。另載入魔術師目前上限84／84，再轉劍士72／72、轉回72／84，證明截低不補回。
 - 五族／四職業選擇、返回配點保持分配、重選相同種族保持人類點數；切不同種族明確核對種族點。新配置受阻按鈕不可啟動；停用既有格可檢視／清空。詳細值在 Sheet，不把長清單堆在總覽。
 - 技能庫 → 單格 → 預覽的返回、關閉、Esc／scrim取消；快速開關再開，不被延後原生 close 事件清空。入口／返回焦點、標題初始焦點、原生dialog焦點限制、選取／按壓／disabled狀態、讀屏名稱及aria-expanded。
-- 320／375／390／430 CSS px、短螢幕及橫向、200%文字與zoom、reduced-motion、reduced-transparency、鍵盤核對。清單內部捲動，返回／開啟回頂；主畫面三個入口與六格可到達，不用大量主頁捲動完成核心配置。不得以裁字或關閉zoom換取一屏。
+- 320／375／390／430 CSS px、短螢幕及橫向、200%文字與zoom、reduced-motion、reduced-transparency、鍵盤核對。一般情境清單內部捲動；文字／低矮視窗不足時，標題與操作跟內容在同一容器捲動，沒有裁字／縮字。返回／開啟回頂；主畫面三個入口與六格可到達，不用大量主頁捲動完成核心配置。不得以裁字或關閉zoom換取一屏。
 - 測量文字與有語意元件對比、44×44 CSS px觸控、safe-area；焦點至少不被完全遮住的 AA 與完整可見 AAA 分開表述。Chrome以外、真手機、讀屏是否實測逐項標明，不能用桌面emulation冒充。
 - DevTools／實際網路紀錄證明只載入原型靜態資源；不使用 API、資料庫、LLM、localStorage／sessionStorage，不碰已有角色或存檔；重新整理回到配點。
 

@@ -1,6 +1,7 @@
-// 已準備，尚未執行。依 AGENTS.md 交由指定 Grok bot 驗證。
+// 初版 13 項由 Grok 外部回報通過；本輪新增案例尚未執行，交由指定 bot 複驗。
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { initialDraft, allocationErrors, previewStarter, createSample, evaluate, previewAction,
   loadTestLibrary, resourceFixture, capacity, limits, races, professions, kits, items } from './model.mjs';
 const changeClass = (state,id) => previewAction(state,{ type:'class',id });
@@ -118,4 +119,61 @@ test('測試庫是明確額外樣本，不自動配置、補血或重發物品',
   assert.deepEqual(next.configuration,state.configuration); assert.deepEqual(next.resources,state.resources);
   assert.equal(next.mode,'loadout'); assert.deepEqual(next.inventory,items.map(i => i.id));
   assert.deepEqual(loadTestLibrary(next).inventory,next.inventory); assert.equal(next.initialClass,state.initialClass);
+});
+
+test('停用防具保留位置但不提供屬性，恢復後才再加入', () => {
+  const state = createSample({ ...initialDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
+  assert.equal(evaluate(state).rows[2].final,9);
+  const off = changeClass(state,'class.mage'), result = evaluate(off);
+  assert.equal(result.equipment.find(g => g.position === 'armor').active,false);
+  assert.equal(off.configuration.armor,'chainmail');
+  assert.equal(result.rows[2].equipment,0);
+  assert.equal(result.rows[2].qualification,8);
+  assert.equal(result.rows[2].final,8);
+  assert.equal(evaluate(changeClass(off,'class.swordsman')).rows[2].final,9);
+});
+test('停用防具不提供護甲，恢復後才再加入', () => {
+  const state = createSample({ ...initialDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
+  assert.equal(evaluate(state).armor,3);
+  const off = changeClass(state,'class.mage');
+  assert.equal(evaluate(off).armor,0);
+  assert.equal(evaluate(changeClass(off,'class.swordsman')).armor,3);
+});
+test('高與極高資質不自動提供直接施法資格，即使已學且智慧達標', () => {
+  const elf = createSample({ ...mageDraft(),raceId:'race.elf',human:[0,0,0,0,0,0] });
+  for (const aptitude of ['high','exceptional']) {
+    const state = { ...structuredClone(elf),aptitude,learned:['flame'],configuration:{ ...structuredClone(elf.configuration),slots:Array(6).fill(null) } };
+    assert.equal(state.directCasting,false);
+    assert.ok(evaluate(state).rows[3].qualification >= 15);
+    assert.throws(() => configure(state,0,{ skillId:'flame',source:'direct' }),/直接施法資格/);
+    assert.equal(evaluate(configure({ ...state,directCasting:true },0,{ skillId:'flame',source:'direct' })).slots[0].active,true);
+  }
+});
+test('其他生效技能的跨屬性加成亦不能支撐新技能資格（隔離測試數值）', async () => {
+  // 現有四能力沒有相同需求屬性；只在此隔離模組給火焰箭敏捷 +2，
+  // 以真正的跨技能邊界測試需求算法，不增加 UI 內容或改正式／原型名冊。
+  const source = await readFile(new URL('./model.mjs',import.meta.url),'utf8');
+  const original = "{ id: 'flame', name: '火焰箭', attribute: 3, requirement: 15, bonus: [0,0,0,1,0,0]";
+  assert.ok(source.includes(original),'隔離樣本必須匹配現有火焰箭定義');
+  const fixture = source.replace(original,original.replace('[0,0,0,1,0,0]','[0,2,0,1,0,0]'));
+  const model = await import(`data:text/javascript;base64,${Buffer.from(fixture).toString('base64')}`);
+  let state = model.loadTestLibrary(model.createSample({ ...mageDraft(),allocation:[2,4,1,3,1,1] }));
+  state = model.previewAction(state,{ type:'equipment',position:'weapon',id:'dagger' });
+  const calculated = model.evaluate(state);
+  assert.equal(calculated.slots[0].active,true);
+  assert.equal(calculated.rows[1].qualification,13);
+  assert.equal(calculated.rows[1].final,15);
+  assert.throws(() => model.previewAction(state,{ type:'skill',position:1,entry:{ skillId:'stab',source:'learned' } }),/目前 13，還差 2/);
+});
+test('普通資質轉職的 MP 包含 +20，並分開未截低與滿值截低案例', () => {
+  const mage = createSample(mageDraft());
+  assert.deepEqual(mage.resources,{ currentHp:52,maxHp:52,currentMp:72,maxMp:84 });
+  const off = changeClass(mage,'class.swordsman');
+  assert.equal(off.resources.maxMp,72); assert.equal(off.resources.currentMp,72);
+  assert.equal(changeClass(off,'class.mage').resources.currentMp,72);
+  const full = resourceFixture(mage,'full'), clipped = changeClass(full,'class.swordsman');
+  assert.equal(full.resources.currentMp,84);
+  assert.equal(clipped.resources.currentMp,72); assert.equal(clipped.resources.maxMp,72);
+  const back = changeClass(clipped,'class.mage');
+  assert.equal(back.resources.currentMp,72); assert.equal(back.resources.maxMp,84);
 });

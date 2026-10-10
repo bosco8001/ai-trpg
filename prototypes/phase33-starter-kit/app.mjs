@@ -7,6 +7,7 @@ const screen = document.querySelector('#screen'), navigation = document.querySel
 const feedback = document.querySelector('#feedback'), dialog = document.querySelector('#sheet');
 const sheetHeader = document.querySelector('#sheet-header'), sheetBody = document.querySelector('#sheet-body');
 const sheetFooter = document.querySelector('#sheet-footer');
+const app = document.querySelector('.app'), masthead = document.querySelector('.masthead');
 let draft = initialDraft(), character = null, view = 'allocation', pointGroup = 'allocation', submitted = false;
 let stack = [], returnFocus = null;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -33,11 +34,25 @@ function restoreKey(key, container = document) {
   if (!key) return false;
   const target = [...container.querySelectorAll('[data-focus]')].find(el => el.dataset.focus === key && !el.disabled);
   if (!target) return false;
-  target.focus({ preventScroll: true }); return true;
+  target.focus(); return true;
 }
+// 字體或視窗變化時改用單一閱讀捲動區；不縮字、不裁掉內容，也不改樣本狀態。
+function adaptLayout() {
+  const em = parseFloat(getComputedStyle(app).fontSize);
+  const available = app.clientHeight - masthead.offsetHeight - feedback.offsetHeight - navigation.offsetHeight;
+  app.classList.toggle('reflow', available < 16 * em);
+  if (dialog.open) {
+    const availableSheet = dialog.clientHeight - sheetHeader.offsetHeight - sheetFooter.offsetHeight;
+    dialog.classList.toggle('reflow', availableSheet < 10 * em);
+  }
+}
+function mainScroller() { return app.classList.contains('reflow') ? app : screen; }
 function warnings(calculated) {
   if (!calculated.warnings.length) return '<p class="notice success">起始配套全部符合啟用條件。</p>';
-  return `<div class="warnings"><h2>配套提醒：無法啟用</h2><ul>${calculated.warnings.map(w => `<li class="danger"><strong>${escape(w.name)}</strong>：${w.reasons.map(escape).join('；')}</li>`).join('')}</ul><p class="hint">合法分配仍可繼續；物品與已學技能保留，暫不配置。</p></div>`;
+  return `<div class="warnings"><h2>配套提醒：無法啟用</h2><ul>${calculated.warnings.map(w => {
+    const scope = items.some(item => item.name === w.name) ? '裝備判定' : '技能資格';
+    return `<li class="danger"><strong>${escape(w.name)}</strong>：${w.reasons.map(reason => escape(reason.replace('，目前 ', `，${scope}目前 `))).join('；')}</li>`;
+  }).join('')}</ul><p class="hint">合法分配仍可繼續；物品與已學技能保留，暫不配置。</p></div>`;
 }
 const bonusText = bonus => bonus.flatMap((n,i) => n ? [`${labels[i]} ${signed(n)}`] : []).join('、') || '無屬性加成';
 const requirementText = definition => `${labels[definition.attribute]} ${definition.requirement}`;
@@ -83,23 +98,25 @@ function renderCharacter() {
       <p class="hint section">${character.mode === 'loadout' ? '換裝測試樣本：八件樣本裝備、三項已學物理技能及書本來源。' : '起始配套樣本：只取得初始職業的固定配套。'}所有數值僅供原型。</p>`;
 }
 function renderMain({ fresh = false } = {}) {
-  const key = focusedKey(), oldScroll = screen.scrollTop;
+  const key = focusedKey(), oldScroll = mainScroller().scrollTop;
   screen.innerHTML = view === 'allocation' ? renderAllocation() : view === 'review' ? renderReview() : renderCharacter();
   navigation.innerHTML = view === 'character' ? `<nav class="navigation" aria-label="角色操作">${button(`${icon('rune')}數值`,'stats','stats')}${button(`${icon('grid')}技能庫`,'skills','skills')}${button(`${icon('gear')}背包`,'inventory','inventory')}</nav>` : `<div class="wizard-cta">${view === 'review' ? button('返回配點','back-allocation','back-allocation') : ''}${button(view === 'review' ? '建立本頁樣本' : '核對起始配套',view === 'review' ? 'create' : 'review','continue','', 'primary')}</div>`;
-  if (fresh) { screen.scrollTop = 0; screen.querySelector('#screen-title').focus({ preventScroll: true }); }
+  adaptLayout();
+  if (fresh) { app.scrollTop = 0; screen.scrollTop = 0; screen.querySelector('#screen-title').focus({ preventScroll: true }); }
   else {
-    screen.scrollTop = oldScroll;
+    mainScroller().scrollTop = oldScroll;
     if (!dialog.open && key && !restoreKey(key)) {
       if (key.startsWith('plus-') || key.startsWith('minus-')) restoreKey(`${key.startsWith('plus-') ? 'minus' : 'plus'}-${key.split('-')[1]}`);
     }
   }
 }
-function openSheet(task) {
-  returnFocus = focusedKey(); document.activeElement?.setAttribute('aria-expanded','true');
-  stack = [task]; renderSheet(true); dialog.showModal(); sheetHeader.querySelector('h2').focus({ preventScroll: true });
+function openSheet(task, control) {
+  // 點擊來源直接決定返回入口；不依賴 Safari 是否把按鈕設成 activeElement。
+  returnFocus = control.dataset.focus; control.setAttribute('aria-expanded','true');
+  stack = [task]; dialog.classList.remove('reflow'); dialog.showModal(); renderSheet(true);
 }
-function push(task) {
-  stack[stack.length-1].returnKey = focusedKey(); stack.push(task); renderSheet(true);
+function push(task, control) {
+  stack[stack.length-1].returnKey = control?.dataset.focus || focusedKey(); stack.push(task); renderSheet(true);
 }
 function closeSheet(message = '已取消，樣本與資源保持原狀。') {
   // 不依賴延後到達的原生 close 事件，避免快關快開時清掉新任務。
@@ -130,7 +147,7 @@ function previewDetails(next) {
 }
 function renderSheet(fresh = false) {
   const task = stack[stack.length-1]; if (!task) return;
-  const key = focusedKey(), scroll = sheetBody.scrollTop;
+  const key = focusedKey(), scroll = (dialog.classList.contains('reflow') ? dialog : sheetBody).scrollTop;
   let title = '', body = '', footer = button('完成','close-sheet','sheet-done','','secondary');
   if (task.kind === 'race') {
     title = '選擇種族'; body = catalogChoices(races,draft.raceId,'choose-race',r => r.free ? '人類另有 2 點自由種族加成。' : r.bonuses.map((n,i) => `${labels[i]} ${signed(n)}`).join('、'));
@@ -174,13 +191,14 @@ function renderSheet(fresh = false) {
   }
   sheetHeader.innerHTML = `<div class="sheet-controls">${stack.length > 1 ? button(icon('back'),'sheet-back','sheet-back','aria-label="返回上一層"') : '<span class="eyebrow">本頁樣本</span>'}${button(icon('close'),'close-sheet','sheet-close','aria-label="取消並關閉"')}</div><h2 id="sheet-title" tabindex="-1">${title}</h2>`;
   sheetBody.innerHTML = body; sheetFooter.innerHTML = footer;
-  if (fresh) { sheetBody.scrollTop = 0; if (dialog.open) sheetHeader.querySelector('h2').focus({ preventScroll: true }); }
-  else { sheetBody.scrollTop = scroll; restoreKey(key,dialog); }
+  adaptLayout();
+  if (fresh) { dialog.scrollTop = 0; sheetBody.scrollTop = 0; if (dialog.open) sheetHeader.querySelector('h2').focus({ preventScroll: true }); }
+  else { (dialog.classList.contains('reflow') ? dialog : sheetBody).scrollTop = scroll; restoreKey(key,dialog); }
 }
-function chooseCandidate(index) {
+function chooseCandidate(index, control) {
   const action = stack[stack.length-1].choices?.[index]; if (!action) return;
   const result = candidate(action); if (result.error) return announce(result.error);
-  push({ kind:'preview',next:result.next,action });
+  push({ kind:'preview',next:result.next,action },control);
 }
 function run(command, control) {
   const task = stack[stack.length-1];
@@ -192,7 +210,7 @@ function run(command, control) {
     const p = previewStarter(draft); announce(`${labels[i]}${group === 'human' ? '種族' : '自由'}分配 ${draft[group][i]} 點。${p.planned.warnings.length ? `${p.planned.warnings.length} 項無法啟用，詳見紅字配套提醒。` : '起始配套全部符合啟用條件。'}`);
   } else if (command === 'point-group') {
     pointGroup = control.dataset.group; renderMain();
-  } else if (command === 'race' || command === 'birth-class') openSheet({ kind:command });
+  } else if (command === 'race' || command === 'birth-class') openSheet({ kind:command },control);
   else if (command === 'choose-race') {
     const race = findRace(control.dataset.id);
     if (race.id !== draft.raceId) draft.human = race.free ? [2,0,0,0,0,0] : [0,0,0,0,0,0];
@@ -207,20 +225,20 @@ function run(command, control) {
   } else if (command === 'back-allocation') { view = 'allocation'; renderMain({ fresh:true }); }
   else if (command === 'create') {
     character = createSample(draft); view = 'character'; renderMain({ fresh:true }); announce('已建立本頁樣本。資源只在出生推導初始化一次；配套提高上限不補滿。');
-  } else if (command === 'class' || command === 'stats' || command === 'skills' || command === 'inventory' || command === 'settings') openSheet({ kind:command });
+  } else if (command === 'class' || command === 'stats' || command === 'skills' || command === 'inventory' || command === 'settings') openSheet({ kind:command },control);
   else if (command === 'equipment-slot') {
-    const next = { kind:'equipment',position:control.dataset.position }; if (dialog.open) push(next); else openSheet(next);
+    const next = { kind:'equipment',position:control.dataset.position }; if (dialog.open) push(next,control); else openSheet(next,control);
   } else if (command === 'skill-slot') {
-    const next = { kind:'skill',position:Number(control.dataset.index) }; if (dialog.open) push(next); else openSheet(next);
-  } else if (command === 'candidate') chooseCandidate(Number(control.dataset.choice));
+    const next = { kind:'skill',position:Number(control.dataset.index) }; if (dialog.open) push(next,control); else openSheet(next,control);
+  } else if (command === 'candidate') chooseCandidate(Number(control.dataset.choice),control);
   else if (command === 'apply' && task?.kind === 'preview') {
     // 再從目前樣本求值；不把 DOM 文字或舊預覽當成權威狀態。
     character = previewAction(character,task.action); closeSheet('配置已套用。屬性、停用原因與資源上限同步更新。');
   } else if (command === 'sheet-back') backSheet();
   else if (command === 'close-sheet') closeSheet(task?.kind === 'preview' ? '已取消預覽，配置與資源保持原狀。' : '已關閉，樣本未變更。');
-  else if (command === 'test-library') push({ kind:'fixture-confirm',fixture:'library',description:'載入換裝測試物品及三項已學物理技能；保留原配裝、初始熟練及目前資源。火焰箭仍只來自書本，不永久學會。' });
-  else if (command === 'resource-fixture') push({ kind:'fixture-confirm',fixture:control.dataset.kind,description:control.dataset.kind === 'zero' ? '載入 HP 0、MP 0，核對上限變更不使 HP 復活或補魔。' : control.dataset.kind === 'full' ? '把測試目前值設為目前上限，以核對卸裝時截低、再穿回時不補回。' : '把測試目前 HP／MP 設為各 40（若上限低於 40，採該上限），核對換裝提高上限不補滿。' });
-  else if (command === 'restart') push({ kind:'fixture-confirm',fixture:'restart',description:'清除本頁角色樣本並返回配點；正式角色與存檔不受影響。' });
+  else if (command === 'test-library') push({ kind:'fixture-confirm',fixture:'library',description:'載入換裝測試物品及三項已學物理技能；保留原配裝、初始熟練及目前資源。火焰箭仍只來自書本，不永久學會。' },control);
+  else if (command === 'resource-fixture') push({ kind:'fixture-confirm',fixture:control.dataset.kind,description:control.dataset.kind === 'zero' ? '載入 HP 0、MP 0，核對上限變更不使 HP 復活或補魔。' : control.dataset.kind === 'full' ? '把測試目前值設為目前上限，以核對卸裝時截低、再穿回時不補回。' : '把測試目前 HP／MP 設為各 40（若上限低於 40，採該上限），核對換裝提高上限不補滿。' },control);
+  else if (command === 'restart') push({ kind:'fixture-confirm',fixture:'restart',description:'清除本頁角色樣本並返回配點；正式角色與存檔不受影響。' },control);
   else if (command === 'apply-fixture' && task?.kind === 'fixture-confirm') {
     if (task.fixture === 'restart') { character = null; draft = initialDraft(); pointGroup = 'allocation'; submitted = false; view = 'allocation'; }
     else character = task.fixture === 'library' ? loadTestLibrary(character) : resourceFixture(character,task.fixture);
@@ -241,4 +259,6 @@ dialog.addEventListener('click',event => {
 document.addEventListener('focusin',event => {
   if (event.target.closest('.scroll')) event.target.scrollIntoView({ block:'nearest',inline:'nearest',behavior:'instant' });
 });
+const layoutObserver = new ResizeObserver(adaptLayout);
+[app,masthead,feedback,navigation,sheetHeader,sheetFooter].forEach(element => layoutObserver.observe(element));
 renderMain();
