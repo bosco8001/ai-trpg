@@ -52,7 +52,35 @@ export function StarterKitCatalogPanel() {
     dialog.addEventListener("keydown", keyboard);
     window.addEventListener("keydown", escape, true);
     headingRef.current?.focus({ preventScroll: true });
+    let resizeFrame: number | null = null;
+    const keepFocusVisible = () => {
+      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(() => {
+        resizeFrame = null;
+        const active = document.activeElement;
+        if (!dialog.open || !(active instanceof HTMLElement) || !dialog.contains(active)) return;
+        const frame = frameRef.current, body = bodyRef.current;
+        const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame
+          : body?.contains(active) ? body : frame;
+        if (!viewport) return;
+        const bounds = active.getBoundingClientRect(), visible = viewport.getBoundingClientRect();
+        if (bounds.top < visible.top + 8 || bounds.bottom > visible.bottom - 8
+          || bounds.left < visible.left || bounds.right > visible.right)
+          active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+      });
+    };
+    // Reflow can move an existing focus between the body and whole-sheet scroll areas.
+    const observer = new ResizeObserver(keepFocusVisible);
+    for (const target of [dialog, frameRef.current, bodyRef.current,
+      dialog.querySelector("header"), dialog.querySelector("footer")])
+      if (target) observer.observe(target);
+    window.addEventListener("resize", keepFocusVisible);
+    window.visualViewport?.addEventListener("resize", keepFocusVisible);
     return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", keepFocusVisible);
+      window.visualViewport?.removeEventListener("resize", keepFocusVisible);
+      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       dialog.removeEventListener("keydown", keyboard);
       window.removeEventListener("keydown", escape, true);
       if (dialog.open) dialog.close();

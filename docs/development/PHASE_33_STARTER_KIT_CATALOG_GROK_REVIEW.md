@@ -51,11 +51,13 @@ Operator：Codex
 
 ---
 
-## 同切片補修完整複驗要求（尚未送達）
+## 同切片補修完整複驗要求（已送達，待結果）
+
+2026-10-10 香港時間 22:23:43 已送指定 Critic 並讀回確認；補修完整 TARGET 與本段送達狀態為提交後補入本地文字，尚未另行提交。
 
 請指定 AI TRPG Architecture Critic 複驗 Phase 33 第七切片同切片補修。Operator：Codex。Repository：https://github.com/bosco8001/ai-trpg；branch：codex/phase27-mobile-ui。
 BASE：49f23f9aa6e627012063b8d3cf5d754557d6886e
-TARGET：待填：本次限定八檔提交推送後的完整 SHA
+TARGET：16c322c78075cd4097145aa36ecb2a9fa0185bf0
 
 先讀 TARGET 的 AGENTS、CANONICAL_MANIFEST、OPEN_QUESTIONS、正式 starter_kits／character_system／classes／magic Canon、PHASE_33_STARTER_KIT_CATALOG.md 的首版外部結果、補修八檔範圍與未測界線。首版 49f23f9 工程 PASS 不當成本次結果，使用者尚未接受第七切片。未提交遠端不得開始本次審查，不回退 BASE 冒稱 TARGET。
 
@@ -70,3 +72,27 @@ TARGET：待填：本次限定八檔提交推送後的完整 SHA
 7. 文件當前狀態與歷史來源分清：首版完整 SHA、461／461 隔離PG與無DB48skip都是外部報告，Codex未親測仍為真；補修TARGET待填只屬模板，commit內不能自我引用尚未生成SHA，評價狀態以送出prompt/後續紀錄為準。未測真手機／讀屏／Safari／系統字級不可改成通過。
 
 回報工程 PASS／FAIL、High／Medium／Low／Info、完整TARGET、精確位置／重現／預期實際／影響、命令exitcode、pass/fail/skip、實做／引用／推斷／未測／受阻。保留證據路徑並清理本次隔離server／DB／role，不碰5432／舊證據。不替使用者接受第七切片或UI手感／平衡。
+
+
+---
+
+## L-2 焦點補修完整複驗要求（尚未送達）
+
+請指定 AI TRPG Architecture Critic 複驗 Phase33第七切片L-2補修。Operator：Codex。
+Repository：https://github.com/bosco8001/ai-trpg
+Branch：codex/phase27-mobile-ui
+BASE：16c322c78075cd4097145aa36ecb2a9fa0185bf0
+TARGET：待填：本次限定六檔提交推送後完整 SHA
+
+先讀TARGET的AGENTS／MANIFEST／OPEN_QUESTIONS、starter_kits／character_system／classes／magic Canon及PHASE_33_STARTER_KIT_CATALOG的歷史／最新回報／六檔補修範圍。前版工程PASS含新增L-2，不當成本次結果；使用者尚未接受第七切片。只改起始配套dialog resize時既有焦點可見性及五份交付文，不改CSS／數值／來源／API／創角／發放／Run／Save／DB／LLM／原型／職業名冊外殼；Codex未親測。
+
+補修：open期間ResizeObserver觀察dialog/frame/body/header/footer，window及visualViewport resize合併rAF；只當目前activeElement仍在dialog內且超出實際scroll viewport，instant scrollIntoView nearest，不focus別的元件／重載／重設一般scrollTop。關閉解除observer、resize listener、取消排程。
+
+1. 核對遠端HEAD完整SHA、祖先及精確六檔；npm ci／npm run build／完整BASE TARGET的git diff --check記exitcode。跑五指定檔 node --import tsx --test tests/starter-kit-catalog.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts，再npm test；DB用全新隔離role/DB/叢集非5432，skip不算PASS。
+2. 真production dist＋postgres先重現BASE L-2：390×844魔術師頁Tab到返回四職業→844×390，以及高640→620；量activeElement同viewport矩形、scrollTop。TARGET相同步驟應不換焦點卻回可見，反向切回亦正常。測36rem邊界±1px、6尺寸320/375/390/430及568×320/844×390，normal／CSSOM200%／真zoom分開記方法。
+3. 已有焦點分別停在標題／關閉／物品summary／規則summary／返回／重讀，跨尺寸／轉向／字級後仍可見（巨大元件需分AA部分可見與AAA完整），按Tab／Shift+Tab、Esc／返回原列／重開都正常。安全區模擬另標。窗口resize與visualViewport resize均有結果證據，不以只檢查observer接線代替UI。跨佈局後首次位置讀取應在reflow後；不產生觀察器循環／滾動震盪。
+4. 手動捲動閱讀時不發生持續吸回；焦點在dialog外或關閉時不操作；關閉前已排rAF/resize→焦點回入口後不能拉動探索／系統抽屜，重開不得重複listener。交錯選職業／返回、載入成功／失敗／19類故障及取消仍正確，只GET、沒有重載或mutation，state／出生／三槽不變。
+5. 前版L-1已修、按鈕逐幀對比最低4.8、kind／resolve／complete三類新增測試守衛做必要回歸。15個caught與3個等價mutation來源依前輪更正，不延用14誤算。職業名冊L-1、原型N1、favicon404、Chrome運行時root字級queryInfo保留，不冒稱已修；未測真裝置／讀屏／Safari／系統字級仍明列。
+6. 狀態文件保留49f23f9／16c322c完整SHA、各自外部PG461／461及無DB48skip。送出prompt是實際TARGET，提交時待填只是模板；新結果不由Codex執行，不替使用者驗收。
+
+回報PASS/FAIL、所有新High/Medium/Low/Info，完整TARGET、精確位置、重現步驟／預期實際／影響、各命令exitcode、pass/fail/skip、實做／引用／推斷／未測／受阻、證據路徑。不修改或commit/push repo，不代使用者批准UI／平衡／第七切片，不傳其他bot或開始下一主要階段；清理本次隔離server／DB／role，保留證據，不碰5432／舊證據。
