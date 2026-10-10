@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#10161e">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>出發之前 · 起始配套原型</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip-link" href="#screen-title">跳至主要內容</a>
+  <div class="app">
+    <header class="masthead"><span class="sigil" aria-hidden="true">◇</span><div><strong>出發之前</strong><span class="eyebrow">起始配套 · 獨立原型</span></div><button type="button" class="quiet" data-command="settings" data-focus="settings" aria-haspopup="dialog" aria-expanded="false">樣本設定</button></header>
+    <main id="screen" class="scroll" aria-labelledby="screen-title"></main>
+    <p id="feedback" class="feedback" role="status" aria-live="polite" aria-atomic="true">只在本頁試用，重新整理會重設。</p>
+    <footer id="navigation"></footer>
+  </div>
+  <dialog id="sheet" aria-labelledby="sheet-title">
+    <div id="sheet-header" class="sheet-header"></div>
+    <div id="sheet-body" class="sheet-body scroll"></div>
+    <footer id="sheet-footer" class="sheet-footer"></footer>
+  </dialog>
+  <noscript>此原型需要啟用 JavaScript。它不讀寫正式角色或存檔。</noscript>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
