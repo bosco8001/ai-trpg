@@ -10,6 +10,7 @@
 
 - `docs/gameplay/character_system.md`
 - `docs/gameplay/classes.md`（2026-10-06 指定製作的四初階職業；收錄已確認規則，未定部分保留）
+- `docs/gameplay/starter_kits.md`（2026-10-10 使用者選 A，批准四職業配套、八件物品與四項能力的首版門檻／加成／護甲值；名冊與唯讀核對，不含發放保存或戰鬥接入）
 - `docs/gameplay/magic.md`
 - `docs/gameplay/combat_system.md`
 - `docs/gameplay/combat_ui.md`
@@ -76,7 +77,11 @@ Agent 遇到 unresolved 項目時：
 
 ## 後續工程規劃
 
-- [Phase 33 第五切片：角色建立與保存](PHASE_33_CHARACTER_CREATION.md)：Grok 對 `b7f723fa73d59c018cefd6fe901276226f93aebe` 的 2026-10-09 外部回覆及 PG 補報確認 M1 16／16、正式 UI 62／62、焦點 32／32、真 TCP 6／6、隔離 PG 453／453 通過，但整體工程仍 FAIL：新增 T1，瀏覽器案例兩個 getByLabel exact 定位逾時。T1 兩行改為 combobox 角色／名稱定位及文件補記已準備，沿用已批准七檔內的六檔，尚未執行或送達新複驗；Codex 未親測，使用者待驗收。首批 PG 受阻已由外部補報解除；N9／N10／I1 仍有觀察、N11 屬推斷，其他 Info／引用／未測與 Safari／WebKit 受阻保留。正式多角色與起始行囊／冒險仍另分切片。 複驗要求見 [工程驗證要求](PHASE_33_CHARACTER_CREATION_GROK_REVIEW.md)。
+- [Phase 33 第七切片：正式起始配套名冊](PHASE_33_STARTER_KIT_CATALOG.md)：使用者選 A，批准原型門檻／加成／護甲值作首版正式數值及名冊／唯讀核對範圍；實作與案例已準備，Codex 未執行 build、測試或 UI 驗證，未新增 commit／push，待限定 Git 授權及指定 Critic 工程驗證、使用者驗收。以下第六切片「正式數值未定／下一切片未開始」為其接受當時狀態。
+
+- [Phase 33 第六切片：獨立起始配套與換裝原型](PHASE_33_STARTER_KIT_PROTOTYPE_PROPOSAL.md)：使用者於2026-10-10回覆「通過」，本原型已接受；Grok對 `72d804335d6f9aa32fbddddd9b93fe7c72228f27` 外部工程PASS、無新缺陷。人類單一14點／初始全零補修包含在接受範圍，Codex未親測。舊N1 Low、Info、DB略過與未測限制保留，不代表正式數值定案或正式角色／存檔接入，不宣告整個Phase 33完成，下一個主要切片未開始。詳見原型README。本項僅登記驗收，不新增Canon。以下第五切片的下一步狀態屬當時紀錄。
+
+- [Phase 33 第五切片：角色建立與保存](PHASE_33_CHARACTER_CREATION.md)：**使用者已於 2026-10-10 接受。** 指定 AI TRPG Architecture Critic 於 2026-10-09 20:53 回報 `7dddce1a02c7171986666b6ea0b06c656a2a2873` 外部工程 PASS、無新缺陷：T1 原檔 helper 四組通過，efaa636 反向證明抓到 M1，獨立鍵盤四次切換 TARGET 16／16；本輪 build、隔離 PG 全套 453／453 通過。Codex 未親測。使用者於 2026-10-10（Asia/Hong_Kong）明確回覆「Phase 33 第五切片：角色建立與保存通過。」 本次接受僅限第五切片，不補寫手動驗收環境或逐項操作結果，也不代表整個 Phase 33 完成。先前未送達為即時讀回誤判，實際完整要求已送達並用於複驗，本輪不重送。新 Info 是案例首行「尚未執行」過時，N9／N10／I1／N8 與歷史 Info、引用／推斷、未測及 Safari／WebKit 受阻保留。正式多角色、起始行囊及冒險另分切片；未開始下一切片。
 
 - [Phase 33 第四切片：正式推導與唯讀樣本核對](PHASE_33_CHARACTER_DERIVATION.md)：使用者於 2026-10-07 指示「進入下一切片」，批准正式推導模組、唯讀計算介面及手機核對畫面；採最新裝備／職業容量政策。已提交／推送並送達 `bb930080ac917a90fc2f6bdf0ecca888ebfcbe87`；Grok t47u 外部工程 PASS（限 Chrome），名冊核對等 6 項 Info 與未測限制保留，使用者已於 2026-10-07 接受第四切片。Codex 未執行本輪工程測試。不是正式創角／轉職／配裝或存檔整合，不沿用原型 PASS。
 

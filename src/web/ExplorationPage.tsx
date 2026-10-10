@@ -8,6 +8,7 @@ import { Panel } from "./ui/Panel.js";
 import { DataHealthPanel } from "./DataHealthPanel.js";
 import { ContentCatalogPanel } from "./ContentCatalogPanel.js";
 import { ClassCatalogPanel } from "./ClassCatalogPanel.js";
+import { StarterKitCatalogPanel } from "./StarterKitCatalogPanel.js";
 import { CharacterDerivationPanel } from "./CharacterDerivationPanel.js";
 import { CharacterCreationPanel } from "./CharacterCreationPanel.js";
 import { RawDataBackupPanel } from "./RawDataBackupPanel.js";
@@ -399,6 +400,7 @@ export function ExplorationPage({
                 />
                 <ContentCatalogPanel />
                 <ClassCatalogPanel />
+                <StarterKitCatalogPanel />
                 <CharacterDerivationPanel />
                 <CharacterCreationPanel />
                 <DataHealthPanel />

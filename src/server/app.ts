@@ -37,6 +37,7 @@ import { registerRepairApplicationRoutes } from "./repair-application-routes.js"
 import { ApplicationFailure } from "./repair-application-core.js";
 import { registerContentCatalogRoutes } from "./content-catalog.js";
 import { registerClassCatalogRoutes } from "./class-catalog.js";
+import { registerStarterKitCatalogRoutes } from "./starter-kit-catalog.js";
 import { registerCharacterDerivationRoutes } from "./character-derivation.js";
 import { registerCharacterCreationRoutes } from "./character-creation/routes.js";
 import type { CreationRepository } from "./character-creation/contracts.js";
@@ -76,6 +77,7 @@ export async function buildApp(options: {
   const app = Fastify({ logger: options.logger ?? false });
   registerContentCatalogRoutes(app);
   registerClassCatalogRoutes(app);
+  registerStarterKitCatalogRoutes(app);
   registerCharacterDerivationRoutes(app);
   const storage = options.storage ?? (options.domainRepository ? "postgres" : "memory");
   registerCharacterCreationRoutes(app, options.creationRepository, storage);

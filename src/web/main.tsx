@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 import "./style.css";
 import "./class-catalog.css";
+import "./starter-kit-catalog.css";
 import "./character-derivation.css";
 import "./character-creation.css";
 
