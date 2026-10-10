@@ -154,3 +154,46 @@ git ls-remote origin refs/heads/codex/phase27-mobile-ui
 ```
 
 BASE `16c322c78075cd4097145aa36ecb2a9fa0185bf0`；TARGET待限定提交推送後填入。待使用者接受第七切片，下一主要切片不開始。
+
+
+## L-2 補修交接紀錄
+
+2026-10-10 使用者授權限定上述六檔 commit／push 並複驗。已提交並推送 `6436313ddc979d7518ffcf7f2c60f70dfd3952a8`，BASE 為 `16c322c78075cd4097145aa36ecb2a9fa0185bf0`，遠端分支讀回一致。香港時間 22:56:14 透過 Grok Bot Control 將完整要求送交 AI TRPG Architecture Critic 一次；讀回完整新 outgoing、BASE／TARGET 與空 composer，確認送達。工程結果待回覆，Working 不代表 PASS；Codex 未執行 build／測試／UI 驗證。前文待提交／待填描述提交前準備狀態，此交接紀錄及 prompt 完整 TARGET 為提交後新增的本地文字，尚未另行提交。其他既有 dirty 檔未納入，第七切片仍待使用者最終驗收，未開始下一主要切片。
+
+
+## 6436313 外部複驗回報（2026-10-10）
+
+指定 AI TRPG Architecture Critic 於香港時間 23:37:31／23:37:38／23:37:44 回覆，Codex 經 Grok Bot Control 原生介面讀回。BASE `16c322c78075cd4097145aa36ecb2a9fa0185bf0`；TARGET `6436313ddc979d7518ffcf7f2c60f70dfd3952a8`。外部結論工程 PASS、無 High／Medium，L-2 已修，但新增 Low L-3。使用者尚未接受第七切片。以下都是外部執行／觀察，Codex 未執行命令或 UI 測試，亦未下載遠端證據。
+
+- 遠端 HEAD／上一個 BASE 及六檔範圍一致：TSX +28／−0，加五份文件；CSS、prototype、server、shared、migration、package 未改。npm ci、build、完整 SHA diff --check、三個隔離 DB migration 均 exit 0；PG 叢集 55426。
+- 五指定檔無 DB／隔離 PG 均 46／46、0 skip；全套無 DB 459 項、411 pass／0 fail／48 skip，隔離 PG 461／461。Production HTTP 125／125、主流程 20／20、故障 19／19；三槽與八個 table md5 未變，只有 GET、無重載。
+- L-2：BASE 390×844 魔術師頁 Tab 返回後轉 844×390，焦點 top1777–1821／viewport1–389，scrollTop0；640→620、反向與629→628亦重現。TARGET 保留同一焦點，例 rect337–381／scrollTop1440；反向與631–627逐1px正常。
+- 6尺寸×normal／CSSOM200%／真縮放×7焦點停點，每次轉向／轉回／尺寸／字級及還原後等6個rAF；882次全部 AA 可見、864次完整可見，18次只AA均在真縮放＋CSSOM200%約400%，其中10個元件大於viewport。無震盪／observer loop／page error；18組Tab、Shift+Tab、返回原魔術師列、Esc回入口及重開標題正常。真縮放用Chrome profile3.8018＋CDP截圖，非系統字級或真手機。
+- window resize 有上述結果證據；`Emulation.setPageScaleFactor 1.5` 僅觸發 visualViewport resize，原可見焦點不移動。`Input.synthesizePinchGesture` 在headless無作用，真pinch受阻。CDP模擬top47／bottom34後TARGET轉向／620高度焦點可見，BASE返回／規則不可見；非真安全區。
+- 開啟時window／visualViewport listener及observer各1，關閉各0，重開5次無累積；dialog外焦點／關閉不操作；resize立即Esc取消rAF且探索／抽屜未捲動；慢載入、重試、選職業／resize／返回、取消交錯正常。
+- **L-3，新 Low，待修**：390×844配套頁焦點在返回，手動捲離（scrollTop1440），window改1px或僅visualViewport resize，被拉回scrollTop220，scrollIntoView一次；程式切details亦觸發。只捲動或等2秒不吸回；BASE不會。位置StarterKitCatalogPanel.tsx L56–69／L73–78。手機pinch／網址列伸縮／轉向可能打斷閱讀是Grok推斷，未真機驗證。
+- Info：reflow後約1–3格生效，第二格仍有98次不可見、第六格全部可見；「使用者感覺不到」只屬推斷。模擬安全區轉橫返回底部373，進入底部安全區17px；Grok指出scroll-padding16px未計env底部。本輪提交狀態字眼屬提交前紀錄，非缺陷。
+- 必要回歸：起始配套L-1仍已修，最小可讀158px；按鈕逐幀對比最低4.8；M4b／M4c／M6a均被抓，還原正常；四尺寸computed style與BASE一致。15caught／3等價引用t66u更正結果，非本輪全量重做。既有職業名冊L-1本輪重測仍36px；原型N1、favicon404、I-1及validator結構／數值分工保留。
+- 未測真機、讀屏、Safari、系統字級、真安全區、真Chrome Android網址列；真pinch受阻。證據由Grok保留 `/workspace/p33t-evidence/`／SUMMARY.md。server／DB／role／叢集已清理，PG套件保留；5432未碰，舊證據hash未變、舊audit維持771e7de，repo無修改／commit／push。本輪未重新測全部舊UI玩法，不能將前輪回歸來源改寫成親測。
+
+## L-3 閱讀位置與安全區補修（尚未提交／複驗）
+
+game-ui-ux負責焦點與閱讀狀態，ui-ux-pro-max負責手機安全區及可見範圍，apple-design負責保留玩家操作主導及instant回饋，共同沿用已接受視覺。本次只補起始配套Sheet，不改其他名冊、正式數值或任何角色狀態。
+
+- 開啟期間記錄目前焦點、實際scroll viewport幾何及可見性。focusin建立新基準，frame／body的scroll在viewport幾何未改時更新閱讀位置；viewport因reflow換區域或尺寸時，保留舊基準供resize判斷，避免把版面變動當手動捲動。
+- resize／observer仍合併rAF，只維持「同一焦點在變動前仍可見」的情況。已手動捲離焦點則不呼叫scrollIntoView；重新用Tab選焦點／捲回可見後重新記錄。處理後更新基準，關閉清除focusin／scroll與原有observer／resize／rAF。
+- whole-frame模式的scroll-padding-bottom加入env(safe-area-inset-bottom)，焦點測量採實際scroll-padding，避免nearest把返回捲進底部安全區。外觀、按鈕顏色／動畫及一般高畫面分段規則保持既有設計。
+- Codex只讀程式、文件、差異及外部報告；未執行build／typecheck／測試／browser／UI驗證，未新增自動化測試。必要真UI案例及原缺陷對照已列於新Grok prompt；本輪補修尚未證明通過。
+
+限定七檔：`src/web/StarterKitCatalogPanel.tsx`、`src/web/starter-kit-catalog.css`、`docs/development/PHASE_33_STARTER_KIT_CATALOG.md`、`docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md`、`docs/development/CANONICAL_MANIFEST.md`、`docs/development/IMPLEMENTATION_PLAN.md`、`docs/development/OPEN_QUESTIONS.md`。包含上輪送達紀錄與本輪外部結果；其他既有dirty不納入。前次六檔commit／push授權已完成；本次加入CSS等新改動，限定提交推送尚待使用者授權。完整prompt見GROK_REVIEW最末段。
+
+```sh
+git add -- src/web/StarterKitCatalogPanel.tsx src/web/starter-kit-catalog.css docs/development/PHASE_33_STARTER_KIT_CATALOG.md docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md docs/development/CANONICAL_MANIFEST.md docs/development/IMPLEMENTATION_PLAN.md docs/development/OPEN_QUESTIONS.md
+git diff --cached --name-only
+git commit -m "fix: preserve starter catalog reading position on resize"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+git ls-remote origin refs/heads/codex/phase27-mobile-ui
+```
+
+BASE `6436313ddc979d7518ffcf7f2c60f70dfd3952a8`；TARGET待限定七檔提交推送後填入。不把本輪外部PASS當成新補修PASS，待使用者最終驗收，未開始下一主要切片。

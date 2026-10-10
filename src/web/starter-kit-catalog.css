@@ -2,7 +2,10 @@
 .starter-catalog__sheet { padding-top: env(safe-area-inset-top); container: starter-sheet / size; }
 /* Keep one useful scroll area when fixed chrome would consume the available height. */
 @container starter-sheet (max-height: 36rem) {
-  .starter-catalog__sheet .class-catalog__frame { overflow: auto; overscroll-behavior: contain; scroll-padding: 1rem; }
+  .starter-catalog__sheet .class-catalog__frame {
+    overflow: auto; overscroll-behavior: contain; scroll-padding: 1rem;
+    scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
   .starter-catalog__sheet .class-catalog__body { flex: none; overflow: visible; }
 }
 /* Background and foreground must change together when loading finishes. */

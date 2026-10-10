@@ -53,22 +53,45 @@ export function StarterKitCatalogPanel() {
     window.addEventListener("keydown", escape, true);
     headingRef.current?.focus({ preventScroll: true });
     let resizeFrame: number | null = null;
+    const measureFocus = () => {
+      const active = document.activeElement;
+      if (!dialog.open || !(active instanceof HTMLElement) || !dialog.contains(active)) return null;
+      const frame = frameRef.current, body = bodyRef.current;
+      const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame
+        : body?.contains(active) ? body : frame;
+      if (!viewport) return null;
+      const bounds = active.getBoundingClientRect(), layout = viewport.getBoundingClientRect();
+      const style = window.getComputedStyle(viewport);
+      const top = layout.top + Math.max(8, Number.parseFloat(style.scrollPaddingTop) || 0);
+      const bottom = layout.bottom - Math.max(8, Number.parseFloat(style.scrollPaddingBottom) || 0);
+      return { active, viewport, layout,
+        visible: bounds.bottom > top && bounds.top < bottom && bounds.right > layout.left && bounds.left < layout.right,
+        contained: bounds.top >= top && bounds.bottom <= bottom && bounds.left >= layout.left && bounds.right <= layout.right };
+    };
+    let previousFocus = measureFocus();
+    const recordFocus = () => { previousFocus = measureFocus(); };
+    const recordScroll = (event: Event) => {
+      if (event.target !== frameRef.current && event.target !== bodyRef.current) return;
+      const next = measureFocus();
+      // Record reading moves, but do not mistake a new scroll layout for manual scrolling.
+      if (!next || !previousFocus || next.active !== previousFocus.active
+        || (next.viewport === previousFocus.viewport && next.layout.top === previousFocus.layout.top
+          && next.layout.bottom === previousFocus.layout.bottom && next.layout.left === previousFocus.layout.left
+          && next.layout.right === previousFocus.layout.right)) previousFocus = next;
+    };
     const keepFocusVisible = () => {
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       resizeFrame = window.requestAnimationFrame(() => {
         resizeFrame = null;
-        const active = document.activeElement;
-        if (!dialog.open || !(active instanceof HTMLElement) || !dialog.contains(active)) return;
-        const frame = frameRef.current, body = bodyRef.current;
-        const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame
-          : body?.contains(active) ? body : frame;
-        if (!viewport) return;
-        const bounds = active.getBoundingClientRect(), visible = viewport.getBoundingClientRect();
-        if (bounds.top < visible.top + 8 || bounds.bottom > visible.bottom - 8
-          || bounds.left < visible.left || bounds.right > visible.right)
-          active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+        const next = measureFocus();
+        // Only retain a focus that was visible before reflow; preserve a reader's chosen position.
+        if (next && previousFocus?.active === next.active && previousFocus.visible && !next.contained)
+          next.active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+        previousFocus = measureFocus();
       });
     };
+    dialog.addEventListener("focusin", recordFocus);
+    dialog.addEventListener("scroll", recordScroll, true);
     // Reflow can move an existing focus between the body and whole-sheet scroll areas.
     const observer = new ResizeObserver(keepFocusVisible);
     for (const target of [dialog, frameRef.current, bodyRef.current,
@@ -81,6 +104,8 @@ export function StarterKitCatalogPanel() {
       window.removeEventListener("resize", keepFocusVisible);
       window.visualViewport?.removeEventListener("resize", keepFocusVisible);
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      dialog.removeEventListener("focusin", recordFocus);
+      dialog.removeEventListener("scroll", recordScroll, true);
       dialog.removeEventListener("keydown", keyboard);
       window.removeEventListener("keydown", escape, true);
       if (dialog.open) dialog.close();
