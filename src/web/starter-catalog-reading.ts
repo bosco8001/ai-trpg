@@ -7,7 +7,18 @@ export function observeStarterReading(
 ) {
   let reading = false, disposed = false, internalScroll = 0;
   let readingMoved = false;
-  const positions = new Map<HTMLElement, number>();
+  type Position = { top: number; maximum: number; width: number; height: number; content: number };
+  const sample = (element: HTMLElement): Position => ({ top: element.scrollTop,
+    maximum: Math.max(0, element.scrollHeight - element.clientHeight),
+    width: element.clientWidth, height: element.clientHeight, content: element.scrollHeight });
+  // Keep the last observation, including before passive wheel delivery. The compositor
+  // may already have moved by the time an input listener gets control.
+  const positions = new Map<HTMLElement, Position>(scrollers.map(element => [element, sample(element)]));
+  const sameLayout = (a: Position, b: Position) => a.maximum === b.maximum
+    && a.width === b.width && a.height === b.height && a.content === b.content;
+  const rememberPositions = () => {
+    for (const element of scrollers) positions.set(element, sample(element));
+  };
   let quietTimer: number | null = null;
   let pointer: { id: number; x: number; y: number; scrollbar: boolean } | null = null;
   let restoreFocusedScroll: (() => void) | null = null;
@@ -31,22 +42,40 @@ export function observeStarterReading(
     if (disposed || internalScroll) return;
     if (!reading) {
       readingMoved = false;
-      for (const element of scrollers) positions.set(element, element.scrollTop);
     }
     reading = true;
     waitForEnd();
   };
+  const observePosition = (element: HTMLElement) => {
+    const before = positions.get(element), after = sample(element);
+    positions.set(element, after);
+    if (!before || before.top === after.top) return false;
+    // A changed range can clamp a previously legal position. Capture it at each
+    // layout notification, before a later layout grows the range again.
+    const clamped = !sameLayout(before, after) && before.top > after.maximum
+      && Math.abs(after.top - after.maximum) < 1;
+    if (internalScroll || clamped) { recordScroll(false); return false; }
+    // Unwrapped APIs and browser-originated reading still own their position.
+    // This fallback never modifies global prototypes or installs descendant wrappers.
+    beginReading(); readingMoved = true; recordScroll(true);
+    return true;
+  };
+  const observePositions = () => {
+    for (const element of scrollers) observePosition(element);
+  };
   const programmaticScroll = (apply: () => unknown) => {
     if (disposed || internalScroll) return apply();
+    observePositions();
     beginReading();
+    const before = scrollers.map(element => element.scrollTop);
     try { return apply(); }
     finally {
       // A scroll event may arrive after the resize rAF. Read the requested position now.
-      if (scrollers.some(element => element.scrollTop !== positions.get(element))) {
+      if (scrollers.some((element, index) => element.scrollTop !== before[index])) {
         readingMoved = true;
         recordScroll(true);
-        for (const element of scrollers) positions.set(element, element.scrollTop);
       }
+      rememberPositions();
       waitForEnd();
     }
   };
@@ -89,6 +118,7 @@ export function observeStarterReading(
   }
   const focusChanged = () => {
     clearQuietTimer(); reading = Boolean(pointer?.scrollbar);
+    if (!reading) { readingMoved = false; rememberPositions(); }
     if (reading) waitForEnd();
     restoreFocusedScroll?.(); restoreFocusedScroll = null;
     const active = document.activeElement;
@@ -98,17 +128,19 @@ export function observeStarterReading(
   const scroll = (event: Event) => {
     const element = event.target;
     if (!(element instanceof HTMLElement) || !scrollers.includes(element)) return;
-    const moved = positions.get(element) !== element.scrollTop;
-    if (reading && moved && !internalScroll) readingMoved = true;
-    recordScroll(reading && moved && !internalScroll);
-    positions.set(element, element.scrollTop);
+    // Do not assume that any scroll during an input session was caused by input.
+    // A no-op End/setter followed by an orientation clamp is still native layout.
+    observePosition(element);
     if (reading) waitForEnd();
   };
   const scrollEnd = (event: Event) => {
     if (scrollers.includes(event.target as HTMLElement)) endReading();
   };
   const wheel = (event: WheelEvent) => {
-    if (!event.ctrlKey && (event.deltaX || event.deltaY)) beginReading();
+    if (!event.ctrlKey && (event.deltaX || event.deltaY)) {
+      observePositions();
+      beginReading();
+    }
   };
   const pointerDown = (event: PointerEvent) => {
     if (!event.isPrimary || event.button !== 0) return;
@@ -133,35 +165,38 @@ export function observeStarterReading(
     const scrollingSpace = event.key === " " && !(target instanceof HTMLElement && target.closest("button, summary, a"));
     if (!event.ctrlKey && !event.metaKey && !event.altKey && (scrollingKey || scrollingSpace)) beginReading();
   };
+  const capture = { capture: true };
+  const passiveCapture = { capture: true, passive: true };
   dialog.addEventListener("focusin", focusChanged);
-  dialog.addEventListener("scroll", scroll, true);
-  dialog.addEventListener("scrollend", scrollEnd, true);
-  dialog.addEventListener("wheel", wheel, { capture: true, passive: true });
-  dialog.addEventListener("pointerdown", pointerDown, true);
-  dialog.addEventListener("keydown", key, true);
-  window.addEventListener("pointermove", pointerMove, { capture: true, passive: true });
-  window.addEventListener("pointerup", pointerUp, true);
-  window.addEventListener("pointercancel", pointerUp, true);
+  dialog.addEventListener("scroll", scroll, capture);
+  dialog.addEventListener("scrollend", scrollEnd, capture);
+  dialog.addEventListener("wheel", wheel, passiveCapture);
+  dialog.addEventListener("pointerdown", pointerDown, capture);
+  dialog.addEventListener("keydown", key, capture);
+  window.addEventListener("pointermove", pointerMove, passiveCapture);
+  window.addEventListener("pointerup", pointerUp, capture);
+  window.addEventListener("pointercancel", pointerUp, capture);
   focusChanged();
   return {
     isReading: () => reading,
+    observeLayout: () => { if (!disposed) observePositions(); },
     repair: (apply: () => void) => {
       internalScroll++;
-      try { apply(); } finally { internalScroll--; }
+      try { apply(); } finally { rememberPositions(); internalScroll--; }
     },
     dispose: () => {
       disposed = true; clearQuietTimer(); pointer = null; reading = false;
       restoreFocusedScroll?.();
       for (const restore of restorations.reverse()) restore();
       dialog.removeEventListener("focusin", focusChanged);
-      dialog.removeEventListener("scroll", scroll, true);
-      dialog.removeEventListener("scrollend", scrollEnd, true);
-      dialog.removeEventListener("wheel", wheel, true);
-      dialog.removeEventListener("pointerdown", pointerDown, true);
-      dialog.removeEventListener("keydown", key, true);
-      window.removeEventListener("pointermove", pointerMove, true);
-      window.removeEventListener("pointerup", pointerUp, true);
-      window.removeEventListener("pointercancel", pointerUp, true);
+      dialog.removeEventListener("scroll", scroll, capture);
+      dialog.removeEventListener("scrollend", scrollEnd, capture);
+      dialog.removeEventListener("wheel", wheel, passiveCapture);
+      dialog.removeEventListener("pointerdown", pointerDown, capture);
+      dialog.removeEventListener("keydown", key, capture);
+      window.removeEventListener("pointermove", pointerMove, passiveCapture);
+      window.removeEventListener("pointerup", pointerUp, capture);
+      window.removeEventListener("pointercancel", pointerUp, capture);
     },
   };
 }

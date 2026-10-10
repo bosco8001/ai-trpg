@@ -55,6 +55,8 @@ export function StarterKitCatalogPanel() {
     window.addEventListener("keydown", escape, true);
     headingRef.current?.focus({ preventScroll: true });
     let resizeFrame: number | null = null;
+    let focusRepairPending = false;
+    let reading: ReturnType<typeof observeStarterReading> | null = null;
     const measureFocus = () => {
       const active = document.activeElement;
       if (!dialog.open || !(active instanceof HTMLElement) || active === dialog || !dialog.contains(active)) return null;
@@ -77,27 +79,45 @@ export function StarterKitCatalogPanel() {
       // Reflow can clamp against an intermediate maximum. It must not erase an anchor.
       // Native focus scrolling may make a new focus visible; explicit reading can hide it.
       if (reading || next?.visible) previousFocus = next;
-    };
-    const keepFocusVisible = () => {
-      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
-      resizeFrame = window.requestAnimationFrame(() => {
-        resizeFrame = null;
-        const next = measureFocus();
-        if (reading.isReading()) return;
-        // Reading calls update the baseline synchronously, before their delayed scroll event.
-        if (next && previousFocus?.active === next.active && previousFocus.visible && !next.contained)
-          reading.repair(() => next.active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }));
-        previousFocus = measureFocus();
-      });
-    };
-    const reading = observeStarterReading(dialog,
-      [frameRef.current, bodyRef.current].filter((element): element is HTMLDivElement => element !== null),
-      recordScroll, moved => {
-        if (!moved) { keepFocusVisible(); return; }
-        // A reading gesture owns its position even if a resize rAF was queued during it.
+      if (reading) {
+        // Reading after a queued resize takes ownership; its end is not a reason
+        // to snap a partially visible control back into view.
+        focusRepairPending = false;
         if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
         resizeFrame = null;
-        previousFocus = measureFocus();
+      }
+    };
+    const keepFocusVisible = () => {
+      // Sample each intermediate range now, rather than compare an old position
+      // against only the final maximum in a later scroll event.
+      focusRepairPending = true;
+      reading?.observeLayout();
+      if (!focusRepairPending) return;
+      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(() => {
+        // Allow first-frame browser/unwrapped programmatic scroll to arrive before
+        // correcting focus. This is two bounded frames, not a polling loop.
+        reading?.observeLayout();
+        if (!focusRepairPending) { resizeFrame = null; return; }
+        resizeFrame = window.requestAnimationFrame(() => {
+          resizeFrame = null;
+          reading?.observeLayout();
+          if (!focusRepairPending) return;
+          const next = measureFocus();
+          if (reading?.isReading()) return;
+          focusRepairPending = false;
+          if (next && previousFocus?.active === next.active && previousFocus.visible && !next.contained)
+            reading?.repair(() => next.active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }));
+          previousFocus = measureFocus();
+        });
+      });
+    };
+    reading = observeStarterReading(dialog,
+      [frameRef.current, bodyRef.current].filter((element): element is HTMLDivElement => element !== null),
+      recordScroll, () => {
+        // Keep the baseline from the last actual reading movement. A later clamp
+        // must not overwrite it, even if this session had moved earlier.
+        if (focusRepairPending) keepFocusVisible();
       });
     readingRef.current = reading;
     dialog.addEventListener("focusin", recordFocus);
@@ -113,7 +133,7 @@ export function StarterKitCatalogPanel() {
       window.removeEventListener("resize", keepFocusVisible);
       window.visualViewport?.removeEventListener("resize", keepFocusVisible);
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
-      reading.dispose();
+      reading?.dispose();
       if (readingRef.current === reading) readingRef.current = null;
       dialog.removeEventListener("focusin", recordFocus);
       dialog.removeEventListener("keydown", keyboard);

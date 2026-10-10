@@ -162,15 +162,15 @@ TARGET：cb76c23788e78dc3e91b230ed42f4e6d2bf60261
 
 ---
 
-## M-1／L-6 來源追蹤補修完整複驗要求（尚未送達）
+## M-1／L-6 來源追蹤補修完整複驗要求（已送達；外部工程 FAIL）
 
-限定八檔清單及commit／push指令見交付文件最新段；新增helper與測試不在前次七檔授權內，目前未提交或送達，Codex未執行下列命令。
+2026-10-11 香港時間02:05:43，取得本次限定八檔commit／push授權後，經Grok Bot Control送交AI TRPG Architecture Critic一次，讀回完整新訊息、兩個完整SHA及空輸入框確認送達。工程結果待回覆；Codex未執行下列驗證命令。限定清單見交付文件；本段送達狀態及完整TARGET為提交後本地文字補記，尚未另行提交。
 
 請AI TRPG Architecture Critic複驗Phase33第七切片M-1／L-6來源追蹤補修。Operator：Codex。
 Repository：https://github.com/bosco8001/ai-trpg
 Branch：codex/phase27-mobile-ui
 BASE：cb76c23788e78dc3e91b230ed42f4e6d2bf60261
-TARGET：待填：限定八檔commit／push後完整SHA
+TARGET：e49567b6a1f64b53365465e6d59192878e6846fa
 
 先讀TARGET AGENTS／CANONICAL_MANIFEST／OPEN_QUESTIONS、正式starter_kits／character_system／classes／magic Canon、PHASE_33_STARTER_KIT_CATALOG最新cb76c23外部FAIL及八檔補修。前版L-4／L-5／模擬安全區框已修，但新Medium M-1轉向中途截限失焦、Low L-6第一個rAF程式scroll吸回（BASE亦有）、Info I-A閱讀跳動仍open；PG461／461不能蓋UI FAIL。使用者尚未接受第七切片，Codex未親測。只改TSX、新增sheet reading helper與9項未執行控制層測試，加五份交付文；CSS／正式數值／API／server／名冊／創角／發放／配裝／Run／Save／DB／LLM／原型不改。
 
@@ -187,3 +187,36 @@ TARGET：待填：限定八檔commit／push後完整SHA
 9. 文件前版cb76c23與9f2b3e2 FAIL、完整SHA／來源／實做／引用／推斷／未測／受阻保留。TARGET待填僅提交前模板，實際SHA以送出prompt為準。新控制層fixture的局部全域替代須finally還原，不跨worker或污染其他tests。
 
 回報工程PASS/FAIL與所有新High/Medium/Low/Info；完整TARGET／實際環境版本／逐命令exitcode／pass-fail-skip、位置／重現／預期實際／影響、事件順序與scrollTop／rect／wrapper／listener／timer證據。不能只跑fixture或PG就PASS。不要修改／commit／push repo，不代使用者接受UI／第七切片，不傳其他bot／開下一階段；清理本輪server／DB／role／cluster，5432及舊證據不動，保留證據。
+
+
+## e49567b 複驗結果讀回
+
+2026-10-11 香港時間03:01:02／03:01:11，指定AI TRPG Architecture Critic回報工程 **FAIL**，完整TARGET `e49567b6a1f64b53365465e6d59192878e6846fa`／BASE `cb76c23788e78dc3e91b230ed42f4e6d2bf60261`與交接一致。M-1／L-6已在外部測過案例修好，AA882／882；新增H-1 High（滾輪／觸控板拉回焦點）、M-2 Medium（Node capture清理fixture固定失敗）、L-7 Low（未追蹤程式捲動後reflow拉回）、L-8 Low（無位移操作250ms內轉向失焦）。build exit0；六指定54pass／1fail、全套無DB419pass／1fail／48skip、隔離PG469pass／1fail，皆exit1。完整重現、Info、實做／引用／推斷／未測／受阻及證據已補記[交付文件](PHASE_33_STARTER_KIT_CATALOG.md#e49567b-外部複驗回報2026-10-11)。Codex只讀回與核對程式，未親測；這次五文件文字補記未提交，沒有修改程式／測試或送新複驗。第七切片尚未接受，下一主要切片未開始。
+
+
+---
+
+## H-1／M-2／L-7／L-8 補修完整複驗要求（尚未送達）
+
+本輪限定八檔授權尚待確認，BASE已知、TARGET未提交。這是完整待送出模板，不是已送達或已測結果。沿用e49567b所有外部FAIL與已通過部分，不能以build或882矩陣替代滾輪／測試結果。
+
+請AI TRPG Architecture Critic複驗Phase33第七切片H-1／M-2／L-7／L-8補修。Operator：Codex。
+Repository：https://github.com/bosco8001/ai-trpg
+Branch：codex/phase27-mobile-ui
+BASE：e49567b6a1f64b53365465e6d59192878e6846fa
+TARGET：待填：本輪限定八檔commit／push後完整SHA
+
+先讀TARGET AGENTS／CANONICAL_MANIFEST／OPEN_QUESTIONS、正式starter_kits／character_system／classes／magic Canon、PHASE_33_STARTER_KIT_CATALOG最新e49567b外部FAIL及八檔補修。只改StarterKitCatalogPanel.tsx、starter-catalog-reading.ts、其test與五文件；沒有CSS／數值／名冊／API／server／創角／發放／配裝／Run／Save／DB／LLM／原型改動。使用者尚未接受第七切片，Codex未親測。前輪M-1／L-6在已測情況已修，AA882／882，但H-1滾輪拉回、M-2單元固定失敗、L-7未追蹤捲動、L-8無位移轉向為工程FAIL；全套PG469pass／1fail，不能寫461／461或470／470。
+
+修法未驗證：從安裝起保存位置／range尺寸，不在beginReading重設位置，passive wheel比較事件到達前最後觀察；resize／RO與兩個有界rAF採樣中途range，已觀察的範圍改變＋舊位置超界＋新位置落max（少於1px誤差）視為clamp，其餘未包裝位移作閱讀回退。實例API包裝仍保留、不改全域prototype；方法呼叫前後同步讀實際位置，own repair/reset保存位置不偽造閱讀。read移動撤銷pending修正，scrollend不因單純閱讀結束排repair；版面仍pending時才收尾重排，保留最後閱讀focus baseline。capture/passive options同物件加入移除。22項受控測試，新增13項未執行，fixture只是Node控制層／非layout。兩幀及250ms仍有時序風險；中途max若完全未觀察、非包裝API與clamp同時落相同位置、zoom原生重定位等必須獨立查，不以fixture或這段算法當證明。
+
+1. 核對完整BASE／TARGET、遠端HEAD、祖先及精確八檔。npm ci、npm run build、完整SHA git diff --check，逐命令exitcode。node --import tsx --test tests/starter-catalog-reading.test.ts tests/starter-kit-catalog.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts；再npm test無DB與新隔離非5432 PG／role／DB，skip不當PASS。Node24 capture object cleanup舊M-2原assert必須通過、不skip不放寬；單檔正反次序各兩次、fixture globals finally還原且不跨worker污染。若測試數增加請回報實際數，不沿用前輪分母。
+2. 先重現BASE H-1。真production dist＋postgres，844×390魔術師返回焦點，滑鼠wheel向上與精確trackpad delta，不resize、5格TARGET不能只移3px或彈1440；1280×800 summary後、真zoom640×400、整頁及分段body焦點、focus部分可見／完全不可見各測，BASE/TARGET至少各5次。headless＋Xvfb有頭Chrome，trace必須passive（non-passive可遮缺陷）；捕捉compositor已先移動再wheel／scroll1140／scrollend／下一幀，自己的scrollIntoView不得出現。繼續反向滾、單步及快速連滾、scrollend有／缺，沒有resize時閱讀結束不能排新焦點修正。
+3. L-8：底部End5次、ArrowDown10次、無位移setter10次、scrollTo("x")／scrollBy(NaN)各3次、邊界wheel10次，0／一幀／249／250／300ms轉向。BASE先重現，TARGET保留原同focus AA可見，可容納完整可見；不能把resize截限算閱讀。clamp1440→799、中途1405後max長大、body-frame切換、reading先真移動後clamp、有位移又到邊界等都測；pending repair不得永久取消，真正read後resize不拉回。回報每次range／client尺寸／top／focus baseline／readingMoved／pending／timer／rAF先後，不只PASS字樣。
+4. L-7：Element.prototype.scrollTo.call、prototype scrollTop setter.call、非focus後代scrollIntoView及不可配置descriptor，先resize、第一個rAF再捲300，各至少3次，兩註冊順序、844×389／843×390；不得拉1441。普通追蹤API、smooth各階段／options overload／this／返回值／throw與第三方後覆寫還原回歸。prototype bypass在穩定尺寸、同幀resize、非clamp位置、新max／max−1／0／fractional及與clamp重合分開報告；不可配置不能沉默當全部支援。頁內搜尋／text fragment／無障礙捲動／autoscroll可做則實測，不可做標未測；不以推斷聲稱已過。
+5. M-1／L-6及L-2至L-5全回歸：BASE與TARGET三轉向各5次（844×390→390×620返回／規則、568×320→320×568返回）、六尺寸320／375／390／430／568×320／844×390×normal／root200%／真zoom×七停點882或等效充分。AA882／882須保持、可容納的焦點完整可見，超大控制分列；中途截限發生在全部RO／resize／scroll回調之前也特測，不能測試替身人為給一個已讀到的中間range就假報M-1。連續5resize、Tab／捲回再轉向、body-frame6次、details＋resize／慢載入，36rem±1、640↔620、字級還原。L-6先resize第一rAF sT300兩次序各5次，L-5同rAF先scroll再resize，第三方第一rAF及第二rAF讀取先後。兩個有界rAF延遲、250ms無位移delay與原1–3格引用分清，停定1秒0rAF、無RO循環／振盪。
+6. 輸入與close：wheel／trackpad／touchfling／cancel／scrollbar按住resize／窗外pointerup、Arrow/Page/Home/End/Space，Ctrl-wheel縮放與summary/button Space／Tab不誤判；smooth長600ms、缺scrollend／合成提早scrollend、無up/cancel合成pointer及真pointer生命週期分列Info。開關／重開5次，window/dialog各listener及RO／單次timer／兩階段rAF／focus wrapper／frame body own API close全部歸零或還原；在第一／第二幀、wheel／smooth／pointer／timer中Esc，背景不動focus回入口。prototypes與其他UI不改、外部後覆寫API保留、無preventDefault阻擋遊戲操作、額外GET或pageerror。
+7. 模擬safe top47／bottom34及0、24組原尺寸／字級／zoom，完整6pxfocus ring侵入0、inset0原間距、至少44px／無雙扣／橫溢出／最小可讀158／對比最低至少4.5（前輪4.8）；CSS未改仍必須回歸。兩名冊、productionHTTP125／主流程20／19故障／慢載入取消重開重試、GET only，出生紀錄／state／三槽／八table md5不變。M4b/M4c/M6a與舊UI4尺寸57畫面；前輪儲存覆蓋背景差異未證實，不當已解決或擅自歸因。
+8. 文件保留五歷史SHA、e49567b/cb76c23/9f2b3e2工程FAIL完整SHA、實做／引用／推斷／未測／受阻。I-A上方details跳閱讀位置與職業L-1／原型N1／favicon404／I-1／validator分工仍open。15caught/3等價t66u、1–3格t68u屬引用；真機／讀屏／Safari／系統字級／真safe／Android網址列未測、真pinch／320真視窗受阻不得改PASS。TARGET待填是提交前模板，以送出prompt完整SHA為準。
+
+回報工程PASS/FAIL及全部High/Medium/Low/Info，完整TARGET、實際環境版本、逐命令exitcode／pass-fail-skip、位置／重現／預期實際／影響、事件與rect／range／wrapper／pending／rAF／timer證據。請獨立找退化，不只跑fixture／PG就PASS。不要修改／commit／push repo，不代使用者接受UI／第七切片、不傳其他bot／開始下一階段。清理本輪server／DB／role／cluster，5432及舊證據不動，保留本輪證據。
