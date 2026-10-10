@@ -5,6 +5,7 @@ import type { OfficialClassCatalog } from "../shared/class-catalog.js";
 import type { OfficialStarterKitCatalog, OfficialStarterItem, StarterKitId, StarterRequirement, StarterWeaponFamily } from "../shared/starter-kit-catalog.js";
 import { readStarterKitCatalog } from "./starter-kit-catalog-client.js";
 import { readClassCatalog } from "./class-catalog-client.js";
+import { observeStarterReading } from "./starter-catalog-reading.js";
 
 const familyNames: Record<StarterWeaponFamily, string> = { sword: "劍類", bow: "弓類", dagger: "匕首類", staff: "杖類" };
 const requirementText = (r: StarterRequirement) => `${CONTENT_ATTRIBUTE_LABELS[r.attribute]} ${r.minimum}`;
@@ -34,6 +35,7 @@ export function StarterKitCatalogPanel() {
   const dialogRef = useRef<HTMLDialogElement>(null), headingRef = useRef<HTMLHeadingElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null), openerRef = useRef<HTMLButtonElement>(null);
+  const readingRef = useRef<ReturnType<typeof observeStarterReading> | null>(null);
   const lastViewedRef = useRef<StarterKitId | null>(null), lastRowRef = useRef<HTMLButtonElement | null>(null);
   const kit = catalogs?.starter.kits.find(k => k.id === selected);
   const ability = catalogs?.starter.abilities.find(a => a.id === kit?.ability.id);
@@ -55,7 +57,7 @@ export function StarterKitCatalogPanel() {
     let resizeFrame: number | null = null;
     const measureFocus = () => {
       const active = document.activeElement;
-      if (!dialog.open || !(active instanceof HTMLElement) || !dialog.contains(active)) return null;
+      if (!dialog.open || !(active instanceof HTMLElement) || active === dialog || !dialog.contains(active)) return null;
       const frame = frameRef.current, body = bodyRef.current;
       const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame
         : body?.contains(active) ? body : frame;
@@ -64,35 +66,41 @@ export function StarterKitCatalogPanel() {
       const style = window.getComputedStyle(viewport);
       const top = layout.top + Math.max(8, Number.parseFloat(style.scrollPaddingTop) || 0);
       const bottom = layout.bottom - Math.max(8, Number.parseFloat(style.scrollPaddingBottom) || 0);
-      return { active, viewport, scrollTop: viewport.scrollTop,
+      return { active, viewport,
         visible: bounds.bottom > top && bounds.top < bottom && bounds.right > layout.left && bounds.left < layout.right,
         contained: bounds.top >= top && bounds.bottom <= bottom && bounds.left >= layout.left && bounds.right <= layout.right };
     };
     let previousFocus = measureFocus();
     const recordFocus = () => { previousFocus = measureFocus(); };
-    const recordScroll = (event: Event) => {
-      const scroller = event.target;
-      if (!(scroller instanceof HTMLElement) || (scroller !== frameRef.current && scroller !== bodyRef.current)) return;
-      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-      // Anchoring is disabled in this sheet. Only an out-of-range position clamped by
-      // reflow preserves the old focus baseline; reading moves count even during resize.
-      if (previousFocus?.viewport === scroller && previousFocus.scrollTop > maximum
-        && Math.abs(scroller.scrollTop - maximum) < 1) return;
-      previousFocus = measureFocus();
+    const recordScroll = (reading: boolean) => {
+      const next = measureFocus();
+      // Reflow can clamp against an intermediate maximum. It must not erase an anchor.
+      // Native focus scrolling may make a new focus visible; explicit reading can hide it.
+      if (reading || next?.visible) previousFocus = next;
     };
     const keepFocusVisible = () => {
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       resizeFrame = window.requestAnimationFrame(() => {
         resizeFrame = null;
         const next = measureFocus();
-        // Only retain a focus that was visible before reflow; preserve a reader's chosen position.
+        if (reading.isReading()) return;
+        // Reading calls update the baseline synchronously, before their delayed scroll event.
         if (next && previousFocus?.active === next.active && previousFocus.visible && !next.contained)
-          next.active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+          reading.repair(() => next.active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }));
         previousFocus = measureFocus();
       });
     };
+    const reading = observeStarterReading(dialog,
+      [frameRef.current, bodyRef.current].filter((element): element is HTMLDivElement => element !== null),
+      recordScroll, moved => {
+        if (!moved) { keepFocusVisible(); return; }
+        // A reading gesture owns its position even if a resize rAF was queued during it.
+        if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+        resizeFrame = null;
+        previousFocus = measureFocus();
+      });
+    readingRef.current = reading;
     dialog.addEventListener("focusin", recordFocus);
-    dialog.addEventListener("scroll", recordScroll, true);
     // Reflow can move an existing focus between the body and whole-sheet scroll areas.
     const observer = new ResizeObserver(keepFocusVisible);
     for (const target of [dialog, frameRef.current, bodyRef.current,
@@ -105,8 +113,9 @@ export function StarterKitCatalogPanel() {
       window.removeEventListener("resize", keepFocusVisible);
       window.visualViewport?.removeEventListener("resize", keepFocusVisible);
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      reading.dispose();
+      if (readingRef.current === reading) readingRef.current = null;
       dialog.removeEventListener("focusin", recordFocus);
-      dialog.removeEventListener("scroll", recordScroll, true);
       dialog.removeEventListener("keydown", keyboard);
       window.removeEventListener("keydown", escape, true);
       if (dialog.open) dialog.close();
@@ -116,20 +125,24 @@ export function StarterKitCatalogPanel() {
   useLayoutEffect(() => {
     if (!open) return;
     const frame = frameRef.current, body = bodyRef.current;
-    if (frame) frame.scrollTop = 0;
-    if (body) body.scrollTop = 0;
-    // Short or enlarged layouts scroll the whole sheet instead of a squeezed body.
-    const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame : body;
-    if (selected) headingRef.current?.focus({ preventScroll: true });
-    else if (lastRowRef.current?.isConnected) {
-      const row = lastRowRef.current;
-      row.focus({ preventScroll: true });
-      if (viewport) {
-        const bounds = row.getBoundingClientRect(), visible = viewport.getBoundingClientRect();
-        if (bounds.bottom > visible.bottom) viewport.scrollTop += bounds.bottom - visible.bottom + 8;
-        else if (bounds.top < visible.top) viewport.scrollTop -= visible.top - bounds.top + 8;
+    const restoreScreen = () => {
+      if (frame) frame.scrollTop = 0;
+      if (body) body.scrollTop = 0;
+      // Short or enlarged layouts scroll the whole sheet instead of a squeezed body.
+      const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame : body;
+      if (selected) headingRef.current?.focus({ preventScroll: true });
+      else if (lastRowRef.current?.isConnected) {
+        const row = lastRowRef.current;
+        row.focus({ preventScroll: true });
+        if (viewport) {
+          const bounds = row.getBoundingClientRect(), visible = viewport.getBoundingClientRect();
+          if (bounds.bottom > visible.bottom) viewport.scrollTop += bounds.bottom - visible.bottom + 8;
+          else if (bounds.top < visible.top) viewport.scrollTop -= visible.top - bounds.top + 8;
+        }
       }
-    }
+    };
+    if (readingRef.current) readingRef.current.repair(restoreScreen);
+    else restoreScreen();
   }, [selected, open]);
   useEffect(() => {
     if (!open) return;
