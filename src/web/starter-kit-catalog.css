@@ -3,6 +3,23 @@
 /* Browser anchoring must not compete with the sheet's focus and reading-position policy. */
 .starter-catalog__sheet .class-catalog__frame,
 .starter-catalog__sheet .class-catalog__body { overflow-anchor: none; }
+/* The same focused node uses the native popover top layer, escaping containment. */
+.starter-catalog__sheet .starter-catalog__focus-docked {
+  position: fixed; inset: auto;
+  left: var(--starter-focus-left); top: var(--starter-focus-top);
+  width: var(--starter-focus-width); max-width: none; min-width: 0;
+  max-height: var(--starter-focus-max-height); min-height: min(2.75rem, var(--starter-focus-max-height));
+  margin: 0; overflow: auto; overscroll-behavior: contain; z-index: 5;
+  border: 1px solid var(--cc-border); border-radius: .75rem;
+  background: var(--cc-elevated); color: var(--cc-text);
+  box-shadow: 0 -.25rem 1.5rem #0008;
+}
+.starter-catalog__sheet summary.starter-catalog__focus-docked { padding: .75rem; }
+.starter-catalog__sheet h2.starter-catalog__focus-docked { padding: .625rem .75rem; }
+.starter-catalog__sheet .class-catalog__button--primary.starter-catalog__focus-docked { background: #ffc39d; color: #1c1412; }
+.starter-catalog__sheet .class-catalog__button--secondary.starter-catalog__focus-docked { background: #bfd3dd; color: #15232d; }
+.starter-catalog__sheet .class-catalog__button[aria-disabled="true"].starter-catalog__focus-docked { background: #293d4b; color: #9cabb9; border-color: #6f8396; }
+.starter-catalog__focus-space { display: block; box-sizing: border-box; pointer-events: none; }
 /* Leave real scroll range for the 6px focus outline beyond the home-indicator inset. */
 .starter-catalog__sheet .class-catalog__footer {
   padding-bottom: max(var(--starter-footer-gap), calc(env(safe-area-inset-bottom) + 8px));

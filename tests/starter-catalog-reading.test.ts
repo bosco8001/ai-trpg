@@ -570,6 +570,86 @@ test("a native API that closes the observer cannot record afterward", () => fixt
   assert.equal(f.timers.size, 0);
 }));
 
+// F1 source-lifetime regressions. Real keyboard smooth/RO/Panel arbitration still
+// require the production-page cases in the Grok handoff; these are not UI tests.
+for (const key of ["Home", "PageUp", "ArrowUp"]) {
+  test(`${key} survives reflow before native scrolling without crediting a clamp`, () => fixture(f => {
+    const policy = f.install();
+    f.dialog.dispatchEvent(Object.assign(new Event("keydown"), { key }));
+    const timer = [...f.timers.keys()][0];
+    assert.ok(timer);
+    f.frame.clientHeight -= 1;
+    f.frame.position = 1315; // Unobserved intermediate native clamp.
+    policy.layoutChanged(); policy.sampleLayout();
+    assert.equal(policy.isReading(), true);
+    assert.deepEqual([...f.timers.keys()], [timer]); // No new deadline or timer.
+    assert.deepEqual(f.observations, [false]);
+    f.emitScroll(f.frame); // Delayed clamp event is not keyboard displacement.
+    assert.deepEqual(f.observations, [false]);
+    f.frame.position = key === "Home" ? 0 : 1129;
+    f.emitScroll(f.frame);
+    assert.equal(f.observations.at(-1), true);
+    f.emitEnd(f.frame);
+    assert.deepEqual(f.endings, [true]);
+    assert.equal(policy.isReading(), false);
+    assert.equal(f.timers.size, 0);
+  }));
+}
+
+test("confirmed wheel input survives reflow without losing its movement result", () => fixture(f => {
+  const policy = f.install();
+  f.frame.position = 1340; // Compositor moves before the passive wheel listener.
+  f.dialog.dispatchEvent(Object.assign(new Event("wheel"), { deltaY: -100, ctrlKey: false }));
+  assert.deepEqual(f.observations, [true]);
+  const timer = [...f.timers.keys()][0];
+  f.frame.clientHeight -= 1;
+  policy.layoutChanged();
+  assert.equal(policy.isReading(), true);
+  assert.deepEqual([...f.timers.keys()], [timer]);
+  f.emitEnd(f.frame);
+  assert.deepEqual(f.endings, [true]);
+  assert.equal(f.timers.size, 0);
+}));
+
+test("a newer boundary End cancels an input preserved through reflow", () => fixture(f => {
+  const policy = f.install();
+  f.dialog.dispatchEvent(Object.assign(new Event("keydown"), { key: "Home" }));
+  f.frame.clientWidth -= 1;
+  policy.layoutChanged();
+  assert.equal(policy.isReading(), true);
+  f.dialog.dispatchEvent(Object.assign(new Event("keydown"), { key: "End" }));
+  assert.equal(policy.isReading(), false);
+  assert.deepEqual(f.endings, [false]);
+  assert.equal(f.timers.size, 0);
+  f.frame.position = 1315;
+  policy.layoutChanged(); f.emitScroll(f.frame);
+  assert.deepEqual(f.observations, [false]);
+}));
+
+test("ending input cannot preserve a later API request through layout", () => fixture(f => {
+  const policy = f.install();
+  f.dialog.dispatchEvent(Object.assign(new Event("keydown"), { key: "Home" }));
+  f.frame.position = 1000; f.emitScroll(f.frame); f.emitEnd(f.frame);
+  assert.deepEqual(f.endings, [true]);
+  f.frame.scrollTo({ top: 300, behavior: "smooth" });
+  policy.layoutChanged();
+  assert.equal(policy.isReading(), false);
+  assert.equal(f.timers.size, 0);
+}));
+
+test("closing during reflow-preserved input cancels its original timer", () => fixture(f => {
+  const policy = f.install();
+  f.dialog.dispatchEvent(Object.assign(new Event("keydown"), { key: "Home" }));
+  policy.layoutChanged();
+  const callback = [...f.timers.values()][0];
+  assert.ok(callback);
+  policy.dispose();
+  callback();
+  assert.equal(policy.isReading(), false);
+  assert.equal(f.timers.size, 0);
+  assert.deepEqual(f.endings, []);
+}));
+
 test("a throwing native method leaves no new source and preserves its exception", () => fixture(f => {
   const failure = new Error("native-failure");
   Object.defineProperty(f.frame, "scrollTo", { configurable: true, value: () => { throw failure; } });

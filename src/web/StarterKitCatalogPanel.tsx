@@ -6,6 +6,7 @@ import type { OfficialStarterKitCatalog, OfficialStarterItem, StarterKitId, Star
 import { readStarterKitCatalog } from "./starter-kit-catalog-client.js";
 import { readClassCatalog } from "./class-catalog-client.js";
 import { observeStarterReading } from "./starter-catalog-reading.js";
+import { createStarterFocusDock } from "./starter-catalog-focus-dock.js";
 
 const familyNames: Record<StarterWeaponFamily, string> = { sword: "劍類", bow: "弓類", dagger: "匕首類", staff: "杖類" };
 const requirementText = (r: StarterRequirement) => `${CONTENT_ATTRIBUTE_LABELS[r.attribute]} ${r.minimum}`;
@@ -36,6 +37,7 @@ export function StarterKitCatalogPanel() {
   const frameRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null), openerRef = useRef<HTMLButtonElement>(null);
   const readingRef = useRef<ReturnType<typeof observeStarterReading> | null>(null);
+  const focusDockRef = useRef<ReturnType<typeof createStarterFocusDock> | null>(null);
   const recordFocusRef = useRef<(() => void) | null>(null);
   const lastViewedRef = useRef<StarterKitId | null>(null), lastRowRef = useRef<HTMLButtonElement | null>(null);
   const kit = catalogs?.starter.kits.find(k => k.id === selected);
@@ -55,6 +57,8 @@ export function StarterKitCatalogPanel() {
     dialog.addEventListener("keydown", keyboard);
     window.addEventListener("keydown", escape, true);
     headingRef.current?.focus({ preventScroll: true });
+    const focusDock = createStarterFocusDock(dialog);
+    focusDockRef.current = focusDock;
     let resizeFrame: number | null = null;
     let focusRepairPending = false;
     let reading: ReturnType<typeof observeStarterReading> | null = null;
@@ -62,7 +66,7 @@ export function StarterKitCatalogPanel() {
       const active = document.activeElement;
       if (!dialog.open || !(active instanceof HTMLElement) || active === dialog || !dialog.contains(active)) return null;
       const frame = frameRef.current, body = bodyRef.current;
-      const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame
+      const viewport = focusDock.isDocked(active) ? dialog : frame && frame.scrollHeight > frame.clientHeight ? frame
         : body?.contains(active) ? body : frame;
       if (!viewport) return null;
       const bounds = active.getBoundingClientRect(), layout = viewport.getBoundingClientRect();
@@ -74,16 +78,26 @@ export function StarterKitCatalogPanel() {
         contained: bounds.top >= top && bounds.bottom <= bottom && bounds.left >= layout.left && bounds.right <= layout.right };
     };
     let previousFocus = measureFocus();
-    const recordFocus = () => { previousFocus = measureFocus(); };
+    const recordFocus = () => { focusDock.refresh(); previousFocus = measureFocus(); };
     recordFocusRef.current = recordFocus;
-    const recordScroll = (reading: boolean) => {
+    const preserveFocusControl = () => {
+      focusDock.refresh();
       const next = measureFocus();
+      // Unknown scroll remains unknown. Keeping the actual control visible does
+      // not require attributing the movement or changing the reading viewport.
+      if (next && previousFocus?.active === next.active && previousFocus.visible && !next.contained)
+        focusDock.pin(next.active);
+      return measureFocus();
+    };
+    const recordScroll = (reading: boolean) => {
+      const next = preserveFocusControl();
       // Reflow can clamp against an intermediate maximum. It must not erase an anchor.
-      // Native focus scrolling may make a new focus visible; explicit reading can hide it.
+      // Native focus scrolling may make a new focus visible. Its operation layer
+      // preserves an already-visible control independently of reading ownership.
       if (reading || next?.visible) previousFocus = next;
       if (reading) {
         // Reading after a queued resize takes ownership; its end is not a reason
-        // to snap a partially visible control back into view.
+        // to change the player's viewport.
         focusRepairPending = false;
         if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
         resizeFrame = null;
@@ -97,25 +111,23 @@ export function StarterKitCatalogPanel() {
       if (!focusRepairPending) return;
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       resizeFrame = window.requestAnimationFrame(() => {
-        // Give tracked commands two bounded frames to arrive. Unattributed
-        // movement cannot cancel focus repair, even at an apparently legal top.
+        // Keep the existing bounded layout sampling. This now positions a real
+        // focused control; it never cancels a native reading animation with SIV.
         reading?.sampleLayout();
         if (!focusRepairPending) { resizeFrame = null; return; }
         resizeFrame = window.requestAnimationFrame(() => {
           resizeFrame = null;
           reading?.sampleLayout();
           if (!focusRepairPending) return;
-          const next = measureFocus();
-          if (reading?.isReading()) return;
           focusRepairPending = false;
-          if (next && previousFocus?.active === next.active && previousFocus.visible && !next.contained)
-            reading?.repair(() => next.active.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" }));
+          preserveFocusControl();
           previousFocus = measureFocus();
         });
       });
     };
     const keepFocusVisible = () => {
       reading?.layoutChanged();
+      focusDock.refresh();
       scheduleFocusRepair();
     };
     reading = observeStarterReading(dialog,
@@ -140,7 +152,9 @@ export function StarterKitCatalogPanel() {
       window.visualViewport?.removeEventListener("resize", keepFocusVisible);
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       reading?.dispose();
+      focusDock.dispose();
       if (readingRef.current === reading) readingRef.current = null;
+      if (focusDockRef.current === focusDock) focusDockRef.current = null;
       if (recordFocusRef.current === recordFocus) recordFocusRef.current = null;
       dialog.removeEventListener("focusin", recordFocus);
       dialog.removeEventListener("keydown", keyboard);
@@ -153,6 +167,7 @@ export function StarterKitCatalogPanel() {
     if (!open) return;
     const frame = frameRef.current, body = bodyRef.current;
     const restoreScreen = () => {
+      focusDockRef.current?.release();
       if (frame) frame.scrollTop = 0;
       if (body) body.scrollTop = 0;
       // Short or enlarged layouts scroll the whole sheet instead of a squeezed body.

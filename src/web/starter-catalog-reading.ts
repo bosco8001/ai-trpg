@@ -19,6 +19,8 @@ export function observeStarterReading(
   type Ticket = { origin: Position; direction: number; kind: "input" | "api" };
   const tickets = new Map<HTMLElement, Ticket>();
   const movedElements = new Set<HTMLElement>();
+  // Input lifetime is independent of the geometry used to attribute displacement.
+  const inputElements = new Set<HTMLElement>();
   // A layout rAF can precede passive wheel delivery. Retain its uncredited delta
   // briefly, without treating that delta itself as a reading command.
   const uncredited = new Map<HTMLElement, { origin: Position; current: Position; time: number }>();
@@ -37,7 +39,7 @@ export function observeStarterReading(
     clearQuietTimer();
     if (pointer?.scrollbar || pointer?.dragging || !reading || disposed) return;
     reading = false;
-    tickets.clear(); movedElements.clear();
+    tickets.clear(); movedElements.clear(); inputElements.clear();
     readingEnded(readingMoved);
   };
   const waitForEnd = () => {
@@ -49,15 +51,18 @@ export function observeStarterReading(
     if (disposed || internalScroll) return;
     if (!reading) {
       readingMoved = false;
-      movedElements.clear();
+      movedElements.clear(); inputElements.clear();
     }
     reading = true;
     waitForEnd();
   };
-  const confirmReading = (elements: HTMLElement[]) => {
+  const confirmReading = (elements: HTMLElement[], kind: Ticket["kind"] = "api") => {
     if (disposed || internalScroll) return;
     beginReading(); readingMoved = true;
-    for (const element of elements) movedElements.add(element);
+    for (const element of elements) {
+      movedElements.add(element);
+      if (kind === "input") inputElements.add(element);
+    }
     recordScroll(true);
   };
   const canMove = (position: Position, direction: number) => direction < 0
@@ -66,16 +71,22 @@ export function observeStarterReading(
     if (!canMove(origin, direction)) return;
     beginReading();
     tickets.set(element, { origin, direction, kind });
+    if (kind === "input") inputElements.add(element);
   };
   const replaceTickets = (elements = scrollers) => {
-    for (const element of elements) tickets.delete(element);
+    for (const element of elements) { tickets.delete(element); inputElements.delete(element); }
     if (reading && !readingMoved && !tickets.size) endReading();
   };
   const observePosition = (element: HTMLElement, allowTicket: boolean, retainDelta = true) => {
     const before = positions.get(element), after = sample(element);
     positions.set(element, after);
     const ticket = tickets.get(element);
-    if (ticket && !sameLayout(ticket.origin, after)) tickets.delete(element);
+    if (ticket && !sameLayout(ticket.origin, after)) {
+      // A changed range invalidates displacement evidence, not an active input.
+      // Rebase without attributing the layout/clamp delta to that input.
+      if (ticket.kind === "input") tickets.set(element, { ...ticket, origin: after });
+      else tickets.delete(element);
+    }
     if (!internalScroll && allowTicket && ticket && sameLayout(ticket.origin, after)
       && after.top !== ticket.origin.top
       && (ticket.direction === 0 || (after.top - ticket.origin.top) * ticket.direction > 0)) {
@@ -83,7 +94,7 @@ export function observeStarterReading(
       // observed the displacement before the delayed native scroll event arrives.
       tickets.set(element, { ...ticket, origin: after });
       uncredited.delete(element);
-      confirmReading([element]); return true;
+      confirmReading([element], ticket.kind); return true;
     }
     if (before && before.top !== after.top && !internalScroll) {
       if (retainDelta && sameLayout(before, after)) {
@@ -183,10 +194,13 @@ export function observeStarterReading(
   }
   const focusChanged = () => {
     clearQuietTimer(); reading = Boolean(pointer?.scrollbar);
-    tickets.clear(); movedElements.clear(); uncredited.clear();
+    tickets.clear(); movedElements.clear(); inputElements.clear(); uncredited.clear();
     if (!reading) { readingMoved = false; rememberPositions(); }
     if (reading) {
-      for (const element of scrollers) tickets.set(element, { origin: sample(element), direction: 0, kind: "input" });
+      for (const element of scrollers) {
+        tickets.set(element, { origin: sample(element), direction: 0, kind: "input" });
+        inputElements.add(element);
+      }
       waitForEnd();
     }
     restoreFocusedScroll?.(); restoreFocusedScroll = null;
@@ -205,11 +219,13 @@ export function observeStarterReading(
     if (!scrollers.includes(element)) return;
     observePosition(element, true);
     const participated = tickets.has(element) || movedElements.has(element);
-    tickets.delete(element); movedElements.delete(element);
+    tickets.delete(element); movedElements.delete(element); inputElements.delete(element);
     // An input may have candidate ancestors which never moved. They need not keep
     // an ended gesture alive; another actually moving scroller still does.
     if (participated && !movedElements.size) {
-      for (const [candidate, ticket] of tickets) if (ticket.kind === "input") tickets.delete(candidate);
+      for (const [candidate, ticket] of tickets) if (ticket.kind === "input") {
+        tickets.delete(candidate); inputElements.delete(candidate);
+      }
       if (!tickets.size) endReading();
     }
   };
@@ -225,7 +241,7 @@ export function observeStarterReading(
       // The compositor can move before a passive listener. Credit that movement
       // only for this known wheel direction and unchanged observed geometry.
       if (before && sameLayout(before, after) && canMove(before, direction)
-        && (after.top - before.top) * direction > 0) confirmReading([element]);
+        && (after.top - before.top) * direction > 0) confirmReading([element], "input");
       else if (before && before.top !== after.top) recordScroll(false);
       positions.set(element, after);
       uncredited.delete(element);
@@ -243,6 +259,7 @@ export function observeStarterReading(
       for (const element of scrollers) {
         const origin = sample(element);
         tickets.set(element, { origin, direction: 0, kind: "input" });
+        inputElements.add(element);
       }
     }
   };
@@ -257,8 +274,9 @@ export function observeStarterReading(
       for (const element of scrollers) {
         const before = positions.get(element), after = sample(element);
         if (before && sameLayout(before, after) && before.top !== after.top
-          && (direction === 0 || (after.top - before.top) * direction > 0)) confirmReading([element]);
+          && (direction === 0 || (after.top - before.top) * direction > 0)) confirmReading([element], "input");
         tickets.set(element, { origin: after, direction, kind: "input" });
+        inputElements.add(element);
         positions.set(element, after);
       }
     }
@@ -296,20 +314,27 @@ export function observeStarterReading(
     isReading: () => reading,
     layoutChanged: () => {
       if (disposed) return;
-      // A no-op command before reflow must not adopt an unseen intermediate clamp.
-      // Keep its last confirmed focus baseline; only a new command can own movement.
-      clearQuietTimer(); tickets.clear(); movedElements.clear(); uncredited.clear();
-      reading = Boolean(pointer?.scrollbar || pointer?.dragging); readingMoved = false;
+      // Keep a live input and its existing deadline. Reflow is not cancellation.
+      // Unconfirmed API requests retain their old conservative invalidation policy.
+      const activeInput = inputElements.size > 0 || Boolean(pointer?.scrollbar || pointer?.dragging);
+      if (!activeInput) {
+        clearQuietTimer(); movedElements.clear(); reading = false; readingMoved = false;
+      }
+      for (const [element, ticket] of tickets) if (ticket.kind !== "input") tickets.delete(element);
+      uncredited.clear();
       observePositions(false);
+      // A repeated RO notification can have the same final geometry even though
+      // an intermediate clamp was never sampled. Do not credit that position delta.
+      for (const [element, ticket] of tickets) tickets.set(element, { ...ticket, origin: sample(element) });
     },
     sampleLayout: () => { if (!disposed) observePositions(); },
     repair: (apply: () => void) => {
       internalScroll++;
-      try { apply(); } finally { rememberPositions(); tickets.clear(); uncredited.clear(); internalScroll--; }
+      try { apply(); } finally { rememberPositions(); tickets.clear(); inputElements.clear(); uncredited.clear(); internalScroll--; }
     },
     dispose: () => {
       disposed = true; clearQuietTimer(); pointer = null; reading = false;
-      tickets.clear(); movedElements.clear(); uncredited.clear();
+      tickets.clear(); movedElements.clear(); inputElements.clear(); uncredited.clear();
       restoreFocusedScroll?.();
       for (const restore of restorations.reverse()) restore();
       dialog.removeEventListener("focusin", focusChanged);

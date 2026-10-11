@@ -525,3 +525,145 @@ git ls-remote origin refs/heads/codex/phase27-mobile-ui
 ```
 
 BASE `66eb28c16c3e050c87a5802f95b2317cd70253c4`；TARGET待本輪限定提交／推送後填完整SHA。完整複驗要求見GROK_REVIEW末段。待本輪工程複驗及使用者手動接受，未開始下一主要切片。
+
+## H-2／L-8 Ultra 補修交接紀錄（2026-10-11）
+
+使用者已明確授權本次限定八檔 commit／push 並複驗。已提交及推送 `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`，BASE 為 `66eb28c16c3e050c87a5802f95b2317cd70253c4`，分支 `codex/phase27-mobile-ui`。提交正好包含上述八檔，加 670 行、刪 84 行；其他既有修改未納入。提交、推送皆回 0；`git ls-remote` 讀回遠端 HEAD 與本地完整 TARGET 一致。這些是版本與交接資訊，不是工程驗證結果。
+
+香港時間 2026-10-11 15:02:22，Codex 透過 Grok Bot Control 送達當次介面核對的 **AI TRPG Architecture Critic**。完整 4514 字元草稿在送出前核對一致；送出後讀回新 outgoing 訊息、完整 BASE／TARGET 及要求，輸入框已清空。送出紀錄先保留單次交接，再確認送達，沒有重複送出；介面曾顯示「Couldn't refresh」，但未把警告或送出動作本身當成送達證據。
+
+提交內「尚未獲授權／尚未提交／未送達／TARGET 待填」均為授權前準備時的歷史狀態；實際複驗版本以上述完整 TARGET 及已送出的 prompt 為準。本節為提交後本地交接補記，尚未另外提交或推送。
+
+Codex 及代理未執行專案測試或驗證命令。Grok 工程結果仍待回覆，L-7、延後 smooth 及晚到截限限制仍交外部評估，沒有宣告解決或接受。第七切片待使用者最終驗收，下一主要切片未開始。
+
+
+## 1435b2c 外部複驗回報（2026-10-11）
+
+透過 Grok Bot Control 從當次介面的 **AI TRPG Architecture Critic** 讀回四則回覆，香港時間 2026-10-11 15:41:52、15:41:55、15:41:57、15:42:01，標記 t73u。外部工程結論為 **FAIL**。TARGET `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`，BASE `66eb28c16c3e050c87a5802f95b2317cd70253c4`，與送驗一致；外部回報遠端 HEAD 是 TARGET、BASE 是祖先、八檔範圍正確。下列是外部回報，Codex 只讀回及核對相關程式，沒有親自執行測試，沒有下載或獨立核對外部證據。
+
+### 已修項目及版本對照
+
+- **H-2：已測案例修好。** 每案新頁 N=5，三段轉向、另外兩種轉向、連續五轉向，以及 resize／第一或第二 rAF 阻塞主線程 300ms、事先阻塞 600ms，TARGET 均 0 失焦；BASE 同案例 5／5 失焦，停 1315 或 1405。Case M 無法在 row 停妥，兩邊均作廢，不當 PASS。
+- **882 矩陣：** TARGET AA 882／882，AAA 864；超大控件另列 10 個，另有 8 個部分可見但不屬超大的案例（真縮放加 200% 字級）。BASE 本輪 AA 730／882，不覆寫上一輪外部 AA 714／882；兩輪結果分開保存。
+- **L-8：已測案例修好。** 七類輸入乘五時序、N=2，無輸入對照及 noop 前後／未知截限後 noop 均 0 失焦。BASE 仍被遮蔽、停 1315。production dist 無法讀取 tickets／readingMoved／pending，內部欄位列受阻，改用 passive trace 記 rAF／timer／SIV 順序，不宣稱直接核對全部內部狀態。
+
+### 仍需補修的兩項 Medium
+
+1. **F1｜Medium｜已知輸入閱讀被同幀 reflow 清除（H-1 同族新退化）。** 位置 `src/web/StarterKitCatalogPanel.tsx:117–119、131`、`src/web/starter-catalog-reading.ts:297–304`；RO 呼叫 layoutChanged 清除 quiet timer、tickets、reading，之後 panel L111 的 repair 呼叫 scrollIntoView。
+   - 證據較強的受信任 CDP 鍵盤重現：390×844 焦點在「返回四職業」→844×390→Home，同幀 resize 到 844×389。TARGET 停 269／286／272（3／3），BASE 到 0（3／3）；沒有 resize 時兩邊到 0。trace 為 key 建立 250ms timer→resize 清 timer→fr187 鍵盤 smooth 開始→fr188 SIV 打斷→scrollend 停約 270。PageUp TARGET 1185／BASE 1129，六次 ArrowUp TARGET 1229／BASE 1200，各 2／2。
+   - 合成 wheel、isTrusted=false：compositor→第一 rAF sample→wheel→scroll，以及 wheel→sample→scroll。TARGET 從 1340 拉回 1441，SIV 一次，headless／有頭各 5／5；BASE 保持 1340。真裝置會否發生仍是推斷，未測。
+   - 預期同幀版面改動不清除已知輸入閱讀；實際捲動被拉回或 smooth 半途停止。影響轉向、鍵盤及 viewport 變化時的閱讀操作。
+2. **F2｜Medium｜L-7 能力縮限形成實測退化。** 來源辨識位置 `src/web/starter-catalog-reading.ts:106–146`。沒有可觀察來源的捲動遇 reflow 會被 nearest 拉回，不因文件已明示縮限就當修好或使用者已接受。
+   - N=3，prototype scrollTo／setter 在 0／300／300.5／max−1／max，穩定尺寸、resize 第一及第二 rAF、與截限同位等形態：TARGET 40／40 拉回 1441 或 1829；BASE 在 0／300／300.5 共 24／24 保持位置。非焦點 SIV：TARGET 4／4 拉回。
+   - CDP DOM.scrollIntoViewIfNeeded、text fragment `#:~:text=普通木杖`、不可配置 own scrollTop／scrollTo=300：BASE 保持、TARGET 拉回，3／3、兩種時序；第三方第一或第二 rAF prototype scrollTo.call，BASE 保持、TARGET 3／3 拉回。
+   - 穩定尺寸且沒有待修正時，未知捲動未主動排 nearest，SIV 0（3／3）；不將這項符合新契約的結果延伸成舊 L-7 需求通過。四個 fixture 改契約不能證明舊需求，250ms wheel 回讀也不是未知來源的因果證明。
+   - 影響搜尋、text fragment、第三方及輔助工具捲動後的閱讀位置。CDP 代用來源不等於真讀屏／Chrome 搜尋列已測。
+
+### 命令與測試（全部為外部實做回報）
+
+外部列出的 npm ci、npm run build、BASE build、三次 migration、完整 SHA git diff --check 及各測試命令皆 exit 0。介面回覆未逐一附上三次 migration 的完整命令，不能補造命令或日志。
+
+| 項目 | 外部結果 |
+| --- | --- |
+| 六指定檔，無 DB／隔離 PG | 109／109、109／109 |
+| npm test，無 DB | 522 項：474 pass、0 fail、48 skip；skip 不當 PASS |
+| npm test，隔離 PG | 524／524 |
+| reading 單檔正序 ×2 | 63／63 |
+| reading＋starter-kit 正反序各 ×2 | 71／71 |
+
+以上自動測試不覆蓋兩項 UI 退化，不改寫工程 FAIL。環境：Node v24.21.0、Chrome 154.0.8037.97、playwright-core 1.59.1、PostgreSQL 17.11，新隔離 55426 cluster。
+
+### 回歸與 Info
+
+- H-1 其他案例：headless／Xvfb 有頭 N=5，單步／連續／trackpad／反向／缺 scrollend／600ms smooth／compositor→wheel／body noop 夾入、0／小數／max 邊界、焦點完全不可見、高畫面 body 及閒置 1 秒無 resize，均未拉回；不覆蓋 F1 的同幀 reflow 缺陷。
+- 包裝 API setter／scroll／scrollTo／scrollBy，同步 0／300／300.5、resize 前／同 task／第一與第二 rAF，TARGET 60／60、BASE 60／60。
+- 重開五次無累積；wheel／smooth／按住 pointer／等待 rAF 或 timer 中 Esc 均正常，焦點回入口、timer 清零、prototype 未改。轉向後閒置一秒 rAF／timer／SIV／scroll 均 0。
+- CDP 模擬 safe area 24 組：焦點環侵入 0、控件至少 44px、無橫溢出、最低對比 4.8。HTTP 125／125、主流程 20／20、故障 19／19、GET only、md5 一致；回覆未逐表列出生／state／三槽／八表結果，不補造各自分母。M4b／M4c／M6a caught。
+- Info：headless CDP Ctrl+wheel TARGET 拉回 1441、BASE 保持 1140；外部指出 reading L217 遇 ctrlKey return。真 Ctrl+wheel 縮放未測，不能當真縮放退化已證實。heading Tab／Shift+Tab 跳「跳至故事紀錄」兩版相同，是舊有行為。
+- 歷史 SHA 保留，TARGET 待填屬提交前模板。引用而未重做：66eb28c 外部結果、t66u 15 caught／3 等價、t68u 1–3 frame。I-A、職業 L-1、原型 N1、favicon 404、I-1、validator 仍 open。
+
+### 未測、受阻與未完成
+
+- 未測：真手機、讀屏、Safari、系統字級、真 safe area、Android 網址列、Chrome 搜尋列、真 Ctrl-wheel。
+- 受阻：真 pinch、真 320 寬視窗、reading 內部欄位；window.find 代用來源兩邊均未捲動。
+- 未完成：取消備份下載四個畫面腳本 3 秒 timeout，舊 UI 57 畫面僅比對 53；H-2 case M 作廢；雙 scroller smooth、touch 反向、resize 中按住 scrollbar 僅單元測試／harness 覆蓋，未跑真頁面。不能改標全部完成或 PASS。
+
+### 證據及狀態
+
+外部證據及摘要保留 `/workspace/p33y-evidence/`；外部回報 server／DB／role／cluster 已清，`/workspace/p33y` 已刪，5432 未碰、舊證據 15／15 hash 不變、repo 未改且沒有 commit／push。Codex 未獨立核對上述外部檔案。
+
+本輪只補記外部結果與狀態文件，未改程式／測試，未 commit／push 或新送驗。先前「等待工程回報」為當時狀態。本版 H-2／L-8 已測案例修好，整體工程仍 **FAIL**，F1／F2 待同切片補修；使用者尚未接受第七切片或 L-7 能力縮限，下一主要切片未開始。
+
+## F1／F2 三段補修：第二段實作交接（2026-10-11）
+
+本節是第二段的工作基準，第三段先讀本節與實際差異，不重新展開歷史分析。使用者已回覆「已切換，繼續」，並確認 **A：允許限定的焦點／閱讀結構調整**。A 批准本 Sheet 的呈現方案，並非工程通過、切片驗收或 commit／push 授權。
+
+### 版本與範圍
+
+讀取時分支仍為 `codex/phase27-mobile-ui`，HEAD／既有遠端追蹤版本為 `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`。上一輪 t73u 的 BASE 為 `66eb28c16c3e050c87a5802f95b2317cd70253c4`；該輪外部工程 **FAIL**，F1／F2 均 Medium，H-2／L-8 僅在已測案例修好。本輪修改尚未提交、推送或送驗。第三段新補丁複驗的 BASE 應使用完整 `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`，TARGET 待限定提交後取得，不沿用舊 BASE 冒充本輪差異。
+
+本輪六個程式／測試檔：
+
+1. `src/web/starter-catalog-reading.ts`
+2. `src/web/StarterKitCatalogPanel.tsx`
+3. `src/web/starter-catalog-focus-dock.ts`（新增）
+4. `src/web/starter-kit-catalog.css`
+5. `tests/starter-catalog-reading.test.ts`
+6. `tests/starter-catalog-focus-dock.test.ts`（新增）
+
+另外更新五份交接／狀態文件：本文件、`PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md`、`CANONICAL_MANIFEST.md`、`IMPLEMENTATION_PLAN.md`、`OPEN_QUESTIONS.md`。這五檔包含本輪開始前已存在的外部結果補記；不得稱為原先乾淨或刪去那些紀錄。限定候選提交共十一檔；其他既有未提交修改保留，不納入。沒有改 Canon、正式數值、API、保存、發放或戰鬥契約，沒有開始下一主要切片。
+
+### 實作決策與處理順序
+
+- **F1 先處理輸入生命週期。** 已知且可移動的鍵盤／wheel 輸入與幾何證據分開保存。`layoutChanged` 保留仍有效的輸入、已確認位移及原有截止時間，重新取樣／重設位置基準；版面或截限位移本身不取得閱讀權限。新邊界操作仍取代舊候選；scrollend、失焦、內部導頁及關閉仍清理。不新增 timer，不延長既有期限；未確認 API 請求沿用原本遇版面變動失效的保守策略。
+- **F2 再處理呈現。** 原本可見、同一個實際焦點控制項若將離開完整可見區，暫時顯示在 Sheet 可見操作區。未知 scroll 仍回報未知，不當成閱讀，也不當成允許拉回。reflow 的兩次既有 rAF 只取樣及安置控制項，不再呼叫 nearest `scrollIntoView` 修正閱讀視窗；late scroll 同樣可保留控制項，不增加等待時間。
+- **原節點與語意保留。** 使用原生 `popover="manual"` 把同一節點呈現在上層，DOM 父節點及原事件不變，沒有複製按鈕或假焦點。一般控制項留空間佔位；原生 summary 留在自己的 details，以來源 padding 保留空間。失焦、明確導頁或關閉時恢復；必要的原節點焦點恢復使用 `preventScroll`，不把焦點轉交替身。已有第三方 popover 不接管，原生顯示被取消或拋錯時撤回本輪變更。
+- **限定呈現細節。** 沿用已接受的字體、色彩、按鈕及焦點環；依 visual viewport、Sheet 邊界與安全區配置位置。原生上層避免現有容器的 containment／裁切問題，不更換捲動容器或移除容器查詢。此技術依據為 [HTML popover 規格](https://html.spec.whatwg.org/multipage/popover.html#dom-showpopover)及 [CSS top layer 規格](https://drafts.csswg.org/css-position-4/#top-layer)，不是本輪瀏覽器實測。
+- **明確導航優先。** 選職業／返回四職業仍先釋放暫留控制項，再執行原本導頁重設與焦點交接；關閉仍回入口。來源包裝、WebIDL 引數轉送、監聽選項與捲動容器切換策略未一起重寫。
+
+### 測試已補寫，全部尚未執行
+
+reading 新案例涵蓋 Home／PageUp／ArrowUp 同幀微 resize 與未觀察截限、已確認 wheel 位移、原 timer 不續期、新邊界命令取消舊候選、已結束輸入不保護後來 API，以及 dispose／晚到回呼。既有斷言沒有降低、刪除或 skip。
+
+新增 focus-dock fixture 涵蓋安全區／超大控制項／空範圍幾何、同一節點與父節點、來源空間及樣式復原、原生顯示取消／例外、第三方 popover、失焦／關閉清理及原節點 `preventScroll` 恢復。它只模擬幾何與 DOM 擁有權，沒有模擬原生 top layer、details、焦點演算法、字體排版或瀏覽器捲動；不能代替真頁面結果。
+
+Codex 本輪只閱讀程式、文件及 Git 資訊，修改程式／測試及交接文件；沒有執行 build、typecheck、lint、格式檢查、diff --check、自動化靜態分析、單元／資料庫／瀏覽器／UI 驗證。新增案例及既有全套均待指定 Critic 執行。沒有工程 PASS 或使用者驗收結果。
+
+### 第三段必須先驗的真頁面案例
+
+1. **H-2：** 無玩家操作的三段轉向、中途截限、第一／第二 rAF 阻塞等舊真頁面案例，原可見實際焦點仍可見，沒有改讀屏名稱／事件或額外取得閱讀權限。
+2. **F1：** 重用 t73u 的受信任 Home 同幀 844×390→844×389、PageUp／ArrowUp，以及兩種 wheel 次序；核對 native smooth 未被打斷、沒有 nearest 拉回、原截止時間與命令取代規則。合成 wheel 結果與真輸入分列。
+3. **F2：** prototype scrollTo／setter、非焦點 SIV、text fragment、CDP 代用來源、不可配置 own descriptor、第三方第一／第二 rAF 遇 reflow；核對閱讀位置未被本補丁拉回，未知來源沒有被改報已知閱讀，控制項仍是同一節點。CDP 不當真讀屏／搜尋列證明。
+4. **L-8：** 邊界／無位移七類與既有時序、noop 前後／未知截限後 noop；不得靠虛假閱讀權限隱藏焦點修正或改斷言取得綠燈。
+5. **呈現及清理：** 全部焦點類型（標題、關閉、職業列、summary、返回、重讀）、短畫面／雙捲動區、字級變動、模擬安全區、超大控制項；核對實際節點、DOM 父節點、Tab／Shift+Tab、summary 的 Enter／Space／點擊開合、按壓／停用狀態、來源佔位、控制項與文字沒有不可達的遮擋。Popover 開合／取消／失焦／返回／Esc／重開及 late callback 不殘留 class、屬性、樣式、佔位或監聽器。
+
+定向真頁面後，沿用本 Phase Spec 與既有完整 GROK_REVIEW 要求完成必要全回歸，包括舊 882 矩陣與完整自動測試；加入新測試檔，不能因省 token 刪掉必要檢查。前版 53／57、作廢 case M、雙 scroller smooth／touch 反向／resize 按住 scrollbar 尚未跑真頁面的缺口必須保留或實際補驗，不能引用成已完成。本輪結果分列實做、引用、推斷、未測、受阻與作廢。
+
+### 已知限制與停止界線
+
+實作沒有直接寫入閱讀 scroller 的位置來維持操作層，但來源佔位、原生 popover／details、字級換行、關閉復原仍可能影響原生排版或焦點；是否完全不跳動尚未證實。控制項暫留可見區的遮擋、可讀性、Tab 順序與安全區由 Grok 真頁面核對，並由使用者決定 UI 是否接受。極小可用範圍或不支援原生 popover 時不能保證完整 44px／AA；沒有虛構備援成功。真手機、讀屏、Safari／系統字級等仍未測，舊 I-A 與其他 Info 不改標已修。API 包裝仍有原先來源與延後 smooth 限制，本輪不宣稱辨識未知來源的因果。
+
+第二段實作完成，仍待工程驗證；最新已送版本工程 FAIL 保留，新本地補丁結果未知。第三段需等使用者把 effort 切換為 high 並回覆「已切換，繼續」，再核對限定十一檔與新的 commit／push 授權、取得 bot 可讀完整 TARGET、經 Grok Bot Control 單次送達指定 Critic。工程 PASS 後才整理手動核對；工程 FAIL 時只分類結果並提醒回到 ultra，不直接續補丁。
+
+## F1／F2 第三段交接準備（2026-10-11）
+
+使用者已回覆「已切換，繼續」。Codex 讀取第二段摘要、實際差異、新增 helper／fixture 及既有完整驗證要求；HEAD 仍為 `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`、分支 `codex/phase27-mobile-ui`，暫存區為空。沒有重新展開根因分析、沒有新增程式補丁，也沒有執行工程驗證。完整新審查 prompt 已寫在 GROK_REVIEW 的第三段；TARGET 待填，尚未送達。
+
+依 [AGENTS.md 第4節](../../AGENTS.md)，送驗「不代表開發代理自動獲得 commit／push 授權」。前次八檔授權已完成；本次需要上節完整十一檔的新限定授權，包含兩個新增檔與原五文件外部結果補記，不納入其他未提交修改。下列命令為待授權指令，尚未執行；若暫存區或版本有新增工作，先核對範圍再提交，不把其他暫存檔夾入。
+
+```sh
+git add -- src/web/StarterKitCatalogPanel.tsx src/web/starter-catalog-reading.ts src/web/starter-catalog-focus-dock.ts src/web/starter-kit-catalog.css tests/starter-catalog-reading.test.ts tests/starter-catalog-focus-dock.test.ts docs/development/PHASE_33_STARTER_KIT_CATALOG.md docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md docs/development/CANONICAL_MANIFEST.md docs/development/IMPLEMENTATION_PLAN.md docs/development/OPEN_QUESTIONS.md
+git diff --cached --name-only
+git commit -m "fix: preserve starter catalog reading across reflow"
+git push origin codex/phase27-mobile-ui
+git rev-parse HEAD
+git ls-remote origin refs/heads/codex/phase27-mobile-ui
+```
+
+取得授權與可讀完整 TARGET 後，替換第三段 prompt 的 TARGET 模板，依 Grok Bot Control 從當次介面核對 AI TRPG Architecture Critic、完整草稿、單次送出與新 outgoing／空白 composer。未送達不寫已送驗；若送出狀態不明，先核對，不重複送出。外部回覆尚未取得前維持待驗證，不將準備工作寫成工程 PASS。
+
+第三段先驗 H-2／F1／F2／L-8／一般閱讀清理，再完成必要完整回歸。PASS 才整理外部結果及短手動核對清單，等待使用者驗收；FAIL 只整理證據分類及受影響範圍，提醒「工程仍 FAIL。請把 effort 切回 ultra，回覆『已切換，繼續分析』」，不自動補程式。本 prompt 的十一檔限定授權未取得前，不提交或推送。
+
+### 本輪限定授權已取得
+
+使用者於本輪明確回覆「授權」，同意上述十一檔 commit／push 並送指定 Critic 複驗。前文「等待授權」是準備當時狀態。提交前 HEAD 仍為完整 BASE `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`；新 TARGET 待提交後取得，實際送出 prompt 必須替換為遠端可讀完整 SHA。授權不包含其他未提交檔案，不包含 Codex 自行工程驗證，也不代表第七切片驗收。提交／推送／送達及外部結果分開補記。

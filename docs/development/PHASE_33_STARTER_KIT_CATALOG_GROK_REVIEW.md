@@ -248,3 +248,82 @@ TARGET：待本輪限定八檔commit／push後填入完整SHA
 8. 兩名冊production HTTP125／主流程20／19故障、慢載入／取消／重開／重試、GET only；出生／state／三槽／八table md5、舊UI57畫面與M4b／M4c／M6a必要回歸。I-A／職業L-1／原型N1／favicon404／I-1／validator仍open；t66u15caught／3等價、t68u1–3frame只作引用，未重做不得改成新結果。文件歷史SHA／實做／引用／推斷／未測／受阻與前版中斷作廢資料保留，TARGET待填是提交前模板，以實際送出完整SHA為準。
 
 請回報工程PASS／FAIL、全部High／Medium／Low／Info、TARGET完整SHA、環境版本、逐命令exitcode及pass／fail／skip、位置／重現／預期實際／影響，附rect／range／來源／pending／rAF／timer證據。真手機、讀屏、Safari、系統字級、真safe、Android網址列、Chrome搜尋與真Ctrl-wheel未做請列未測；真pinch／320真視窗不能做列受阻。清理本輪隔離server／DB／role／cluster，不碰5432或舊證據，保留本輪證據與摘要。不代使用者接受第七切片或特殊能力縮限。尚未送達不得寫成已送驗。
+
+## 1435b2c 複驗送達紀錄
+
+使用者授權限定八檔 commit／push 並複驗後，Codex 已提交及推送 TARGET `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`，BASE `66eb28c16c3e050c87a5802f95b2317cd70253c4`，分支 `codex/phase27-mobile-ui`。提交正好八檔，加 670 行、刪 84 行；遠端 HEAD 與本地完整 SHA 一致，未納入其他既有修改。
+
+香港時間 2026-10-11 15:02:22，透過 Grok Bot Control 送達當次介面確認的 **AI TRPG Architecture Critic**。送出前完整 4514 字元草稿一致，送出後已讀回新訊息、完整版本與複驗要求及空白輸入框；單次送出紀錄已確認，沒有重複送出。介面刷新警告未當成成功證據。
+
+已送 prompt 將上方 TARGET 待填替換為實際完整 SHA，並附精確八檔及已獲授權、已推送狀態。提交內準備段落的未授權／未提交／未送達是當時狀態，不是現況。本節為本地交接補記，尚未另外提交或推送。
+
+沒有由 Codex 或代理執行專案驗證；外部工程回報仍待讀回，不宣告本輪 PASS。L-7 及時序限制仍待評估，第七切片及下一主要切片的使用者驗收界線不變。
+
+
+## 1435b2c 複驗結果讀回
+
+2026-10-11 香港時間 15:41:52／15:41:55／15:41:57／15:42:01，指定 AI TRPG Architecture Critic 回報 t73u 外部工程 **FAIL**。TARGET `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`／BASE `66eb28c16c3e050c87a5802f95b2317cd70253c4` 與交接一致；八檔及遠端版本已由外部核對。
+
+H-2、L-8 在本輪已測案例修好，TARGET AA 882／882、AAA 864；BASE 本輪 AA 730／882，保留上一輪 714／882 作獨立歷史結果。新增 F1 Medium：同幀 reflow 清除已知輸入的閱讀狀態，Home／PageUp 等 smooth 被 nearest 打斷；F2 Medium：prototype／非焦點 SIV／CDP／text fragment 等來源在 reflow 時被拉回，屬 L-7 實測退化，沒有使用者接受縮限。
+
+六檔無 DB／PG 各 109／109；全套無 DB 474 pass／0 fail／48 skip（522 項），隔離 PG 524／524；reading 63／63、兩檔正反序各兩次 71／71。外部列出命令 exit 0 不代替 UI FAIL。未完成：舊 UI 僅 53／57 畫面、H-2 case M 作廢、雙 scroller smooth／touch 反向／resize 中按住 scrollbar 未跑真頁面。內部 reading 欄位讀取受阻，不宣稱直接驗證全部內部狀態。真機／讀屏／Safari 等限制保留。
+
+完整缺陷位置、重現、實做／引用／推斷／未測／受阻及證據清理見[本輪交付紀錄](PHASE_33_STARTER_KIT_CATALOG.md#1435b2c-外部複驗回報2026-10-11)。Codex 只讀回及核對程式，沒有親測或獨立下載外部證據。這次五文件文字補記未提交，未改程式或新送驗。F1／F2 待同切片補修，工程 FAIL，第七切片未接受，下一主要切片未開始。
+
+## F1／F2 第二段實作交接，尚未送驗
+
+使用者已確認 A：允許本 Sheet 限定焦點／閱讀結構調整。本地補丁保留有效輸入生命週期，並以原生 manual popover 暫留同一實際焦點節點，reflow 不再 nearest 拉回閱讀位置。未知仍未知；明確導頁維持原行為。六個程式／測試檔與五份文件的完整十一檔清單、決策、未執行測試、限制及定向真頁面要求見[第二段交接](PHASE_33_STARTER_KIT_CATALOG.md#f1f2-三段補修第二段實作交接2026-10-11)。既有完整驗證要求仍適用，不以新增 fixture 取代真頁面。
+
+本輪 BASE 為 `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`；TARGET 待第三段限定提交／推送後填完整 SHA。目前未提交、未推送、未送達；沒有新 commit／push 授權，也沒有由 Codex 執行工程驗證。t73u 外部工程 FAIL 保留；新補丁尚待驗證及使用者接受。前文「未改程式」是當時外部報告補記的狀態。
+
+依使用者三段安排，等 effort 切換為 high 及「已切換，繼續」後才準備完整新 prompt、核對授權與可讀版本、送達指定 AI TRPG Architecture Critic。定向案例先驗 H-2、F1、F2、L-8、一般閱讀及清理，再完成 Phase Spec／本文件既有必要全回歸。PASS 僅整理工程結果與手動核對；FAIL 僅整理分類、證據及範圍，停止並提醒回 ultra。
+
+## F1／F2 第三段完整複驗 prompt（準備中，未送達）
+
+使用者已回覆「已切換，繼續」，第三段交接已開始。本段只準備工程交接，不新增程式補丁。使用者其後已明確回覆「授權」，同意本輪限定十一檔 commit／push 並複驗；前次八檔授權沒有自行延伸。提交前 HEAD／分支未變。下列 TARGET 是待填模板，取得遠端可讀完整版本後才可送出；不是已送驗紀錄。提交指令見 PHASE_33_STARTER_KIT_CATALOG.md 第三段段落，提交／推送及送達另行補記。
+
+```text
+請 AI TRPG Architecture Critic 做 Phase 33 第七切片 F1／F2 補修的工程複驗。開發／交接方為 Codex；工程 PASS 不代替使用者驗收。這仍是同一切片，不開始下一主要切片。
+
+Repository：https://github.com/bosco8001/ai-trpg
+分支：codex/phase27-mobile-ui
+BASE：1435b2ca15f232edee1a8d9ffd8aa7f23a823336
+TARGET：__待限定提交並推送後填入完整SHA__
+
+先核對完整 BASE／TARGET、遠端 HEAD、祖先及精確十一檔。未取得可讀 TARGET 不得回退 BASE 或用舊 PASS 作本輪結果。讀 TARGET 的 AGENTS.md、docs/development/CANONICAL_MANIFEST.md、OPEN_QUESTIONS.md、PHASE_33_STARTER_KIT_CATALOG.md 第二段交接／最新 t73u 外部報告，以及正式 docs/gameplay/starter_kits.md、character_system.md、classes.md、magic.md；沿用本 Phase Spec 和 GROK_REVIEW 必要全回歸，本 prompt 取代舊八檔 prompt 的版本、範圍和已作廢的預期，不刪除必要驗證。
+
+精確十一檔：
+src/web/StarterKitCatalogPanel.tsx
+src/web/starter-catalog-reading.ts
+src/web/starter-catalog-focus-dock.ts（新增）
+src/web/starter-kit-catalog.css
+tests/starter-catalog-reading.test.ts
+tests/starter-catalog-focus-dock.test.ts（新增）
+docs/development/PHASE_33_STARTER_KIT_CATALOG.md
+docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md
+docs/development/CANONICAL_MANIFEST.md
+docs/development/IMPLEMENTATION_PLAN.md
+docs/development/OPEN_QUESTIONS.md
+
+t73u 對上述 BASE 的外部工程結論為 FAIL：H-2／L-8 已測案例修好，F1 Medium 為同幀 reflow 清除已知輸入、nearest 打斷 Home／PageUp／wheel；F2 Medium 為未知／繞過包裝的捲動遇 reflow 被拉回，屬 L-7 退化。舊 AA882／882、AAA864、全套 PG524／524 不能代替本輪結果。直接重用你的 /workspace/p33y-evidence/ 真頁面腳本與 trace；不要重貼完整歷史，分清已實測與推斷。
+
+本次 F1 保留有效輸入生命週期及原截止時間，版面／截限位移不取得閱讀權限；F2 經使用者確認 A，允許本 Sheet 限定結構調整：同一實際焦點節點以 manual popover 暫留可見操作區，DOM 父節點不變，沒有克隆／假焦點；reflow 不再 nearest 拉回閱讀視窗。未知仍未知，導頁重設維持原行為。未改 Canon、正式數值、API、保存、DB、發放、戰鬥或其他畫面。Codex 未自行執行 build／typecheck／lint／格式／靜態分析／任何測試或瀏覽器驗證。新增 fixture 只描述狀態、幾何與 DOM 擁有權，不是原生瀏覽器證明。
+
+先以隔離 TARGET／BASE 準備真 production 頁面，列 npm ci、npm run build 等每條命令及 exit code；先跑下列定向真頁面案例，再依結果完成必要完整回歸。每案正確初始化、重複與 trace，受信任鍵盤、合成 wheel、CDP 代用來源分列。不得只看 fixture 或 PG 綠燈就 PASS。
+
+1. H-2：無玩家操作 390×844→844×390→390×620 返回四職業、另外兩種轉向、連續五轉向、完全沒讀到中途 maximum、scroll 早／晚於 resize、body→frame、字級還原及內容長大；第一／第二 rAF 阻塞 300ms、事先阻塞 600ms，以及第三幀／250ms 以後 late scroll 沒有新 RO。重用 t73u 每案新頁 N=5；case M 若仍不能有效停妥列作廢，不當 PASS。原本可見的實際焦點不完全消失。
+2. F1：重用受信任 CDP Home，390×844→844×390，Home 同幀微 resize 至 844×389；前版三次停 269／286／272，BASE66eb28c到0。另 PageUp、六次 ArrowUp、無 resize 對照。wheel 的 compositor→第一 rAF sample→wheel→scroll、wheel→sample→scroll，headless／有頭各 N=5，前版 1340→1441。核對 smooth 未被焦點修正或 popover 開合打斷，scroll 位置／事件與原 timer 期限；不能以無 nearest 呼叫但仍跳位置當修好。真裝置未測就標未測，不把合成 wheel 當真輸入。
+3. F2：prototype scrollTo／scrollTop setter、非焦點 SIV、CDP DOM.scrollIntoViewIfNeeded、text fragment #:~:text=普通木杖、不可配置 own descriptor、第三方第一／第二 rAF。穩定尺寸及 reflow 各 N=3，0／300／300.5／max−1／max、與 clamp 同位、兩個 rAF 註冊順序分列；對照 t73u 40／40 拉回與24／24舊版保持的真頁面證據。未知仍不得冒充已知閱讀，搜尋／輔助工具／第三方閱讀位置不被無故拉回。CDP、text fragment 不等於真讀屏或 Chrome 搜尋列。
+4. L-8：七類輸入、End／ArrowDown／同值 setter／scrollTo("x")／scrollBy(NaN)／邊界 wheel，0／1frame／249／250／300ms；無輸入對照先驗，noop 前後、未知 clamp→新邊界 noop、新命令取代舊可動來源、已結束輸入不保護後來 API。至少沿用 t73u N=2；不得靠虛假閱讀權限或放寬斷言掩蓋失焦。
+5. 新操作層：標題、關閉、職業列、summary、返回、重讀的實際 activeElement、節點 identity、DOM 父節點、原事件／可及名稱與焦點環；summary 的 Enter／Space／點擊及 details 開合、Tab／Shift+Tab、ARIA disabled／載入狀態。popover show/hide、取消、例外、第三方屬性／樣式覆寫、焦點轉移／restore、來源佔位、字級換行、短畫面、雙 scroller、模擬安全區與超大控制項。檢查讀取視窗沒有原生 clamp／焦點自動捲動退化、遮擋不造成文字或操作不可達；不只驗 JS 沒寫 scrollTop。popover 不支援／空範圍回退如有缺陷照報，不因文件列限制而免評。
+6. 一般閱讀／清理：原 H-1 passive trace 的 wheel／trackpad、單步／連滾／反向、缺 scrollend、600ms smooth、body noop 夾入、0／fractional／max、部分／完全不可見焦點，高畫面 body／短畫面 frame。Wrapped setter／scroll／scrollTo／scrollBy、options／this／return／throw／getter／繼承／Proxy／apply 中 dispose／第三方覆寫保持；延後 SIV／CSS auto smooth／跨版面／超250ms仍獨立評價。雙 scroller smooth、touch 反向、水平 pointer、resize 按住 scrollbar／窗外 up／cancel 須補真頁面，不能以 harness 引用代替。Esc 第一／第二 rAF、wheel／smooth／pointer／timer 中關閉、五次重開：不殘留 popover／class／屬性／樣式／佔位／RO／refs／wrapper／listener／rAF／timer，不改全域 prototype；停定一秒活動歸零，不振盪。
+
+定向後完成必要全回歸，保留所有有效舊需求／斷言，不 skip 取綠燈：
+（a）六尺寸／三種字級／七停點原882矩陣或充分等效，AA／AAA、超大與部分可見分開；M-1／L-2至L-6回歸。模擬 safe top47／bottom34及0的24組，完整6px焦點環侵入0、至少44px、無橫溢出、對比至少4.5，minimum body可讀與視覺一致性。CSS／top layer 改了必須重驗，舊4.8不冒充本輪。
+（b）完整 SHA git diff --check BASE TARGET；node --import tsx --test tests/starter-catalog-reading.test.ts tests/starter-catalog-focus-dock.test.ts tests/starter-kit-catalog.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts；npm test 無 DB及新隔離非5432 PG／role／DB，逐命令exit／pass／fail／skip，skip不當PASS。兩份 fixture globals／finally／worker 污染及 reading＋focus-dock＋starter-kit 正反序各兩次；M-2 cleanup 斷言與舊測試不放寬。本次只是新增案例，歷史四個 fixture 改契約不能當舊 L-7 需求通過。
+（c）兩名冊 production HTTP125／主流程20／故障19、慢載入取消重開重試、GET only；出生紀錄／state／三槽／八表 md5、不修改資料。舊UI四尺寸57畫面與 M4b／M4c／M6a必要回歸。前輪取消備份四頁timeout、只53／57未完成須補驗或仍列未完成。I-A／職業L-1／原型N1／favicon404／I-1／validator保留；t66u15caught／3等價、t68u1–3frame未重做只作引用。若已同版完成且有效可引用、不無故重跑，但新補丁影響的項目必須重驗。
+
+回報外部工程 PASS／FAIL、完整 TARGET／BASE與環境版本；全部 High／Medium／Low／Info、精確位置、重現、預期／實際、影響與最小受影響範圍。附逐命令exit code／分母與pass-fail-skip，rect／range／來源／rAF／timer／popover／focus事件證據；內部欄位不可讀就列受阻，passive trace不是直接內部狀態證明。分列實做、引用、推斷、未測、受阻、作廢；真手機／讀屏／Safari／系統字級／真safe／Android網址列／Chrome搜尋／真Ctrl-wheel未做列未測，真pinch／真320視窗受阻不改PASS。保留本輪證據與摘要，清理本輪隔離server／DB／role／cluster，不碰5432或舊證據。
+
+不要修改或 commit／push repository，不傳其他 bot、不代使用者接受第七切片、不開始下一主要階段。FAIL 時請只整理失敗分類、證據和受影響範圍；Codex 會停止，等使用者切回 ultra 再分析。PASS 時才整理簡短手動核對清單，仍待使用者接受。
+```
