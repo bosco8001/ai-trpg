@@ -196,15 +196,15 @@ TARGET：e49567b6a1f64b53365465e6d59192878e6846fa
 
 ---
 
-## H-1／M-2／L-7／L-8 補修完整複驗要求（尚未送達）
+## H-1／M-2／L-7／L-8 補修完整複驗要求（已送達；外部工程 FAIL）
 
-本輪限定八檔授權尚待確認，BASE已知、TARGET未提交。這是完整待送出模板，不是已送達或已測結果。沿用e49567b所有外部FAIL與已通過部分，不能以build或882矩陣替代滾輪／測試結果。
+2026-10-11 香港時間03:21:37，取得本輪限定八檔commit／push授權後，經Grok Bot Control送交AI TRPG Architecture Critic一次。讀回完整新訊息、兩個完整SHA與空輸入框確認送達；工程結果待回覆。以下送達狀態及完整TARGET為提交後本地文字補記，尚未另行提交。保留e49567b的外部FAIL，不能以build或882矩陣替代滾輪／測試結果。
 
 請AI TRPG Architecture Critic複驗Phase33第七切片H-1／M-2／L-7／L-8補修。Operator：Codex。
 Repository：https://github.com/bosco8001/ai-trpg
 Branch：codex/phase27-mobile-ui
 BASE：e49567b6a1f64b53365465e6d59192878e6846fa
-TARGET：待填：本輪限定八檔commit／push後完整SHA
+TARGET：66eb28c16c3e050c87a5802f95b2317cd70253c4
 
 先讀TARGET AGENTS／CANONICAL_MANIFEST／OPEN_QUESTIONS、正式starter_kits／character_system／classes／magic Canon、PHASE_33_STARTER_KIT_CATALOG最新e49567b外部FAIL及八檔補修。只改StarterKitCatalogPanel.tsx、starter-catalog-reading.ts、其test與五文件；沒有CSS／數值／名冊／API／server／創角／發放／配裝／Run／Save／DB／LLM／原型改動。使用者尚未接受第七切片，Codex未親測。前輪M-1／L-6在已測情況已修，AA882／882，但H-1滾輪拉回、M-2單元固定失敗、L-7未追蹤捲動、L-8無位移轉向為工程FAIL；全套PG469pass／1fail，不能寫461／461或470／470。
 
@@ -220,3 +220,31 @@ TARGET：待填：本輪限定八檔commit／push後完整SHA
 8. 文件保留五歷史SHA、e49567b/cb76c23/9f2b3e2工程FAIL完整SHA、實做／引用／推斷／未測／受阻。I-A上方details跳閱讀位置與職業L-1／原型N1／favicon404／I-1／validator分工仍open。15caught/3等價t66u、1–3格t68u屬引用；真機／讀屏／Safari／系統字級／真safe／Android網址列未測、真pinch／320真視窗受阻不得改PASS。TARGET待填是提交前模板，以送出prompt完整SHA為準。
 
 回報工程PASS/FAIL及全部High/Medium/Low/Info，完整TARGET、實際環境版本、逐命令exitcode／pass-fail-skip、位置／重現／預期實際／影響、事件與rect／range／wrapper／pending／rAF／timer證據。請獨立找退化，不只跑fixture／PG就PASS。不要修改／commit／push repo，不代使用者接受UI／第七切片、不傳其他bot／開始下一階段。清理本輪server／DB／role／cluster，5432及舊證據不動，保留本輪證據。
+
+
+## 66eb28c 複驗結果讀回
+
+2026-10-11 香港時間05:03:42／05:03:50，指定AI TRPG Architecture Critic回報工程 **FAIL**；TARGET `66eb28c16c3e050c87a5802f95b2317cd70253c4`／BASE `e49567b6a1f64b53365465e6d59192878e6846fa`與交接一致。舊H-1與M-2已修，L-7限已測形態已修；新增High H-2為轉向後焦點消失／M-1復發，TARGET AA714／882、BASE882／882，三轉向TARGET15／15失焦。L-8因無輸入對照也失敗而被H-2遮蔽，不能判定通過。六指定68／68、reading22／22、無DB433pass／0fail／48skip、隔離PG483／483不覆蓋UI FAIL。
+
+完整中斷／作廢重做、實做／引用／推斷／未測／受阻、Info與證據已記入[交付文件](PHASE_33_STARTER_KIT_CATALOG.md#66eb28c-外部複驗回報2026-10-11)。遠端TARGET待填屬提交前模板；完整SHA以送出prompt及本地交接紀錄為準。不將不可配置descriptor回退寫成直接API追蹤，不將CDP搜尋替代視作真搜尋／讀屏通過。Codex只讀回及核對程式，未親測；五文件文字補記未提交，沒有程式／測試修改或新送驗。第七切片未接受，下一主要切片未開始。
+
+## H-2／L-8 Ultra 補修完整複驗要求（尚未提交／送達）
+
+Operator：Codex。指定AI TRPG Architecture Critic；Repository：https://github.com/bosco8001/ai-trpg；branch：codex/phase27-mobile-ui。
+BASE：66eb28c16c3e050c87a5802f95b2317cd70253c4
+TARGET：待本輪限定八檔commit／push後填入完整SHA
+
+請先核對可讀取遠端完整TARGET，未有版本不得回退BASE作本輪PASS。讀AGENTS、CANONICAL_MANIFEST、OPEN_QUESTIONS、正式starter_kits／character_system／classes／magic Canon，以及PHASE_33_STARTER_KIT_CATALOG.md最新外部FAIL與Ultra補修／能力界線。兩個Ultra代理只有讀碼意見；Codex與代理皆未跑任何驗證。66eb28c的H-1／M-2已修、L-7限定PASS、H-2新增／L-8遮蔽及483／483等，全部是上一版外部結果。
+
+限定八檔：StarterKitCatalogPanel.tsx、starter-catalog-reading.ts、starter-catalog-reading.test.ts，以及PHASE_33_STARTER_KIT_CATALOG.md、對應GROK_REVIEW.md、CANONICAL_MANIFEST.md、IMPLEMENTATION_PLAN.md、OPEN_QUESTIONS.md。本次改來源／採樣分離、無位移不授權閱讀、API限定scroller、兩來源scrollend、返回完成焦點及受控測試；CSS／正式數值／內容／API／創角／發放／Run／Save／DB／LLM／原型未改。不要修改、commit、push repo；不送其他bot／不代使用者驗收或開始下一切片。
+
+1. 核對完整BASE／TARGET、遠端HEAD、祖先及精確八檔；逐項執行npm ci、npm run build、完整SHA git diff --check，列每項命令／exitcode。執行node --import tsx --test tests/starter-catalog-reading.test.ts tests/starter-kit-catalog.test.ts tests/content-catalog.test.ts tests/class-catalog.test.ts tests/character-derivation.test.ts tests/character-creation.test.ts；再npm test無DB與新隔離非5432 PG／role／DB。skip不當PASS，測試數依本次實際分母。reading globals含performance的finally還原、正反檔案次序各兩次及跨worker污染獨立查；M-2原cleanup assert不得放寬／skip。
+2. **先重現H-2，再獨立評L-8**：每案新頁／初始焦點與位置正確，390×844→844×390→390×620返回四職業，BASE應1315／失焦，TARGET須修復；另外兩轉向各5次、六尺寸／三種字級放大／七停點882矩陣或充分等效，本輪BASE66eb28c的外部AA為714／882；882／882是e49567b外部對照，本輪目標恢復AA882／882，可容納focus完整可見，超大控制分列。必須測完全沒讀到中途maximum、scroll早於／晚於resize、body→frame、內容長大／字級還原、慢回應與連續5轉向。不要只跑人造中途range fixture就宣告H-2。原生scroll第三幀以後／250ms以後才送且沒有新RO也獨立測；本次兩幀不是全部時序保證，缺陷照報。
+3. L-8完整對照×End／ArrowDown／同值setter／scrollTo("x")／scrollBy(NaN)／邊界wheel，0／1frame／249／250／300ms，BASE與TARGET各重複。無輸入對照要先通過才能關閉遮蔽。noop前後及未知clamp→新邊界noop的順序都測；新noop不能沿用舊可動來源／smooth。記錄top、max、client尺寸、focus rect、候選方向／種類、readingMoved、pending、timer及rAF；不能把截限算閱讀或只報收尾timer0。
+4. **H-1不可退化**：真production＋PG，headless及Xvfb有頭Chrome，passive trace（non-passive可遮缺陷），844×390返回焦點向上wheel／trackpad、反向、單步／連滾／scrollend缺失及600ms smooth；BASE／TARGET每案至少5次。compositor先移動→wheel→scroll、compositor→第一rAF sample→wheel→scroll、wheel→sample→scroll及body noop夾在frame compositor／wheel之間都查。0／fractional／max邊界獨立分列；回讀快取在新邊界已不可動時會拒絕，真正wheel已到邊界且先被採樣可能受限，須報真實結果。一般高畫面body與短畫面frame、focus部分可見／完全不可見，閱讀結束沒有resize不能排nearest或拉回。
+5. API與L-7務必獨立：wrapped setter／scroll／scrollTo／scrollBy同步0／300／300.5在resize前、同task、第一／第二rAF各註冊順序，以及options／this／return／throw／apply內dispose／第三方後覆寫。兩個scroller獨立smooth先後、另一方noop／scrollend、反向touch lastY／水平pointer不認領、scrollbar按住resize／窗外up／cancel，舊清理回歸。本次延後候選僅明確data smooth＋有限data top的scroller方法；focused SIV的同步前後會記錄，延後SIV／CSS auto smooth／getter／繼承／Proxy／超250ms／跨版面並無完整保證，全部可做則實測並報限制／缺陷，不能因文件明示就免評價。descriptor probe可能被Proxy觀察，不能冒稱完全零副作用。
+6. **L-7能力縮限不是已修**：prototype方法／setter、非focus SIV、不可配置descriptor、text fragment／Chrome find／a11y捲動，穩定尺寸及resize第一／第二rAF至少各3次，0／300／300.5／max−1／max及與clamp同位分開；對照66eb28c已測PASS形態。未知位移不再有閱讀優先權，reflow可能被nearest拉回。原四項fixture改為此契約，不能當它們舊需求仍通過；請明確列出退化嚴重度，H-2優先不等於使用者已接受L-7限制。穩定尺寸本次不因unknown scroll主動排nearest，亦需驗證。已知wheel相符的250ms回讀不是未知來源的全面因果證明。
+7. M-1／L-2至L-6及安全區全部必要回歸，兩有界rAF／單次timer、停定1秒0活動、不振盪；focus導航／內部返回完成、Tab／ShiftTab／summary/button Space／Ctrl-wheel／touch／Esc第一第二frame／wheel／smooth／pointer期間關閉。5次重開無累積，RO／refs／local wrappers／listener／rAF／timer歸零或還原，同options清理不改全域prototype。模擬safe top47／bottom34及0的24組、6pxfocus ring侵入0、至少44px、無橫溢出／對比至少4.5，真機限制分列。
+8. 兩名冊production HTTP125／主流程20／19故障、慢載入／取消／重開／重試、GET only；出生／state／三槽／八table md5、舊UI57畫面與M4b／M4c／M6a必要回歸。I-A／職業L-1／原型N1／favicon404／I-1／validator仍open；t66u15caught／3等價、t68u1–3frame只作引用，未重做不得改成新結果。文件歷史SHA／實做／引用／推斷／未測／受阻與前版中斷作廢資料保留，TARGET待填是提交前模板，以實際送出完整SHA為準。
+
+請回報工程PASS／FAIL、全部High／Medium／Low／Info、TARGET完整SHA、環境版本、逐命令exitcode及pass／fail／skip、位置／重現／預期實際／影響，附rect／range／來源／pending／rAF／timer證據。真手機、讀屏、Safari、系統字級、真safe、Android網址列、Chrome搜尋與真Ctrl-wheel未做請列未測；真pinch／320真視窗不能做列受阻。清理本輪隔離server／DB／role／cluster，不碰5432或舊證據，保留本輪證據與摘要。不代使用者接受第七切片或特殊能力縮限。尚未送達不得寫成已送驗。

@@ -36,6 +36,7 @@ export function StarterKitCatalogPanel() {
   const frameRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null), openerRef = useRef<HTMLButtonElement>(null);
   const readingRef = useRef<ReturnType<typeof observeStarterReading> | null>(null);
+  const recordFocusRef = useRef<(() => void) | null>(null);
   const lastViewedRef = useRef<StarterKitId | null>(null), lastRowRef = useRef<HTMLButtonElement | null>(null);
   const kit = catalogs?.starter.kits.find(k => k.id === selected);
   const ability = catalogs?.starter.abilities.find(a => a.id === kit?.ability.id);
@@ -74,6 +75,7 @@ export function StarterKitCatalogPanel() {
     };
     let previousFocus = measureFocus();
     const recordFocus = () => { previousFocus = measureFocus(); };
+    recordFocusRef.current = recordFocus;
     const recordScroll = (reading: boolean) => {
       const next = measureFocus();
       // Reflow can clamp against an intermediate maximum. It must not erase an anchor.
@@ -87,21 +89,21 @@ export function StarterKitCatalogPanel() {
         resizeFrame = null;
       }
     };
-    const keepFocusVisible = () => {
-      // Sample each intermediate range now, rather than compare an old position
-      // against only the final maximum in a later scroll event.
+    const scheduleFocusRepair = () => {
       focusRepairPending = true;
-      reading?.observeLayout();
+      // Sampling never grants reading ownership. A native intermediate range
+      // need not have been observed for the previous visible focus to survive.
+      reading?.sampleLayout();
       if (!focusRepairPending) return;
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       resizeFrame = window.requestAnimationFrame(() => {
-        // Allow first-frame browser/unwrapped programmatic scroll to arrive before
-        // correcting focus. This is two bounded frames, not a polling loop.
-        reading?.observeLayout();
+        // Give tracked commands two bounded frames to arrive. Unattributed
+        // movement cannot cancel focus repair, even at an apparently legal top.
+        reading?.sampleLayout();
         if (!focusRepairPending) { resizeFrame = null; return; }
         resizeFrame = window.requestAnimationFrame(() => {
           resizeFrame = null;
-          reading?.observeLayout();
+          reading?.sampleLayout();
           if (!focusRepairPending) return;
           const next = measureFocus();
           if (reading?.isReading()) return;
@@ -112,12 +114,16 @@ export function StarterKitCatalogPanel() {
         });
       });
     };
+    const keepFocusVisible = () => {
+      reading?.layoutChanged();
+      scheduleFocusRepair();
+    };
     reading = observeStarterReading(dialog,
       [frameRef.current, bodyRef.current].filter((element): element is HTMLDivElement => element !== null),
       recordScroll, () => {
         // Keep the baseline from the last actual reading movement. A later clamp
         // must not overwrite it, even if this session had moved earlier.
-        if (focusRepairPending) keepFocusVisible();
+        if (focusRepairPending) scheduleFocusRepair();
       });
     readingRef.current = reading;
     dialog.addEventListener("focusin", recordFocus);
@@ -135,6 +141,7 @@ export function StarterKitCatalogPanel() {
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
       reading?.dispose();
       if (readingRef.current === reading) readingRef.current = null;
+      if (recordFocusRef.current === recordFocus) recordFocusRef.current = null;
       dialog.removeEventListener("focusin", recordFocus);
       dialog.removeEventListener("keydown", keyboard);
       window.removeEventListener("keydown", escape, true);
@@ -163,6 +170,9 @@ export function StarterKitCatalogPanel() {
     };
     if (readingRef.current) readingRef.current.repair(restoreScreen);
     else restoreScreen();
+    // Returning can focus a row before the internal scroll makes it visible.
+    // Record the completed reset, rather than the earlier focusin geometry.
+    recordFocusRef.current?.();
   }, [selected, open]);
   useEffect(() => {
     if (!open) return;
