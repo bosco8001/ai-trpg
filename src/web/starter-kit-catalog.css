@@ -1,21 +1,39 @@
 /* Shares the accepted class-catalog design tokens and modal shell. */
-.starter-catalog__sheet { --starter-footer-gap: .75rem; padding-top: env(safe-area-inset-top); container: starter-sheet / size; }
+.starter-catalog__sheet {
+  --starter-footer-gap: .75rem; padding-top: env(safe-area-inset-top);
+  display: flex; flex-direction: column; container-type: normal; container-name: none;
+  /* A transformed/contained ancestor would make the fixed control follow the
+     scrolling source instead of the separate reserve area. */
+  transform: none; animation-name: starter-catalog-arrive;
+}
+.starter-catalog__sheet .class-catalog__frame {
+  display: block; flex: 1; min-height: 0; height: auto;
+  overflow: auto; overscroll-behavior: contain; scroll-padding: 1rem; scrollbar-gutter: stable;
+}
+.starter-catalog__sheet .class-catalog__body { flex: none; overflow: visible; container-type: normal; }
+.starter-catalog__focus-rail {
+  flex: none; height: min(calc(var(--starter-reserve-height, 5.25rem) + 16px + env(safe-area-inset-bottom)), 50%);
+  min-height: calc(44px + 16px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+  scroll-padding-top: 8px; scroll-padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--cc-border); background: var(--cc-surface);
+}
 /* Browser anchoring must not compete with the sheet's focus and reading-position policy. */
 .starter-catalog__sheet .class-catalog__frame,
 .starter-catalog__sheet .class-catalog__body { overflow-anchor: none; }
-/* The same focused node uses the native popover top layer, escaping containment. */
+/* The actual node stays in its original parent; the reserved box is outside the
+   scroll frame. It cannot cover another control in that frame. */
 .starter-catalog__sheet .starter-catalog__focus-docked {
   position: fixed; inset: auto;
   left: var(--starter-focus-left); top: var(--starter-focus-top);
   width: var(--starter-focus-width); max-width: none; min-width: 0;
   max-height: var(--starter-focus-max-height); min-height: min(2.75rem, var(--starter-focus-max-height));
   margin: 0; overflow: auto; overscroll-behavior: contain; z-index: 5;
-  border: 1px solid var(--cc-border); border-radius: .75rem;
+  border-radius: .75rem;
   background: var(--cc-elevated); color: var(--cc-text);
   box-shadow: 0 -.25rem 1.5rem #0008;
 }
-.starter-catalog__sheet summary.starter-catalog__focus-docked { padding: .75rem; }
-.starter-catalog__sheet h2.starter-catalog__focus-docked { padding: .625rem .75rem; }
+/* A reading heading is not a touch button; keep its original line height. */
+.starter-catalog__sheet h2.starter-catalog__focus-docked { min-height: 0; }
 .starter-catalog__sheet .class-catalog__button--primary.starter-catalog__focus-docked { background: #ffc39d; color: #1c1412; }
 .starter-catalog__sheet .class-catalog__button--secondary.starter-catalog__focus-docked { background: #bfd3dd; color: #15232d; }
 .starter-catalog__sheet .class-catalog__button[aria-disabled="true"].starter-catalog__focus-docked { background: #293d4b; color: #9cabb9; border-color: #6f8396; }
@@ -25,14 +43,6 @@
   padding-bottom: max(var(--starter-footer-gap), calc(env(safe-area-inset-bottom) + 8px));
 }
 @media (max-height: 28rem) { .starter-catalog__sheet { --starter-footer-gap: .5rem; } }
-/* Keep one useful scroll area when fixed chrome would consume the available height. */
-@container starter-sheet (max-height: 36rem) {
-  .starter-catalog__sheet .class-catalog__frame {
-    overflow: auto; overscroll-behavior: contain; scroll-padding: 1rem;
-    scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-  }
-  .starter-catalog__sheet .class-catalog__body { flex: none; overflow: visible; }
-}
 /* Background and foreground must change together when loading finishes. */
 .starter-catalog-entry .class-catalog__button,
 .starter-catalog__sheet .class-catalog__button { transition: transform 100ms ease-out; }
@@ -42,18 +52,22 @@
 .starter-catalog__kind { color: var(--cc-muted); font-size: .875rem; margin-inline-start: .5rem; }
 .starter-catalog__item[open] summary { color: var(--cc-accent); border-bottom: 1px solid var(--cc-border); }
 .starter-catalog__facts { display: grid; gap: .625rem; margin: .75rem 0; }
-.starter-catalog__facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: .75rem; }
-.starter-catalog__facts dt { color: var(--cc-secondary); }
-.starter-catalog__facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.starter-catalog__facts > div {
+  display: flex; flex-wrap: wrap; gap: .125rem .75rem;
+  /* Container-free wrapping responds to the real available width and font size. */
+}
+.starter-catalog__facts dt { flex: 1 1 calc((22rem - .75rem) / 3); color: var(--cc-secondary); }
+.starter-catalog__facts dd { flex: 2 1 calc((22rem - .75rem) * 2 / 3); margin: 0; font-variant-numeric: tabular-nums; }
 .starter-catalog__facts dt, .starter-catalog__facts dd { overflow-wrap: anywhere; min-width: 0; }
 .starter-catalog__item .starter-catalog__facts { padding-inline: .75rem; }
 .starter-catalog__item > p { padding: 0 .75rem .75rem; }
 .starter-catalog__item summary { transition: background-color 120ms ease-out; touch-action: manipulation; }
 .starter-catalog__item summary:active { background: var(--cc-elevated); }
 @media (hover: hover) { .starter-catalog__item summary:hover { background: var(--cc-elevated); } }
-@container (max-width: 22rem) { .starter-catalog__facts > div { grid-template-columns: minmax(0, 1fr); gap: .125rem; } }
 @media (prefers-reduced-motion: reduce) {
+  .starter-catalog__sheet { animation: none; }
   .starter-catalog__item summary,
   .starter-catalog-entry .class-catalog__button,
   .starter-catalog__sheet .class-catalog__button { transition: none; }
 }
+@keyframes starter-catalog-arrive { from { opacity: .5; } to { opacity: 1; } }

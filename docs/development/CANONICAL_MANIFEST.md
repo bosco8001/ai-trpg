@@ -1,6 +1,10 @@
 # Canonical Source-of-Truth Manifest
 
+目前交接（2026-10-11，t74u 後第三段）：使用者已回覆「已切換，繼續」，限定補修已完成本地實作，第三段只整理提交／送驗。新補丁 BASE 為 `7fbcdd8c0d471505b5c540c5d7884d883f865294`；使用者已另行回覆「授權」，批准本次限定十檔 commit／push 並送指定 Critic；TARGET 待提交／推送後取得遠端可讀完整 SHA。前次十一檔授權已用於該 BASE，本次依新的十檔授權執行。完整清單／指令及新複驗 prompt 見第七切片交付與 GROK_REVIEW 文末；[實作摘要](PHASE_33_STARTER_KIT_REPAIR_PLAN_T74U.md#第二段xhigh-實作交接2026-10-11尚未驗證)保留決策與限制。沒有新驗證、提交、推送或送達，t74u 外部 FAIL 仍有效，第七切片未接受。下方舊停止界線／十一檔授權為當時狀態，沒有改 Canon 或下一主要切片。
+
 ## Purpose
+
+最新工程結果（2026-10-11，本地未提交文字補記）：指定 AI TRPG Architecture Critic 於香港時間18:28:46–18:28:54回報t74u **FAIL**。TARGET `7fbcdd8c0d471505b5c540c5d7884d883f865294`、BASE `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`。F1／F2已測案例修好；新增G1 High（焦點浮層遮住返回／重讀）、G2 Medium至High（summary切換吞click／padding殘留）、G3–G5 Medium（閱讀位置歸零、返回後再dock、模擬不支援popover失焦），另兩項Low清理／第三方hide失焦。外部PG545／545不覆蓋UI FAIL；矩陣僅812／882、主流程10／20，未完成與未測保留。Codex未親測、未續補丁／commit／push；第七切片未接受，下一主要切片未開始。第三段停止，等待使用者切回ultra並回覆「已切換，繼續分析」。以下待回覆／提交前／待授權／未送達段落為當時狀態。詳見[完整外部結果](PHASE_33_STARTER_KIT_CATALOG.md#t74u-外部工程結果7fbcdd8-fail2026-10-11)。
 
 這份 manifest 用來避免舊文件、Prototype、聊天記錄或重複檔案覆蓋最新設計。
 

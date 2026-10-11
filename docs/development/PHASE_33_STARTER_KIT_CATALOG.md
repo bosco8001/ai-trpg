@@ -667,3 +667,105 @@ git ls-remote origin refs/heads/codex/phase27-mobile-ui
 ### 本輪限定授權已取得
 
 使用者於本輪明確回覆「授權」，同意上述十一檔 commit／push 並送指定 Critic 複驗。前文「等待授權」是準備當時狀態。提交前 HEAD 仍為完整 BASE `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`；新 TARGET 待提交後取得，實際送出 prompt 必須替換為遠端可讀完整 SHA。授權不包含其他未提交檔案，不包含 Codex 自行工程驗證，也不代表第七切片驗收。提交／推送／送達及外部結果分開補記。
+
+## 7fbcdd8 限定提交與複驗送達（2026-10-11）
+
+依本輪使用者授權，Codex 已提交並推送 TARGET `7fbcdd8c0d471505b5c540c5d7884d883f865294`，BASE `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`，分支 `codex/phase27-mobile-ui`。正好十一檔，加715行、刪33行，包含兩個新增 helper／測試。git add、commit、push 皆 exit 0；提交前暫存區為空，加入後核對十一檔，推送後 git ls-remote 讀回完整 SHA 與本地一致。其他既有未提交修改保留且未納入。這些是版本與交接結果，不是工程驗證。
+
+香港時間 2026-10-11 17:42:32，Codex 經 Grok Bot Control 單次送達當次介面核對的 **AI TRPG Architecture Critic**。送出前完整5199字元草稿一致；送出後出現唯一新 You 訊息、正確完整 BASE／TARGET與十一檔要求，輸入框清空。展開訊息後 AX 顯示省略了九字「活動歸零，不振盪。」；未因此重送，而是透過訊息自身 Copy 選項讀回原文，完整5199字元逐字一致，該句也在原文中。核對用草稿已清除、未再次送出。單次送出紀錄已確認。
+
+指定 Critic 於17:42:36回覆確認開始複驗 `7fbcdd8`，核對遠端 SHA／祖先／十一檔後會重用 t73u 真頁面腳本，先定向再全回歸，CSS／top layer 改動相關882矩陣、安全區及對比度會重驗。這是外部收到及工作計畫，**不是 PASS／FAIL 結果或已執行證明**。
+
+提交內「待授權／TARGET待填／未送達」為準備當時狀態；實際本輪版本與送達以上述完整 SHA及單次訊息為準。本節為提交後本地純文字補記，尚未另行 commit／push。Codex 沒有執行 build、typecheck、lint、格式檢查、diff --check、自動化靜態分析或任何專案測試／瀏覽器驗證。工程結果仍待指定 Critic，Phase33第七切片未接受，下一主要切片未開始。PASS／FAIL 後處理仍依三段停止界線。
+
+
+## t74u 外部工程結果：7fbcdd8 FAIL（2026-10-11）
+
+香港時間 2026-10-11 18:28:46／18:28:50／18:28:53／18:28:54，指定 **AI TRPG Architecture Critic** 經 Grok Bot Control 對本輪回報工程 **FAIL**。Codex 已讀回四段報告；以下全部測試及真頁面結果均是外部回報，不是 Codex 親測。分支 `codex/phase27-mobile-ui`，TARGET `7fbcdd8c0d471505b5c540c5d7884d883f865294`、BASE `1435b2ca15f232edee1a8d9ffd8aa7f23a823336`。外部核對遠端 HEAD 為 TARGET，僅一個 commit、精確十一檔；本地讀取 HEAD／分支與上述相同，其他未提交修改仍保留。前文「等待回覆」為當時狀態。
+
+### 已測修復與新失敗分類
+
+- **F1 已測案例修好。** 受信任 CDP Home／PageUp／六次 ArrowUp，N=5，有／無 resize 結果一致，位置分別 0／1179／1250，SIV 0；本輪 BASE Home 停 266–273。合成 wheel（isTrusted=false）headless／有頭各 N=5，TARGET 保持 1440、BASE 被拉走；不等同真裝置或真縮放通過。
+- **F2 已測案例修好。** N=3，外部報告 prototype scrollTo／setter「五個值乘五種時序，55格全部 SIV 0」；保留其原分母，但回覆沒有展開55格構成，不能自行補成完整笛卡兒積通過。CDP scrollIntoViewIfNeeded、text fragment、不可配置 descriptor 各保持3／3；window.find 沒有引發捲動，受阻。
+
+| 編號／嚴重度 | 實測證據及影響 | 原因／位置的證據界線 |
+| --- | --- | --- |
+| G1 High | 844×390：開配套、焦點放標題、wheel +300，再捲到底。dock 標題 y330–374 覆蓋返回四職業 y337–381，hit-test 打中標題；滑鼠 click／觸控 tap 都無反應，BASE 正常返回。整頁844×390、568×320、320×568、390×620的返回／重讀被遮；分段390×844的summary遮返回、重讀遮斥候列。390×844標題及1280×800不受影響。 | 外部推斷 TSX preserveFocusControl／recordScroll 與 focus-dock L5–13、L108–114。遮擋與操作失敗已實測，具體因果仍是推斷。 |
+| G2 Medium 至 High（沿用外部分級） | 真 wheel 後點另一個 summary，滑鼠與觸控各0／3能開；click轉到SECTION。上一個details殘留49.7969px padding-top，6／6。 | 外部推斷 focus-dock L95全精度寫入與L43–44比較不一致，未當作已證實根因。 |
+| G3 Medium | body→frame閱讀位置丟失，H-2 N=5。Case A TARGET停0／最大1875，BASE1829；Case E TARGET停0／最大1490，BASE1440。其餘H-2焦點靠dock保住。 | 閱讀位置退化已實測；回覆未提供更精確根因／程式位置，不補造。 |
+| G4 Medium | 返回導航後原行再dock；844×390、568×320、390×620各3／3，BASE為0。與「導航重設維持原行為」預期不符。 | 回覆未提供更精確根因／程式位置，不補造。 |
+| G5 Medium | 模擬刪除showPopover，C2停1315／最大1829，焦點不可見；BASE仍可見。 | 模擬已實做，真舊瀏覽器影響屬推斷。外部指出focus-dock L84直接return、舊SIV修正已移除；原因仍列推斷。 |
+
+另有兩項 **Low**：Tab／Shift+Tab 跳至 BODY 後 popover／佔位仍殘留（跳至BODY本身為舊有行為）；第三方 hidePopover 令焦點跌至 BODY。外部沒有另給編號或詳細分母，不能稱所有清理通過。
+
+最小受影響範圍為本 Sheet 的焦點浮層、summary佔位／還原、導頁及body→frame閱讀位置交接；目前沒有報告遊戲數值、API或保存契約的新缺陷。本段只整理範圍，不定案新修復方案。
+
+### 工程命令與回歸：外部實做
+
+環境：Node24.21.0、Chrome154.0.8037.97、playwright-core1.59.1、PostgreSQL17.11，新隔離叢集127.0.0.1:55426。外部稱npm ci、三版本build、三次migration、git diff --check及下列測試皆exit0；回覆未逐條列出三版本完整SHA、migration命令或每條完整命令，不能把送驗prompt的要求直接改寫成實際命令紀錄。
+
+- 七指定測試檔：無DB130／130、PG130／130；正反序各兩次，每次92／92。測試diff僅新增+268／−0，未放寬斷言。
+- npm test無DB：543項，495pass／0fail／48skip；PG545／545。skip不算PASS，測試綠燈不覆蓋真頁面FAIL。
+- H-1：17案例headless／有頭各N=3，無跳位、SIV0。L-8七類×五時序N=2，TARGET失焦0，靠dock保住；不據此聲稱所有內部閱讀權限已直接檢查。
+- 焦點層節點identity、DOM parent、可及名稱與焦點環保留；Enter／Space／Click在所測案例有效，Esc五次無殘留、閒置1秒歸零。G2點另一summary與Low失焦清理另有失敗，不能統括為所有點擊／清理PASS。
+- 882矩陣實量812格：AA790、AAA776；22個AA miss均為summary可見但遮返回，另70格因G1受阻。不是AA790／882全矩陣已完成。
+- 主流程只完成10／20，魔術師步驟timeout、後半10步受阻；HTTP125／125、故障19／19、md5一致。回覆未逐表列出生／state／三槽／八表分母，不補造。
+- 模擬safe area24組侵入0、控件最小44px、最低對比4.8；safe area加dock組合未完成，兩者不可合併宣稱通過。M4b／M4c／M6a caught。舊UI57畫面只完成53，其中45零差異、8只差時間戳。
+
+### 引用、推斷、未測、受阻與作廢
+
+- **引用：** 本輪重用t73u腳本／證據作對照；先前PASS、t66u／t68u歷史結果及舊Info仍各保留原版本，不當成本輪完成。外部回覆沒有新增可核對的完整引用清單。
+- **推斷：** G1／G2／G5原因；G5真舊瀏覽器影響。已實測的現象與推斷的原因分開。
+- **未測：** 真手機、讀屏、Safari、系統字級、真safe area、Android網址列、Chrome搜尋列、真Ctrl-wheel。
+- **受阻：** 真pinch、真320寬視窗、window.find捲動；取消備份下載四畫面BASE／TARGET等15秒仍timeout；G1阻擋矩陣70格與主流程後半10步。
+- **未完成：** M-1、L-4至L-6、API段、真頁面雙scroller／touch反向／按住scrollbar／pointercancel、safe area加dock、真縮放F1；TARGET390×844主頁一個404資源未分析。既有I-A、職業L-1、原型N1、I-1、validator等沒有新解決證據，保持原狀。
+- **作廢：** H-2 case M兩版不能有效停妥；首次F1按鍵TARGET準備步驟已dock的一輪作廢，外部已修正準備方式重跑，採有效重跑結果。
+
+外部證據與SUMMARY.md在`/workspace/p33z-evidence/`，410張截圖。外部回報server／DB／role／cluster已清、`/workspace/p33z`已刪、5432未碰、舊證據16／16 hash不變、repo未改且無commit／push。Codex未下載或獨立驗證外部證據目錄／清理結果。
+
+### 第三段停止與下一輪基準
+
+本輪Codex只讀取指定對話、Git與文件，補記五份純文字狀態文件；未改程式／測試、未執行工程驗證、未再commit／push或送訊息。F1／F2在已測案例修好，但G1–G5與兩項Low及未完成回歸令整體工程仍FAIL。第七切片未由使用者接受，下一主要切片未開始。下一輪需以本節完整BASE／TARGET、失敗證據與限制為摘要基準；不要重做完整歷史推理，也不要在high段續補丁。
+
+工程仍 FAIL。請把 effort 切回 ultra，回覆『已切換，繼續分析』。
+
+
+## t74u 後第二段限定補修交接（2026-10-11，尚未驗證）
+
+使用者回覆「已切換，繼續」後，依第一段建議實作單一 frame 捲動與不遮閱讀區的焦點保留區，保留原生 details／實際節點及父節點，取消本 Sheet 的 popover 依賴；另補 pointer 交易、CSSOM 還原、BODY 失焦、共同導航範圍及舊修正世代取消。目的畫面的保留區先量度再返回定位。未改 reading 演算法／250ms、Canon／數值／API／保存。七檔清單、實作順序、未執行案例與真頁面缺口見[第二段交接](PHASE_33_STARTER_KIT_REPAIR_PLAN_T74U.md#第二段xhigh-實作交接2026-10-11尚未驗證)。
+
+HEAD／新補丁 BASE：`7fbcdd8c0d471505b5c540c5d7884d883f865294`；TARGET 待第三段取得新限定提交授權並推送後填完整 SHA。新補丁沒有執行工程檢查，未 commit／push／送驗；最近外部 t74u FAIL 保留，沒有宣告 G1–G5 或 Low 已通過，第七切片未接受。其他既有未提交差異保留。第二段停止，等待使用者切換 high 並回覆「已切換，繼續」才開始第三段。
+
+
+## t74u 後第三段交接準備（2026-10-11，待授權）
+
+授權更新：使用者其後明確回覆「授權」，批准下列限定十檔 commit／push 並送指定 Critic。下方待授權描述是準備當時狀態；執行與送達另行記錄。
+
+使用者已回覆「已切換，繼續」，本段只讀摘要／實際 diff 及準備工程交接，沒有新增程式補丁。Git 分支仍 `codex/phase27-mobile-ui`、HEAD／新補丁 BASE `7fbcdd8c0d471505b5c540c5d7884d883f865294`。需要新的限定 commit／push 授權；前次十一檔授權已完成，沒有延伸。本次 TARGET：`__待新限定提交並推送後填入完整SHA__`，未提交／推送／送達，未執行任何工程驗證。
+
+提交候選正好十檔：第二段七檔，加 CANONICAL_MANIFEST／IMPLEMENTATION_PLAN／OPEN_QUESTIONS 三份工作狀態同步。五份既有狀態／交付文件含上一輪尚未提交的 t74u 外部結果及送達補記，保留來源，不改成 Codex 親測。範圍不含 AGENTS、Phase 31、創角文件、其他原型或 docs/ui-ux 既有差異；完整指令如下，只是待授權命令，未執行。
+
+```sh
+git add -- \
+  src/web/StarterKitCatalogPanel.tsx \
+  src/web/starter-catalog-focus-dock.ts \
+  src/web/starter-kit-catalog.css \
+  tests/starter-catalog-focus-dock.test.ts \
+  docs/development/PHASE_33_STARTER_KIT_REPAIR_PLAN_T74U.md \
+  docs/development/PHASE_33_STARTER_KIT_CATALOG.md \
+  docs/development/PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md \
+  docs/development/CANONICAL_MANIFEST.md \
+  docs/development/IMPLEMENTATION_PLAN.md \
+  docs/development/OPEN_QUESTIONS.md
+git diff --cached --name-only
+git commit -m "fix(web): reserve starter catalog focus space and keep one scroll owner"
+git push origin HEAD:codex/phase27-mobile-ui
+git rev-parse HEAD
+git ls-remote origin refs/heads/codex/phase27-mobile-ui
+```
+
+執行前再次核對 staged 清單及有無預先 staged 的其他修改；只提交上述十檔，不執行 add -A。若 HEAD／範圍變動，核對新增差異；推送不使用 force。以 rev-parse 與遠端分支完整 SHA 核對 bot 可讀 TARGET；命令並非工程測試結果。
+
+Grok Bot Control 已讀取已安裝 Grok Bot 的當前指定對話 AI TRPG Architecture Critic，仍是 t74u 四段 FAIL 回覆，輸入框空白；沒有寫入草稿或送出新訊息。bundle ID 對到安裝包及正式 app 的歧義已透過完整安裝路徑選取處理，不是 bot 不可用。正式送出前仍須當次重新核對目標／草稿／送達及防重送紀錄，不能引用此讀取當永久新鮮證據。
+
+完整新 prompt 已準備於 [GROK_REVIEW](PHASE_33_STARTER_KIT_CATALOG_GROK_REVIEW.md#t74u-後第三段完整複驗-prompt待授權未送達)。先定向 G1–G5／Low、H-2／F1／F2／L-8，再依結果完成原必要全回歸；新增 fixture 及舊 PG545／545不代替本輪真頁面。實做／引用／推斷／未測／受阻／作廢分列。FAIL 時只整理證據與影響範圍，停止並提醒切回 ultra；PASS 時整理外部結果及轉向／字級、正常閱讀、折疊／返回／重讀、關閉重開的手動清單，仍等使用者接受第七切片。

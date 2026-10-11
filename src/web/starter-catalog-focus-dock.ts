@@ -1,6 +1,27 @@
 type Rect = { left: number; right: number; top: number; bottom: number };
 type DockBounds = Rect & { paddingTop: number; paddingBottom: number };
 
+/** The same visible, padded bounds are used by focus observation and navigation. */
+export function starterFocusViewportBounds(element: HTMLElement) {
+  const rect = element.getBoundingClientRect(), style = window.getComputedStyle(element);
+  const viewport = window.visualViewport;
+  return {
+    left: Math.max(rect.left, viewport?.offsetLeft ?? 0),
+    right: Math.min(rect.right, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth)),
+    top: Math.max(rect.top, viewport?.offsetTop ?? 0) + Math.max(8, Number.parseFloat(style.scrollPaddingTop) || 0),
+    bottom: Math.min(rect.bottom, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight))
+      - Math.max(8, Number.parseFloat(style.scrollPaddingBottom) || 0),
+  };
+}
+
+export function starterFocusNavigationDelta(control: Rect, viewport: Rect) {
+  // An oversized row cannot be fully contained; expose its beginning explicitly.
+  if (control.bottom - control.top > viewport.bottom - viewport.top) return control.top - viewport.top;
+  if (control.bottom > viewport.bottom) return control.bottom - viewport.bottom;
+  if (control.top < viewport.top) return control.top - viewport.top;
+  return 0;
+}
+
 /** Geometry only; this does not identify why a viewport or scroll position changed. */
 export function starterFocusDockPlacement(bounds: DockBounds, controlHeight: number) {
   const inset = 8;
@@ -14,91 +35,115 @@ export function starterFocusDockPlacement(bounds: DockBounds, controlHeight: num
 
 /** Keep the actual focused node accessible without scrolling or changing focus. */
 export function createStarterFocusDock(dialog: HTMLDialogElement) {
-  type StyleWrite = { node: HTMLElement; key: string; previous: string; priority: string; value: string };
-  type DockState = { node: HTMLElement; placeholder: HTMLElement | null; writes: StyleWrite[] };
+  type StyleWrite = { node: HTMLElement; key: string; previous: string; priority: string; value: string; writtenPriority: string };
+  type DockState = { node: HTMLElement; placeholder: HTMLElement | null; writes: StyleWrite[];
+    sourceHeight: number; sourceWidth: number; marginHeight: number; parentPadding: number; minimumPerRem: number };
   let docked: DockState | null = null;
   let disposed = false;
+  let pointerId: number | null = null;
+  let releasePending = false;
   const write = (state: DockState, node: HTMLElement, key: string, value: string) => {
     let saved = state.writes.find(item => item.node === node && item.key === key);
     if (!saved) {
       saved = { node, key, previous: node.style.getPropertyValue(key),
-        priority: node.style.getPropertyPriority(key), value };
+        priority: node.style.getPropertyPriority(key), value, writtenPriority: "" };
       state.writes.push(saved);
     }
-    saved.value = value;
     node.style.setProperty(key, value);
+    // CSSOM may serialize a floating point length differently from its input.
+    saved.value = node.style.getPropertyValue(key);
+    saved.writtenPriority = node.style.getPropertyPriority(key);
   };
-  const release = () => {
+  const release = (force = true) => {
+    if (!force && pointerId !== null) { releasePending = true; return; }
+    releasePending = false;
     const state = docked;
     if (!state) return;
-    const wasFocused = document.activeElement === state.node;
     docked = null;
-    // Removing our manual popover also releases its top-layer box. Do not alter
-    // a later third-party popover setting or restore focus after an actual blur.
-    if (state.node.getAttribute("popover") === "manual") state.node.removeAttribute("popover");
     state.node.classList.remove("starter-catalog__focus-docked");
     state.placeholder?.remove();
     for (const item of state.writes.reverse()) {
       // Leave a later third-party inline override intact.
       if (item.node.style.getPropertyValue(item.key) !== item.value
-        || item.node.style.getPropertyPriority(item.key)) continue;
+        || item.node.style.getPropertyPriority(item.key) !== item.writtenPriority) continue;
       if (item.previous) item.node.style.setProperty(item.key, item.previous, item.priority);
       else item.node.style.removeProperty(item.key);
     }
-    if (wasFocused && state.node.isConnected && dialog.open && document.activeElement !== state.node)
-      state.node.focus({ preventScroll: true });
   };
   const position = () => {
     const state = docked;
-    if (!state || disposed) return;
-    const bounds = dialog.getBoundingClientRect();
-    const frame = dialog.querySelector<HTMLElement>(".class-catalog__frame");
-    if (!frame) { release(); return; }
-    const padding = window.getComputedStyle(frame);
+    if (!state || disposed || pointerId !== null) return;
+    const rail = dialog.querySelector<HTMLElement>(".starter-catalog__focus-rail");
+    if (!rail) { release(); return; }
+    const bounds = rail.getBoundingClientRect(), padding = window.getComputedStyle(rail);
     const viewport = window.visualViewport;
     const visibleBounds = {
       left: Math.max(bounds.left, viewport?.offsetLeft ?? 0),
       right: Math.min(bounds.right, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth)),
       top: Math.max(bounds.top, viewport?.offsetTop ?? 0),
       bottom: Math.min(bounds.bottom, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight)),
-      paddingTop: Number.parseFloat(padding.scrollPaddingTop) || 0,
-      paddingBottom: Number.parseFloat(padding.scrollPaddingBottom) || 0,
+      paddingTop: 8,
+      paddingBottom: 8 + (Number.parseFloat(padding.paddingBottom) || 0),
     };
-    const placement = starterFocusDockPlacement(visibleBounds, state.node.getBoundingClientRect().height);
-    if (!placement) { release(); return; }
-    write(state, state.node, "--starter-focus-left", `${placement.left}px`);
-    write(state, state.node, "--starter-focus-width", `${placement.width}px`);
+    const placement = starterFocusDockPlacement(visibleBounds, state.sourceHeight);
+    if (!placement || placement.maxHeight < 44) { release(); return; }
+    // Match the source width so docking does not introduce different text wrapping.
+    const parent = state.node.parentElement;
+    const parentStyle = parent && window.getComputedStyle(parent);
+    const sourceWidth = state.placeholder?.getBoundingClientRect().width
+      ?? (parent && parentStyle ? parent.getBoundingClientRect().width
+        - (Number.parseFloat(parentStyle.paddingLeft) || 0) - (Number.parseFloat(parentStyle.paddingRight) || 0)
+        - (Number.parseFloat(parentStyle.borderLeftWidth) || 0) - (Number.parseFloat(parentStyle.borderRightWidth) || 0)
+        : state.sourceWidth);
+    const width = Math.min(placement.width, sourceWidth || state.sourceWidth);
+    write(state, state.node, "--starter-focus-left", `${placement.left + (placement.width - width) / 2}px`);
+    write(state, state.node, "--starter-focus-width", `${width}px`);
     write(state, state.node, "--starter-focus-max-height", `${placement.maxHeight}px`);
-    // Width can change wrapping. Measure the real control once after that write.
+    // Keep the source space responsive to font/wrapping changes, without writing
+    // any scroll position. Native layout clamping remains a separate observation.
+    const rect = state.node.getBoundingClientRect(), style = window.getComputedStyle(state.node);
+    // This sheet's normal control minima are authored in rem. Changing only a
+    // control's text size must not multiply its minimum a second time.
+    const rootSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+    state.sourceHeight = Math.max(rect.height, state.minimumPerRem * rootSize, state.node.scrollHeight
+      + (Number.parseFloat(style.borderTopWidth) || 0) + (Number.parseFloat(style.borderBottomWidth) || 0));
+    if (state.placeholder) state.placeholder.style.height = `${state.sourceHeight}px`;
+    else if (parent) write(state, parent, "padding-top", `${state.parentPadding + state.sourceHeight + state.marginHeight}px`);
     const finalPlacement = starterFocusDockPlacement(visibleBounds, state.node.getBoundingClientRect().height);
     if (finalPlacement) write(state, state.node, "--starter-focus-top", `${finalPlacement.top}px`);
   };
   return {
     isDocked: (node: HTMLElement) => docked?.node === node,
+    isPressing: () => pointerId !== null,
+    sourceHeight: (node: HTMLElement) => docked?.node === node ? docked.sourceHeight : node.getBoundingClientRect().height,
     pin: (node: HTMLElement) => {
       if (disposed || !dialog.open || !node.isConnected || !dialog.contains(node)
         || document.activeElement !== node) return;
       if (docked?.node === node) { position(); return; }
-      // A native top-layer box escapes the existing container-query containment
-      // and clipping without reparenting the original control or changing layout.
-      if (typeof node.showPopover !== "function" || node.hasAttribute("popover")) return;
+      // A new focus must not relocate the press target before pointerup hit-testing.
+      if (pointerId !== null) return;
+      // Leave third-party popovers alone. This presentation needs no popover API.
+      if (node.hasAttribute("popover")) return;
       release();
       const rect = node.getBoundingClientRect(), style = window.getComputedStyle(node);
-      const state: DockState = { node, placeholder: null, writes: [] };
+      const state: DockState = { node, placeholder: null, writes: [], sourceHeight: rect.height, sourceWidth: rect.width,
+        marginHeight: (Number.parseFloat(style.marginTop) || 0) + (Number.parseFloat(style.marginBottom) || 0), parentPadding: 0,
+        minimumPerRem: (Number.parseFloat(style.minHeight) || 0)
+          / (Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16) };
       const parent = node.parentElement;
       if (!parent) return;
       if (node.tagName === "SUMMARY" && parent.tagName === "DETAILS") {
         // Summary must remain the native disclosure control in its own details.
         // Padding preserves its space even while the details element is closed.
         const parentStyle = window.getComputedStyle(parent);
-        const space = rect.height + (Number.parseFloat(style.marginTop) || 0) + (Number.parseFloat(style.marginBottom) || 0);
-        write(state, parent, "padding-top", `${(Number.parseFloat(parentStyle.paddingTop) || 0) + space}px`);
+        state.parentPadding = Number.parseFloat(parentStyle.paddingTop) || 0;
+        write(state, parent, "padding-top", `${state.parentPadding + rect.height + state.marginHeight}px`);
       } else {
         const placeholder = document.createElement("span");
         placeholder.className = "starter-catalog__focus-space";
         placeholder.setAttribute("aria-hidden", "true");
         placeholder.style.height = `${rect.height}px`;
-        placeholder.style.width = `${rect.width}px`;
+        placeholder.style.width = "100%";
         placeholder.style.margin = style.margin;
         placeholder.style.flex = style.flex;
         parent.insertBefore(placeholder, node);
@@ -106,19 +151,24 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
       }
       docked = state;
       node.classList.add("starter-catalog__focus-docked");
-      node.setAttribute("popover", "manual");
-      try { node.showPopover(); }
-      catch { release(); return; }
-      if (!node.matches(":popover-open")) { release(); return; }
-      if (document.activeElement !== node) node.focus({ preventScroll: true });
       position();
     },
     refresh: () => {
-      if (docked && (!docked.node.isConnected || document.activeElement !== docked.node
-        || !docked.node.matches(":popover-open"))) release();
-      else position();
+      if (docked && (!dialog.open || !docked.node.isConnected || docked.node.hasAttribute("popover")
+        || document.activeElement !== docked.node)) release(false);
+      else { releasePending = false; position(); }
     },
-    release,
-    dispose: () => { disposed = true; release(); },
+    leaveFocus: (node: HTMLElement) => { if (docked?.node === node) release(false); },
+    beginPointer: (id: number) => { if (!disposed && pointerId === null) pointerId = id; },
+    endPointer: (id: number) => {
+      if (pointerId !== id) return false;
+      pointerId = null;
+      // The up/cancel target is already determined. Keep the real node and parent
+      // so native click dispatch/default activation does not lose its target.
+      if (releasePending) release();
+      return true;
+    },
+    release: () => { pointerId = null; release(); },
+    dispose: () => { disposed = true; pointerId = null; release(); },
   };
 }

@@ -6,7 +6,7 @@ import type { OfficialStarterKitCatalog, OfficialStarterItem, StarterKitId, Star
 import { readStarterKitCatalog } from "./starter-kit-catalog-client.js";
 import { readClassCatalog } from "./class-catalog-client.js";
 import { observeStarterReading } from "./starter-catalog-reading.js";
-import { createStarterFocusDock } from "./starter-catalog-focus-dock.js";
+import { createStarterFocusDock, starterFocusNavigationDelta, starterFocusViewportBounds } from "./starter-catalog-focus-dock.js";
 
 const familyNames: Record<StarterWeaponFamily, string> = { sword: "劍類", bow: "弓類", dagger: "匕首類", staff: "杖類" };
 const requirementText = (r: StarterRequirement) => `${CONTENT_ATTRIBUTE_LABELS[r.attribute]} ${r.minimum}`;
@@ -35,10 +35,13 @@ export function StarterKitCatalogPanel() {
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [attempt, setAttempt] = useState(0);
   const dialogRef = useRef<HTMLDialogElement>(null), headingRef = useRef<HTMLHeadingElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null), openerRef = useRef<HTMLButtonElement>(null);
   const readingRef = useRef<ReturnType<typeof observeStarterReading> | null>(null);
   const focusDockRef = useRef<ReturnType<typeof createStarterFocusDock> | null>(null);
   const recordFocusRef = useRef<(() => void) | null>(null);
+  const resetFocusRef = useRef<(() => void) | null>(null);
+  const layoutFocusRef = useRef<(() => void) | null>(null);
   const lastViewedRef = useRef<StarterKitId | null>(null), lastRowRef = useRef<HTMLButtonElement | null>(null);
   const kit = catalogs?.starter.kits.find(k => k.id === selected);
   const ability = catalogs?.starter.abilities.find(a => a.id === kit?.ability.id);
@@ -61,24 +64,31 @@ export function StarterKitCatalogPanel() {
     focusDockRef.current = focusDock;
     let resizeFrame: number | null = null;
     let focusRepairPending = false;
+    let generation = 0;
     let reading: ReturnType<typeof observeStarterReading> | null = null;
     const measureFocus = () => {
       const active = document.activeElement;
       if (!dialog.open || !(active instanceof HTMLElement) || active === dialog || !dialog.contains(active)) return null;
-      const frame = frameRef.current, body = bodyRef.current;
-      const viewport = focusDock.isDocked(active) ? dialog : frame && frame.scrollHeight > frame.clientHeight ? frame
-        : body?.contains(active) ? body : frame;
+      const viewport = focusDock.isDocked(active) ? railRef.current : frameRef.current;
       if (!viewport) return null;
-      const bounds = active.getBoundingClientRect(), layout = viewport.getBoundingClientRect();
-      const style = window.getComputedStyle(viewport);
-      const top = layout.top + Math.max(8, Number.parseFloat(style.scrollPaddingTop) || 0);
-      const bottom = layout.bottom - Math.max(8, Number.parseFloat(style.scrollPaddingBottom) || 0);
+      const bounds = active.getBoundingClientRect(), layout = starterFocusViewportBounds(viewport);
       return { active, viewport,
-        visible: bounds.bottom > top && bounds.top < bottom && bounds.right > layout.left && bounds.left < layout.right,
-        contained: bounds.top >= top && bounds.bottom <= bottom && bounds.left >= layout.left && bounds.right <= layout.right };
+        visible: bounds.bottom > layout.top && bounds.top < layout.bottom && bounds.right > layout.left && bounds.left < layout.right,
+        contained: bounds.top >= layout.top && bounds.bottom <= layout.bottom && bounds.left >= layout.left && bounds.right <= layout.right };
     };
     let previousFocus = measureFocus();
-    const recordFocus = () => { focusDock.refresh(); previousFocus = measureFocus(); };
+    const cancelFocusRepair = () => {
+      generation++;
+      focusRepairPending = false;
+      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = null;
+    };
+    const recordFocus = () => {
+      focusDock.refresh();
+      const next = measureFocus();
+      if (next?.active !== previousFocus?.active) cancelFocusRepair();
+      previousFocus = next;
+    };
     recordFocusRef.current = recordFocus;
     const preserveFocusControl = () => {
       focusDock.refresh();
@@ -91,17 +101,20 @@ export function StarterKitCatalogPanel() {
     };
     const recordScroll = (reading: boolean) => {
       const next = preserveFocusControl();
+      const deferred = focusDock.isPressing() && previousFocus?.active === next?.active
+        && previousFocus?.visible && !next?.contained;
       // Reflow can clamp against an intermediate maximum. It must not erase an anchor.
       // Native focus scrolling may make a new focus visible. Its operation layer
       // preserves an already-visible control independently of reading ownership.
-      if (reading || next?.visible) previousFocus = next;
+      if (!deferred && (reading || next?.visible)) previousFocus = next;
       if (reading) {
         // Reading after a queued resize takes ownership; its end is not a reason
         // to change the player's viewport.
-        focusRepairPending = false;
-        if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
-        resizeFrame = null;
+        cancelFocusRepair();
       }
+      // A press delays presentation, not reading ownership. Settle it on the
+      // matching up/cancel rather than discard the prior visible focus.
+      if (deferred) focusRepairPending = true;
     };
     const scheduleFocusRepair = () => {
       focusRepairPending = true;
@@ -110,36 +123,82 @@ export function StarterKitCatalogPanel() {
       reading?.sampleLayout();
       if (!focusRepairPending) return;
       if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      const scheduledGeneration = ++generation;
       resizeFrame = window.requestAnimationFrame(() => {
+        if (scheduledGeneration !== generation) return;
         // Keep the existing bounded layout sampling. This now positions a real
         // focused control; it never cancels a native reading animation with SIV.
         reading?.sampleLayout();
+        if (scheduledGeneration !== generation) return;
         if (!focusRepairPending) { resizeFrame = null; return; }
         resizeFrame = window.requestAnimationFrame(() => {
+          if (scheduledGeneration !== generation) return;
           resizeFrame = null;
           reading?.sampleLayout();
+          if (scheduledGeneration !== generation) return;
           if (!focusRepairPending) return;
           focusRepairPending = false;
           preserveFocusControl();
-          previousFocus = measureFocus();
+          if (focusDock.isPressing()) focusRepairPending = true;
+          else previousFocus = measureFocus();
         });
       });
     };
+    const measureReserve = () => {
+      const rail = railRef.current;
+      if (!rail) return;
+      // This space exists even without a dock. Its size follows the actual
+      // controls/font, not focus state, and CSS keeps reading space available.
+      const height = Math.max(44, ...Array.from(dialog.querySelectorAll<HTMLElement>("button, summary, h2"))
+        .map(node => focusDock.sourceHeight(node)));
+      const value = `${Math.ceil(height)}px`;
+      if (rail.style.getPropertyValue("--starter-reserve-height") !== value)
+        rail.style.setProperty("--starter-reserve-height", value);
+    };
+    const resetFocus = () => {
+      cancelFocusRepair(); previousFocus = null; focusDock.release();
+      // Size the destination screen's reserve before measuring its navigation
+      // target; otherwise a taller row could shrink the frame after return.
+      measureReserve();
+    };
+    resetFocusRef.current = resetFocus;
     const keepFocusVisible = () => {
       reading?.layoutChanged();
       focusDock.refresh();
+      measureReserve();
       scheduleFocusRepair();
     };
+    layoutFocusRef.current = keepFocusVisible;
+    measureReserve();
+    const pointerDown = (event: PointerEvent) => {
+      if (event.isPrimary && event.button === 0) focusDock.beginPointer(event.pointerId);
+    };
+    const pointerEnd = (event: PointerEvent) => {
+      if (!focusDock.endPointer(event.pointerId)) return;
+      if (focusRepairPending) { cancelFocusRepair(); preserveFocusControl(); }
+      recordFocus();
+    };
+    const focusOut = (event: FocusEvent) => {
+      if (event.relatedTarget instanceof Node && dialog.contains(event.relatedTarget)) return;
+      // focusout's activeElement may already be BODY. Do not move the old press
+      // target until pointerup/cancel has determined its native target.
+      if (event.target instanceof HTMLElement) focusDock.leaveFocus(event.target);
+      cancelFocusRepair(); previousFocus = null;
+    };
     reading = observeStarterReading(dialog,
-      [frameRef.current, bodyRef.current].filter((element): element is HTMLDivElement => element !== null),
+      [frameRef.current].filter((element): element is HTMLDivElement => element !== null),
       recordScroll, () => {
         // Keep the baseline from the last actual reading movement. A later clamp
         // must not overwrite it, even if this session had moved earlier.
         if (focusRepairPending) scheduleFocusRepair();
       });
     readingRef.current = reading;
-    dialog.addEventListener("focusin", recordFocus);
-    // Reflow can move an existing focus between the body and whole-sheet scroll areas.
+    window.addEventListener("focusin", recordFocus);
+    dialog.addEventListener("focusout", focusOut);
+    dialog.addEventListener("pointerdown", pointerDown, true);
+    window.addEventListener("pointerup", pointerEnd, true);
+    window.addEventListener("pointercancel", pointerEnd, true);
+    // One owner survives short/tall layouts. No old scrollTop is copied on reflow.
     const observer = new ResizeObserver(keepFocusVisible);
     for (const target of [dialog, frameRef.current, bodyRef.current,
       dialog.querySelector("header"), dialog.querySelector("footer")])
@@ -150,13 +209,19 @@ export function StarterKitCatalogPanel() {
       observer.disconnect();
       window.removeEventListener("resize", keepFocusVisible);
       window.visualViewport?.removeEventListener("resize", keepFocusVisible);
-      if (resizeFrame !== null) window.cancelAnimationFrame(resizeFrame);
+      cancelFocusRepair();
       reading?.dispose();
       focusDock.dispose();
       if (readingRef.current === reading) readingRef.current = null;
       if (focusDockRef.current === focusDock) focusDockRef.current = null;
       if (recordFocusRef.current === recordFocus) recordFocusRef.current = null;
-      dialog.removeEventListener("focusin", recordFocus);
+      if (resetFocusRef.current === resetFocus) resetFocusRef.current = null;
+      if (layoutFocusRef.current === keepFocusVisible) layoutFocusRef.current = null;
+      window.removeEventListener("focusin", recordFocus);
+      dialog.removeEventListener("focusout", focusOut);
+      dialog.removeEventListener("pointerdown", pointerDown, true);
+      window.removeEventListener("pointerup", pointerEnd, true);
+      window.removeEventListener("pointercancel", pointerEnd, true);
       dialog.removeEventListener("keydown", keyboard);
       window.removeEventListener("keydown", escape, true);
       if (dialog.open) dialog.close();
@@ -165,22 +230,17 @@ export function StarterKitCatalogPanel() {
   }, [open]);
   useLayoutEffect(() => {
     if (!open) return;
-    const frame = frameRef.current, body = bodyRef.current;
+    const frame = frameRef.current;
+    // Explicit screen navigation ends the old repair generation before setting
+    // the new baseline. Late layout callbacks cannot apply the old focus.
+    resetFocusRef.current?.();
     const restoreScreen = () => {
-      focusDockRef.current?.release();
       if (frame) frame.scrollTop = 0;
-      if (body) body.scrollTop = 0;
-      // Short or enlarged layouts scroll the whole sheet instead of a squeezed body.
-      const viewport = frame && frame.scrollHeight > frame.clientHeight ? frame : body;
       if (selected) headingRef.current?.focus({ preventScroll: true });
       else if (lastRowRef.current?.isConnected) {
         const row = lastRowRef.current;
         row.focus({ preventScroll: true });
-        if (viewport) {
-          const bounds = row.getBoundingClientRect(), visible = viewport.getBoundingClientRect();
-          if (bounds.bottom > visible.bottom) viewport.scrollTop += bounds.bottom - visible.bottom + 8;
-          else if (bounds.top < visible.top) viewport.scrollTop -= visible.top - bounds.top + 8;
-        }
+        if (frame) frame.scrollTop += starterFocusNavigationDelta(row.getBoundingClientRect(), starterFocusViewportBounds(frame));
       }
     };
     if (readingRef.current) readingRef.current.repair(restoreScreen);
@@ -189,6 +249,7 @@ export function StarterKitCatalogPanel() {
     // Record the completed reset, rather than the earlier focusin geometry.
     recordFocusRef.current?.();
   }, [selected, open]);
+  useLayoutEffect(() => { if (open) layoutFocusRef.current?.(); }, [open, selected, catalogs, busy]);
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController(), timer = window.setTimeout(() => controller.abort(), 5000);
@@ -278,6 +339,7 @@ export function StarterKitCatalogPanel() {
               }}>重新讀取名冊</button>}
         </footer>
       </div>
+      <div className="starter-catalog__focus-rail" ref={railRef} aria-hidden="true" />
     </dialog>, document.body) : null}
   </section>;
 }
