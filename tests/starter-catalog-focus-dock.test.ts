@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createStarterFocusDock, starterFocusDockPlacement, starterFocusNavigationDelta,
+import { createStarterFocusDock, starterFocusDockPlacement, starterFocusNavigationDelta, starterFocusNavigationTarget,
   starterFocusViewportBounds } from "../src/web/starter-catalog-focus-dock.js";
 
 test("the actual control fits inside the focus-ring and simulated safe-area bounds", () => {
@@ -369,6 +369,93 @@ test("navigation shares visual-viewport clipping with focus measurement", () => 
   assert.deepEqual(bounds, { left: 10, right: 330, top: 108, bottom: 466 });
   assert.equal(starterFocusNavigationDelta({ left: 10, right: 330, top: 440, bottom: 484 }, bounds), 18);
 }));
+
+// 尚未執行。This local setter model exercises write/read geometry, not native
+// browser layout, the Panel lifecycle or RO/rAF. The real-page probe covers those.
+function navigationSample(control: Parameters<typeof starterFocusNavigationTarget>[0],
+  viewport: Parameters<typeof starterFocusNavigationTarget>[1], current = 0, maximum = 1200,
+  quantize: (value: number) => number = Math.floor) {
+  let position = current;
+  const writes: number[] = [];
+  const rect = () => ({ ...control, top: control.top - (position - current), bottom: control.bottom - (position - current) });
+  return {
+    viewport, maximum, writes, rect,
+    get scrollTop() { return position; },
+    set scrollTop(value: number) { writes.push(value); position = Math.min(maximum, Math.max(0, quantize(value))); },
+    contained: () => {
+      const actual = rect();
+      return actual.top >= viewport.top && actual.bottom <= viewport.bottom
+        && actual.left >= viewport.left && actual.right <= viewport.right;
+    },
+  };
+}
+
+for (const sample of [
+  { name: "844x390", bottom: 273, rowBottom: 520.484375, target: 248 },
+  { name: "568x320", bottom: 203, rowBottom: 520.484375, target: 318 },
+  { name: "390x620", bottom: 503, rowBottom: 604.234375, target: 102 },
+]) test(`G4 ${sample.name}: actual setter readback contains the row after one navigation write`, () => {
+  // t76u supplied the residual and bottom edges; the rest is isolated model geometry.
+  const viewport = { left: 0, right: 390, top: 16, bottom: sample.bottom };
+  const control = { left: 0, right: 390, top: sample.rowBottom - 84, bottom: sample.rowBottom };
+  const before = navigationSample(control, viewport);
+  before.scrollTop += starterFocusNavigationDelta(before.rect(), viewport);
+  assert.equal(before.contained(), false, "the old fractional edge write must remain a red control in this model");
+  const after = navigationSample(control, viewport);
+  after.scrollTop = starterFocusNavigationTarget(after.rect(), viewport, after.scrollTop, after.maximum);
+  assert.deepEqual(after.writes, [sample.target]);
+  assert.equal(after.scrollTop, sample.target);
+  assert.equal(after.contained(), true, "compare the actual post-setter rect with both unchanged edges");
+});
+
+test("top-edge navigation rounds the absolute position inward, rather than rounding a delta", () => {
+  const viewport = { left: 0, right: 390, top: 16, bottom: 273 };
+  const sample = navigationSample({ left: 0, right: 390, top: 15.75, bottom: 99.75 }, viewport, 300.5);
+  sample.scrollTop = starterFocusNavigationTarget(sample.rect(), viewport, sample.scrollTop, sample.maximum);
+  assert.deepEqual(sample.writes, [300]);
+  assert.equal(sample.contained(), true);
+});
+
+test("an already-contained fractional position is not rounded or given an extra write", () => {
+  const viewport = { left: 0, right: 390, top: 16, bottom: 273 };
+  const sample = navigationSample({ left: 0, right: 390, top: 16, bottom: 100 }, viewport, 300.375);
+  const target = starterFocusNavigationTarget(sample.rect(), viewport, sample.scrollTop, sample.maximum);
+  if (target !== sample.scrollTop) sample.scrollTop = target;
+  assert.equal(target, 300.375);
+  assert.deepEqual(sample.writes, []);
+  assert.equal(sample.contained(), true);
+});
+
+test("a fractional-only feasible interval never rounds through the opposite edge", () => {
+  const viewport = { left: 0, right: 390, top: 16, bottom: 100 };
+  const control = { left: 0, right: 390, top: 116.75, bottom: 200.25 };
+  const fractional = navigationSample(control, viewport, 0, 1200, value => value);
+  fractional.scrollTop = starterFocusNavigationTarget(fractional.rect(), viewport, fractional.scrollTop, fractional.maximum);
+  assert.deepEqual(fractional.writes, [100.25]);
+  assert.equal(fractional.contained(), true);
+  const integer = navigationSample(control, viewport);
+  integer.scrollTop = starterFocusNavigationTarget(integer.rect(), viewport, integer.scrollTop, integer.maximum);
+  assert.deepEqual(integer.writes, [100.25]);
+  assert.equal(integer.contained(), false, "an unrepresentable interval must not be reported as contained");
+});
+
+test("a range clamp is explicit and cannot invent extra scroll room", () => {
+  const viewport = { left: 0, right: 390, top: 16, bottom: 100 };
+  const sample = navigationSample({ left: 0, right: 390, top: 116.5, bottom: 200.5 }, viewport, 0, 100.25, value => value);
+  sample.scrollTop = starterFocusNavigationTarget(sample.rect(), viewport, sample.scrollTop, sample.maximum);
+  assert.deepEqual(sample.writes, [100.25]);
+  assert.equal(sample.contained(), false);
+  assert.equal(starterFocusNavigationTarget(sample.rect(), viewport, sample.scrollTop, sample.maximum), 100.25);
+});
+
+test("oversized rows retain their start-alignment policy without claiming full containment", () => {
+  const viewport = { left: 0, right: 390, top: 16, bottom: 676 };
+  const sample = navigationSample({ left: 0, right: 390, top: 40, bottom: 900 }, viewport);
+  sample.scrollTop = starterFocusNavigationTarget(sample.rect(), viewport, sample.scrollTop, sample.maximum);
+  assert.deepEqual(sample.writes, [24]);
+  assert.equal(sample.rect().top, viewport.top);
+  assert.equal(sample.contained(), false);
+});
 
 test("a deferred new dock can be applied after a matching press ends without granting scroll movement", () => fixture(f => {
   f.dock.beginPointer(12); f.pin();

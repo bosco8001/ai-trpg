@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 /**
  * G4 最小真頁面探針：開魔術師配套，再返回原列。
  * @param {import('playwright').Page} page 已載入正式頁面的獨立 Page。
- * @param {{targetSha: string, instrument?: boolean,
+ * @param {{targetSha: string, instrument?: boolean, entryAction?: 'click' | 'enter',
+ *   returnAction?: 'click' | 'enter', scrollToBottom?: boolean, reopenBeforeEntry?: boolean,
  *   onEvidence: (report: object) => Promise<void>}} options
  * onEvidence 必須先保存 JSON／截圖，因為紅燈會在保存後拋出斷言。
  * 每次呼叫使用新 Page；尺寸、字級、安全區、瀏覽器版本由呼叫方固定並另記。
@@ -14,20 +15,49 @@ export async function probeStarterCatalogG4(page, options) {
   assert.match(options.targetSha, /^[0-9a-f]{40}$/, "須提供實際完整 TARGET");
   assert.equal(typeof options.onEvidence, "function", "須先配置證據保存函式");
   const instrument = options.instrument !== false;
+  const entryAction = options.entryAction ?? "click", returnAction = options.returnAction ?? "click";
+  assert.ok(["click", "enter"].includes(entryAction), "進入操作須為 click 或 enter");
+  assert.ok(["click", "enter"].includes(returnAction), "返回操作須為 click 或 enter");
   const sheet = page.locator("dialog.starter-catalog__sheet[open]");
   assert.equal(await sheet.count(), 0, "每案從未開啟名冊的新 Page 開始");
   await page.getByRole("button", { name: "起始配套名冊", exact: true }).click();
   const row = sheet.locator("button.starter-catalog__row").filter({ hasText: "魔術師" });
   await row.waitFor({ state: "visible" });
   assert.equal(await row.count(), 1, "需正式魔術師列，不使用假 DOM");
-  await row.click();
+  const settleSheet = async () => {
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await page.waitForFunction(() => {
+      const dialog = document.querySelector("dialog.starter-catalog__sheet[open]");
+      return dialog && dialog.getAnimations({ subtree: true }).every(animation =>
+        animation.playState !== "running" && animation.playState !== "pending");
+    });
+  };
+  await settleSheet();
+  if (options.reopenBeforeEntry) {
+    // 明確是進入配套之前關閉／重開，不冒稱重建 t75u 的全部歷史準備。
+    await page.keyboard.press("Escape");
+    assert.equal(await sheet.count(), 0, "準備步驟須真正關閉名冊");
+    await page.getByRole("button", { name: "起始配套名冊", exact: true }).click();
+    await row.waitFor({ state: "visible" });
+    await settleSheet();
+  }
+  const frame = sheet.locator(".class-catalog__frame");
+  if (options.scrollToBottom) {
+    assert.ok(await frame.evaluate(node => node.scrollHeight > node.clientHeight), "底部準備須有實際捲動範圍，否則另列受阻");
+    await frame.hover({ position: { x: 10, y: 10 } });
+    await page.mouse.wheel(0, await frame.evaluate(node => node.scrollHeight));
+    await page.waitForFunction(() => {
+      const node = document.querySelector("dialog.starter-catalog__sheet[open] .class-catalog__frame");
+      return node && node.scrollTop > 0 && node.scrollTop >= node.scrollHeight - node.clientHeight;
+    });
+  }
+  const preparation = await frame.evaluate(node => ({ scrollTop: node.scrollTop,
+    maximumScroll: node.scrollHeight - node.clientHeight, rootFontSize: getComputedStyle(document.documentElement).fontSize }));
+  // locator.press 取焦後送原生 Enter；這不是從入口開始逐次 Tab 的完整鍵盤流程。
+  if (entryAction === "enter") await row.press("Enter");
+  else await row.click();
   await sheet.getByRole("heading", { name: "魔術師配套", exact: true }).waitFor();
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  await page.waitForFunction(() => {
-    const dialog = document.querySelector("dialog.starter-catalog__sheet[open]");
-    return dialog && dialog.getAnimations({ subtree: true }).every(animation =>
-      animation.playState !== "running" && animation.playState !== "pending");
-  });
+  await settleSheet();
 
   // 不攔截 scrollTop、scroll API、rAF 或正式 observer，不改來源分類。
   // 量測仍可能影響排版時序，必須配對 instrument=false 的無探針對照。
@@ -38,7 +68,7 @@ export async function probeStarterCatalogG4(page, options) {
     const rail = dialog.querySelector(".starter-catalog__focus-rail");
     if (!frame || !rail) throw new Error("缺少正式閱讀區／焦點區");
     const trace = [];
-    let frameNumber = 0, raf = null;
+    let frameNumber = 0, raf = null, firstReturnedInline = null;
     function rect(node) {
       if (!node) return null;
       const box = node.getBoundingClientRect();
@@ -60,22 +90,30 @@ export async function probeStarterCatalogG4(page, options) {
         right: Math.min(area.right, (viewport?.offsetLeft ?? 0)
           + (viewport?.width ?? window.innerWidth)),
       };
+      const docked = !!mage?.classList.contains("starter-catalog__focus-docked");
+      const previous = mage?.previousElementSibling;
+      const placeholder = docked && previous?.classList.contains("starter-catalog__focus-space") ? previous : null;
+      // 原位置和焦點欄位置分列；placeholder 只能作來源證據，不代替原列成功。
+      const sourceBox = docked ? rect(placeholder) : box;
       const active = document.activeElement;
       const contained = box ? box.top >= bounds.top && box.bottom <= bounds.bottom
         && box.left >= bounds.left && box.right <= bounds.right : null;
+      const sourceContained = sourceBox ? sourceBox.top >= bounds.top && sourceBox.bottom <= bounds.bottom
+        && sourceBox.left >= bounds.left && sourceBox.right <= bounds.right : null;
+      const rowInlineContained = !!mage && !docked && frame.contains(mage) && contained === true;
       // 這是按現有公式重算的預測，並非攔截到的 scrollTop 寫入值。
       const delta = !box ? null : box.height > bounds.bottom - bounds.top
         ? box.top - bounds.top : box.bottom > bounds.bottom
           ? box.bottom - bounds.bottom : box.top < bounds.top ? box.top - bounds.top : 0;
       return { reason, time: performance.now(), frameNumber,
         scrollTop: frame.scrollTop, maximumScroll: frame.scrollHeight - frame.clientHeight,
-        frame: area, rail: rect(rail), bounds, row: box,
-        sourcePlaceholder: rect(dialog.querySelector(".starter-catalog__focus-space")),
+        frame: area, rail: rect(rail), bounds, row: box, sourceRow: sourceBox,
+        sourcePlaceholder: rect(placeholder), sourceContained, rowInlineContained,
         overflowBottom: box ? box.bottom - bounds.bottom : null,
         contained, projectedDelta: delta,
         projectedScrollTop: delta === null ? null : frame.scrollTop + delta,
         projectedOnly: true, rowPresent: !!mage,
-        docked: !!mage?.classList.contains("starter-catalog__focus-docked"),
+        docked,
         activeIsRow: !!mage && active === mage,
         active: active ? { tag: active.tagName, id: active.id, className: active.className } : null,
         viewport: { width: window.innerWidth, height: window.innerHeight,
@@ -84,7 +122,13 @@ export async function probeStarterCatalogG4(page, options) {
           devicePixelRatio: window.devicePixelRatio },
         rootFontSize: getComputedStyle(document.documentElement).fontSize };
     }
-    const record = reason => { if (trace.length < 400) trace.push(snapshot(reason)); };
+    const record = reason => {
+      if (trace.length >= 400) return;
+      const sample = snapshot(reason);
+      trace.push(sample);
+      if (!firstReturnedInline && sample.rowPresent && sample.activeIsRow && !sample.docked)
+        firstReturnedInline = sample;
+    };
     const onScroll = () => record("scroll");
     const onFocus = () => record("focusin");
     const observer = enabled ? new MutationObserver(() => record("mutation")) : null;
@@ -98,20 +142,23 @@ export async function probeStarterCatalogG4(page, options) {
       raf = requestAnimationFrame(tick);
     }
     window[key] = {
-      snapshot,
+      snapshot, record,
       stop() {
         if (raf !== null) cancelAnimationFrame(raf);
         observer?.disconnect();
         frame.removeEventListener("scroll", onScroll);
         dialog.removeEventListener("focusin", onFocus, true);
-        return { trace, final: snapshot("final"), traceTruncated: trace.length >= 400 };
+        return { trace, firstReturnedInline, final: snapshot("final"), traceTruncated: trace.length >= 400 };
       },
     };
   }, { key: probeKey, enabled: instrument });
 
   let evidence, completed = false;
   try {
-    await sheet.getByRole("button", { name: "返回四職業", exact: true }).click();
+    const back = sheet.getByRole("button", { name: "返回四職業", exact: true });
+    if (returnAction === "enter") await back.press("Enter");
+    else await back.click();
+    if (instrument) await page.evaluate(key => window[key].record("after-return-action"), probeKey);
     await sheet.getByRole("heading", { name: "起始配套", exact: true }).waitFor();
     // 有界觀察窗口；不改產品 timer，也不以等待／重試把短暫 dock 隱藏。
     // 24 幀只覆蓋導航及已知兩 rAF 路徑，不宣稱涵蓋所有晚到回呼。
@@ -131,16 +178,19 @@ export async function probeStarterCatalogG4(page, options) {
     }, probeKey);
     const seenDock = evidence.trace.some(sample => sample.rowPresent && sample.docked);
     const verdict = !completed || evidence.traceTruncated ? "BLOCKED"
-      : evidence.final.rowPresent && evidence.final.activeIsRow && evidence.final.contained
+      : evidence.final.rowPresent && evidence.final.activeIsRow && evidence.final.contained && evidence.final.rowInlineContained
         && !evidence.final.docked && !seenDock ? "PASS" : "FAIL";
     await options.onEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
-      instrument, verdict, scope: "僅本次有限導航觀察，不是切片工程結論", ...evidence });
+      instrument, entryAction, returnAction, scrollToBottom: !!options.scrollToBottom,
+      reopenBeforeEntry: !!options.reopenBeforeEntry, preparation,
+      verdict, scope: "僅本次有限導航觀察，不是切片工程結論", ...evidence });
   }
   assert.ok(evidence.final.rowPresent, "返回後必須存在魔術師列");
   assert.ok(evidence.final.activeIsRow, "返回後必須保留原列實際焦點");
   assert.equal(evidence.traceTruncated, false, "探針紀錄截限須另列受阻");
   assert.equal(evidence.final.docked, false, "G4：返回原列不應收入焦點欄");
   assert.ok(evidence.final.contained, "正常尺寸的返回列必須留在完整可用閱讀區");
+  assert.ok(evidence.final.rowInlineContained, "焦點欄或來源佔位的位置不得冒充原列在閱讀區完整可見");
   assert.equal(evidence.trace.some(sample => sample.rowPresent && sample.docked), false,
     "G4：觀察期間不得短暫 dock 後再被重試掩蓋");
   return evidence;

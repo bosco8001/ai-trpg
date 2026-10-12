@@ -22,6 +22,27 @@ export function starterFocusNavigationDelta(control: Rect, viewport: Rect) {
   return 0;
 }
 
+/** Choose a legal absolute position; containment still uses the actual DOM rect. */
+export function starterFocusNavigationTarget(control: Rect, viewport: Rect, current: number, maximum: number) {
+  const limit = Math.max(0, maximum);
+  const clamp = (value: number) => Math.min(limit, Math.max(0, value));
+  const delta = starterFocusNavigationDelta(control, viewport);
+  // Preserve an already-contained fractional position, including a no-op at a boundary.
+  if (delta === 0) return clamp(current);
+  const geometricTarget = clamp(current + delta);
+  // An oversized row or a clamped range cannot be made fully visible by rounding.
+  const minimum = Math.max(0, current + control.bottom - viewport.bottom);
+  const maximumContained = Math.min(limit, current + control.top - viewport.top);
+  if (minimum > maximumContained) return geometricTarget;
+  const firstInteger = Math.ceil(minimum), lastInteger = Math.floor(maximumContained);
+  // A fractional-only interval is valid geometry, not permission to overshoot it.
+  if (firstInteger > lastInteger) return geometricTarget;
+  // Select inside both edges rather than request an exact fractional boundary.
+  // This does not assume every browser quantizes scrollTop to integer CSS pixels.
+  const inwardTarget = delta > 0 ? Math.ceil(geometricTarget) : Math.floor(geometricTarget);
+  return Math.min(lastInteger, Math.max(firstInteger, inwardTarget));
+}
+
 /** Geometry only; this does not identify why a viewport or scroll position changed. */
 export function starterFocusDockPlacement(bounds: DockBounds, controlHeight: number) {
   const inset = 8;

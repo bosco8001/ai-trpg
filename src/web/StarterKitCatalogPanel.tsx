@@ -6,7 +6,7 @@ import type { OfficialStarterKitCatalog, OfficialStarterItem, StarterKitId, Star
 import { readStarterKitCatalog } from "./starter-kit-catalog-client.js";
 import { readClassCatalog } from "./class-catalog-client.js";
 import { observeStarterReading } from "./starter-catalog-reading.js";
-import { createStarterFocusDock, starterFocusNavigationDelta, starterFocusViewportBounds } from "./starter-catalog-focus-dock.js";
+import { createStarterFocusDock, starterFocusNavigationTarget, starterFocusViewportBounds } from "./starter-catalog-focus-dock.js";
 
 const familyNames: Record<StarterWeaponFamily, string> = { sword: "劍類", bow: "弓類", dagger: "匕首類", staff: "杖類" };
 const requirementText = (r: StarterRequirement) => `${CONTENT_ATTRIBUTE_LABELS[r.attribute]} ${r.minimum}`;
@@ -240,13 +240,19 @@ export function StarterKitCatalogPanel() {
       else if (lastRowRef.current?.isConnected) {
         const row = lastRowRef.current;
         row.focus({ preventScroll: true });
-        if (frame) frame.scrollTop += starterFocusNavigationDelta(row.getBoundingClientRect(), starterFocusViewportBounds(frame));
+        if (frame) {
+          const target = starterFocusNavigationTarget(row.getBoundingClientRect(), starterFocusViewportBounds(frame),
+            frame.scrollTop, frame.scrollHeight - frame.clientHeight);
+          if (target !== frame.scrollTop) frame.scrollTop = target;
+        }
       }
     };
     if (readingRef.current) readingRef.current.repair(restoreScreen);
     else restoreScreen();
     // Returning can focus a row before the internal scroll makes it visible.
-    // Record the completed reset, rather than the earlier focusin geometry.
+    // repair reads back the actual scrollTop; recordFocus measures the actual row
+    // after that write, not a rect projected from the requested target. A remaining
+    // clamp/overflow stays subject to the unchanged strict focus observation.
     recordFocusRef.current?.();
   }, [selected, open]);
   useLayoutEffect(() => { if (open) layoutFocusRef.current?.(); }, [open, selected, catalogs, busy]);
