@@ -1,6 +1,8 @@
 // 開發代理未執行；交指定 AI TRPG Architecture Critic 在隔離環境執行。
 // 重用審查者的 Playwright Page，不安裝套件、不啟動服務、不修改正式程式。
 import assert from "node:assert/strict";
+import { probeErrorDetails, saveProbeEvidence } from "./starter-catalog-probe-evidence.mjs";
+export { probeFailureReport } from "./starter-catalog-probe-evidence.mjs";
 
 /**
  * G4 最小真頁面探針：開魔術師配套，再返回原列。
@@ -8,7 +10,8 @@ import assert from "node:assert/strict";
  * @param {{targetSha: string, instrument?: boolean, entryAction?: 'click' | 'enter',
  *   returnAction?: 'click' | 'enter', scrollToBottom?: boolean, reopenBeforeEntry?: boolean,
  *   onEvidence: (report: object) => Promise<void>}} options
- * onEvidence 必須先保存 JSON／截圖，因為紅燈會在保存後拋出斷言。
+ * onEvidence 先保存 JSON，再按 stage 保存可取得的截圖／trace；BLOCKED 不保證有 trace／final。
+ * 保存失敗仍拋錯。主錯誤保留原實例；probeFailureReport(error) 可讀回次級失敗。
  * 每次呼叫使用新 Page；尺寸、字級、安全區、瀏覽器版本由呼叫方固定並另記。
  */
 export async function probeStarterCatalogG4(page, options) {
@@ -48,8 +51,7 @@ export async function probeStarterCatalogG4(page, options) {
         animation.playState !== "running" && animation.playState !== "pending");
     });
   };
-  const bottomToleranceCssPx = 1; // 僅測試準備的量測差；產品 containment 仍嚴格。
-  let preparation = { requestedBottom: !!options.scrollToBottom, bottomToleranceCssPx,
+  let preparation = { requestedBottom: !!options.scrollToBottom, bottomPolicy: "exact-unchanged-geometry",
     beforeBottom: null, afterBottom: null, alreadyAtBottom: false, actualMovement: null, entryCompleted: false };
   try {
     assert.equal(await sheet.count(), 0, "每案從未開啟名冊的新 Page 開始");
@@ -70,13 +72,12 @@ export async function probeStarterCatalogG4(page, options) {
     assert.ok(before, "準備步驟須存在正式閱讀區");
     if (options.scrollToBottom) {
       assert.ok(before.maximumScroll > 0, "底部準備須有實際捲動範圍，否則另列受阻");
-      preparation.alreadyAtBottom = before.scrollTop > 0
-        && Math.abs(before.remainingScroll) <= bottomToleranceCssPx;
+      preparation.alreadyAtBottom = before.scrollTop > 0 && before.remainingScroll === 0;
       await frame.hover({ position: { x: 10, y: 10 } });
       await page.mouse.wheel(0, before.scrollHeight);
       // 保留一次原生 wheel 及原等待上限。到達量測邊界須有實際位移，
       // alreadyAtBottom 例外只表示原位置成立，不授予產品閱讀權限。
-      await page.waitForFunction(({ before, alreadyAtBottom, tolerance }) => {
+      await page.waitForFunction(({ before, alreadyAtBottom }) => {
         const node = document.querySelector("dialog.starter-catalog__sheet[open] .class-catalog__frame");
         if (!node) return false;
         const rect = node.getBoundingClientRect(), viewport = window.visualViewport;
@@ -89,9 +90,9 @@ export async function probeStarterCatalogG4(page, options) {
           && viewport?.offsetTop === before.viewport.offsetTop && viewport?.offsetLeft === before.viewport.offsetLeft
           && getComputedStyle(document.documentElement).fontSize === before.rootFontSize;
         return sameGeometry && maximum > 0 && node.scrollTop > 0
-          && Math.abs(maximum - node.scrollTop) <= tolerance
+          && maximum === node.scrollTop
           && (alreadyAtBottom || node.scrollTop > before.scrollTop);
-      }, { before, alreadyAtBottom: preparation.alreadyAtBottom, tolerance: bottomToleranceCssPx });
+      }, { before, alreadyAtBottom: preparation.alreadyAtBottom });
     }
     const after = await capturePreparation();
     preparation.afterBottom = after;
@@ -102,7 +103,7 @@ export async function probeStarterCatalogG4(page, options) {
         frame: sample.frame, rootFontSize: sample.rootFontSize, viewport: sample.viewport });
       assert.deepEqual(geometry(after), geometry(before), "底部準備前後尺寸須一致，否則另列受阻");
       assert.ok(after.maximumScroll > 0 && after.scrollTop > 0
-        && Math.abs(after.remainingScroll) <= bottomToleranceCssPx, "底部準備差值須在量測界線內");
+        && after.remainingScroll === 0, "底部準備須精確到達原量測上限；不可用容差掩蓋幾何變動");
       assert.ok(preparation.alreadyAtBottom || preparation.actualMovement > 0, "尚未在底部的準備須有正向實際位移");
     }
     // locator.press 取焦後送原生 Enter；這不是從入口開始逐次 Tab 的完整鍵盤流程。
@@ -112,19 +113,21 @@ export async function probeStarterCatalogG4(page, options) {
     await settleSheet();
     preparation.entryCompleted = true;
   } catch (error) {
-    const last = await capturePreparation().catch(() => null);
-    await options.onEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
+    const secondaryErrors = [];
+    const last = await capturePreparation().catch(lastError => {
+      secondaryErrors.push({ stage: "last-preparation", ...probeErrorDetails(lastError) }); return null;
+    });
+    await saveProbeEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
       instrument, entryAction, returnAction, scrollToBottom: !!options.scrollToBottom,
       reopenBeforeEntry: !!options.reopenBeforeEntry, stage: "preparation", verdict: "BLOCKED",
       scope: "準備失敗，尚未判定 G4；不得計入產品通過或失敗", preparation, lastPreparation: last,
-      error: { name: error instanceof Error ? error.name : "Error",
-        message: error instanceof Error ? error.message : String(error) } });
-    throw error;
+      error: probeErrorDetails(error), secondaryErrors }, options.onEvidence, { error });
   }
 
   // 不攔截 scrollTop、scroll API、rAF 或正式 observer，不改來源分類。
   // 量測仍可能影響排版時序，必須配對 instrument=false 的無探針對照。
   const probeKey = "__starterG4Diagnostic";
+  try {
   await sheet.evaluate((dialog, { key, enabled }) => {
     if (Object.hasOwn(window, key)) throw new Error("已有同名探針，停止覆蓋");
     const frame = dialog.querySelector(".class-catalog__frame");
@@ -218,8 +221,14 @@ export async function probeStarterCatalogG4(page, options) {
       },
     };
   }, { key: probeKey, enabled: instrument });
+  } catch (error) {
+    await saveProbeEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
+      instrument, entryAction, returnAction, preparation, stage: "instrumentation", verdict: "BLOCKED",
+      scope: "探針安裝失敗，尚未判定 G4", error: probeErrorDetails(error) }, options.onEvidence, { error });
+  }
 
-  let evidence, completed = false;
+  let evidence = null, failure = null;
+  const secondaryErrors = [];
   try {
     const back = sheet.getByRole("button", { name: "返回四職業", exact: true });
     if (returnAction === "enter") await back.press("Enter");
@@ -233,31 +242,36 @@ export async function probeStarterCatalogG4(page, options) {
       function next() { if (--remaining === 0) resolve(); else requestAnimationFrame(next); }
       requestAnimationFrame(next);
     }));
-    completed = true;
-  } finally {
+  } catch (error) { failure = { error }; }
+  try {
     evidence = await page.evaluate(key => {
       const probe = window[key];
       if (!probe) throw new Error("探針狀態遺失");
-      const result = probe.stop();
-      delete window[key];
-      return result;
+      try { return probe.stop(); }
+      finally { delete window[key]; }
     }, probeKey);
-    const seenDock = evidence.trace.some(sample => sample.rowPresent && sample.docked);
-    const verdict = !completed || evidence.traceTruncated ? "BLOCKED"
-      : evidence.final.rowPresent && evidence.final.activeIsRow && evidence.final.contained && evidence.final.rowInlineContained
-        && !evidence.final.docked && !seenDock ? "PASS" : "FAIL";
-    await options.onEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
-      instrument, entryAction, returnAction, scrollToBottom: !!options.scrollToBottom,
-      reopenBeforeEntry: !!options.reopenBeforeEntry, preparation,
-      verdict, scope: "僅本次有限導航觀察，不是切片工程結論", ...evidence });
+  } catch (error) {
+    secondaryErrors.push({ stage: "probe-stop", ...probeErrorDetails(error) });
+    failure ??= { error };
   }
-  assert.ok(evidence.final.rowPresent, "返回後必須存在魔術師列");
-  assert.ok(evidence.final.activeIsRow, "返回後必須保留原列實際焦點");
-  assert.equal(evidence.traceTruncated, false, "探針紀錄截限須另列受阻");
-  assert.equal(evidence.final.docked, false, "G4：返回原列不應收入焦點欄");
-  assert.ok(evidence.final.contained, "正常尺寸的返回列必須留在完整可用閱讀區");
-  assert.ok(evidence.final.rowInlineContained, "焦點欄或來源佔位的位置不得冒充原列在閱讀區完整可見");
-  assert.equal(evidence.trace.some(sample => sample.rowPresent && sample.docked), false,
-    "G4：觀察期間不得短暫 dock 後再被重試掩蓋");
+  let verdict = "BLOCKED";
+  if (!failure && evidence) {
+    try {
+      assert.ok(evidence.final.rowPresent, "返回後必須存在魔術師列");
+      assert.ok(evidence.final.activeIsRow, "返回後必須保留原列實際焦點");
+      assert.equal(evidence.traceTruncated, false, "探針紀錄截限須另列受阻");
+      assert.equal(evidence.final.docked, false, "G4：返回原列不應收入焦點欄");
+      assert.ok(evidence.final.contained, "正常尺寸的返回列必須留在完整可用閱讀區");
+      assert.ok(evidence.final.rowInlineContained, "焦點欄或來源佔位的位置不得冒充原列在閱讀區完整可見");
+      assert.equal(evidence.trace.some(sample => sample.rowPresent && sample.docked), false,
+        "G4：觀察期間不得短暫 dock 後再被重試掩蓋");
+      verdict = "PASS";
+    } catch (error) { failure = { error }; verdict = evidence.traceTruncated ? "BLOCKED" : "FAIL"; }
+  }
+  await saveProbeEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
+    instrument, entryAction, returnAction, scrollToBottom: !!options.scrollToBottom,
+    reopenBeforeEntry: !!options.reopenBeforeEntry, preparation,
+    stage: "return", verdict, scope: "僅本次有限導航觀察，不是切片工程結論", ...evidence,
+    ...(failure ? { error: probeErrorDetails(failure.error) } : {}), secondaryErrors }, options.onEvidence, failure);
   return evidence;
 }

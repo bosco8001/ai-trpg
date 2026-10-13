@@ -6,7 +6,7 @@ import type { OfficialStarterKitCatalog, OfficialStarterItem, StarterKitId, Star
 import { readStarterKitCatalog } from "./starter-kit-catalog-client.js";
 import { readClassCatalog } from "./class-catalog-client.js";
 import { observeStarterReading } from "./starter-catalog-reading.js";
-import { createStarterFocusDock, starterFocusNavigationTarget, starterFocusViewportBounds } from "./starter-catalog-focus-dock.js";
+import { createStarterFocusDock, starterFocusDockMinimumHeight, starterFocusNavigationTarget, starterFocusViewportBounds } from "./starter-catalog-focus-dock.js";
 
 const familyNames: Record<StarterWeaponFamily, string> = { sword: "劍類", bow: "弓類", dagger: "匕首類", staff: "杖類" };
 const requirementText = (r: StarterRequirement) => `${CONTENT_ATTRIBUTE_LABELS[r.attribute]} ${r.minimum}`;
@@ -147,10 +147,10 @@ export function StarterKitCatalogPanel() {
     const measureReserve = () => {
       const rail = railRef.current;
       if (!rail) return;
-      // This space exists even without a dock. Its size follows the actual
-      // controls/font, not focus state, and CSS keeps reading space available.
+      // Budget the compact readable line for every control on this screen.
+      // Source wrapping/placeholder height and dock state cannot change it.
       const height = Math.max(44, ...Array.from(dialog.querySelectorAll<HTMLElement>("button, summary, h2"))
-        .map(node => focusDock.sourceHeight(node)));
+        .map(node => starterFocusDockMinimumHeight(node)));
       const value = `${Math.ceil(height)}px`;
       if (rail.style.getPropertyValue("--starter-reserve-height") !== value)
         rail.style.setProperty("--starter-reserve-height", value);

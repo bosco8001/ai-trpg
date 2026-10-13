@@ -43,22 +43,40 @@ export function starterFocusNavigationTarget(control: Rect, viewport: Rect, curr
   return Math.min(lastInteger, Math.max(firstInteger, inwardTarget));
 }
 
-/** Geometry only; this does not identify why a viewport or scroll position changed. */
+/** A compact control still needs a readable line; 44px is a touch minimum, not a cap. */
+export function starterFocusDockMinimumHeight(node: HTMLElement) {
+  const style = window.getComputedStyle(node);
+  const line = (element: HTMLElement) => {
+    const textStyle = window.getComputedStyle(element);
+    // The sheet authors numeric line heights. Preserve its 1.55 fallback if an
+    // external style supplies 'normal'; real glyph layout still needs review.
+    return Number.parseFloat(textStyle.lineHeight) || (Number.parseFloat(textStyle.fontSize) || 16) * 1.55;
+  };
+  const lineHeight = Math.max(line(node), ...Array.from(node.querySelectorAll<HTMLElement>("*"), line));
+  const padding = Number.parseFloat(window.getComputedStyle(node.closest("dialog") ?? node)
+    .getPropertyValue("--starter-focus-padding-block")) || 4;
+  return Math.max(node.tagName === "H2" ? 0 : 44, lineHeight + padding * 2
+    + (Number.parseFloat(style.borderTopWidth) || 0) + (Number.parseFloat(style.borderBottomWidth) || 0));
+}
+
+/** Position the measured box, reporting an infeasible fit instead of shrinking its facts. */
 export function starterFocusDockPlacement(bounds: DockBounds, controlHeight: number) {
   const inset = 8;
   const left = bounds.left + inset, right = bounds.right - inset;
   const top = bounds.top + Math.max(inset, bounds.paddingTop);
   const bottom = bounds.bottom - Math.max(inset, bounds.paddingBottom);
   if (![left, right, top, bottom, controlHeight].every(Number.isFinite) || right <= left || bottom <= top) return null;
-  const height = Math.min(Math.max(44, controlHeight), bottom - top);
-  return { left, top: bottom - height, width: right - left, maxHeight: bottom - top };
+  if (controlHeight <= 0) return null;
+  return { left, top: Math.max(top, bottom - controlHeight), width: right - left,
+    maxHeight: bottom - top, fits: controlHeight <= bottom - top };
 }
 
 /** Keep the actual focused node accessible without scrolling or changing focus. */
 export function createStarterFocusDock(dialog: HTMLDialogElement) {
   type StyleWrite = { node: HTMLElement; key: string; previous: string; priority: string; value: string; writtenPriority: string };
   type DockState = { node: HTMLElement; placeholder: HTMLElement | null; writes: StyleWrite[];
-    sourceHeight: number; sourceWidth: number; marginHeight: number; parentPadding: number; minimumPerRem: number };
+    sourceHeight: number; sourceWidth: number; marginHeight: number; parentPadding: number; minimumPerRem: number;
+    geometry: { actualHeight: number; availableHeight: number; fits: boolean } | null };
   let docked: DockState | null = null;
   let disposed = false;
   let pointerId: number | null = null;
@@ -114,13 +132,16 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
     const visibleBounds = {
       left: Math.max(bounds.left, viewport?.offsetLeft ?? 0),
       right: Math.min(bounds.right, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth)),
-      top: Math.max(bounds.top, viewport?.offsetTop ?? 0),
+      top: Math.max(bounds.top + (Number.parseFloat(padding.borderTopWidth) || 0), viewport?.offsetTop ?? 0),
       bottom: Math.min(bounds.bottom, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight)),
       paddingTop: 8,
       paddingBottom: 8 + (Number.parseFloat(padding.paddingBottom) || 0),
     };
     const placement = starterFocusDockPlacement(visibleBounds, state.sourceHeight);
-    if (!placement || placement.maxHeight < 44) { release(); return; }
+    // Insufficient geometry is not a blur. Keep the actual focus/parent and
+    // expose the failed fit; do not move the player's reading viewport.
+    if (!placement) { state.geometry = { actualHeight: state.node.getBoundingClientRect().height,
+      availableHeight: 0, fits: false }; return; }
     // Match the source width so docking does not introduce different text wrapping.
     const parent = state.node.parentElement;
     const parentStyle = parent && window.getComputedStyle(parent);
@@ -132,6 +153,7 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
     const width = Math.min(placement.width, sourceWidth || state.sourceWidth);
     write(state, state.node, "--starter-focus-left", `${placement.left + (placement.width - width) / 2}px`);
     write(state, state.node, "--starter-focus-width", `${width}px`);
+    write(state, state.node, "--starter-focus-min-height", `${starterFocusDockMinimumHeight(state.node)}px`);
     write(state, state.node, "--starter-focus-max-height", `${placement.maxHeight}px`);
     // Keep the source space responsive to font/wrapping changes, without writing
     // any scroll position. Native layout clamping remains a separate observation.
@@ -143,12 +165,17 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
       + (Number.parseFloat(style.borderTopWidth) || 0) + (Number.parseFloat(style.borderBottomWidth) || 0));
     if (state.placeholder) state.placeholder.style.height = `${state.sourceHeight}px`;
     else if (parent) write(state, parent, "padding-top", `${state.parentPadding + state.sourceHeight + state.marginHeight}px`);
-    const finalPlacement = starterFocusDockPlacement(visibleBounds, state.node.getBoundingClientRect().height);
+    const actualHeight = state.node.getBoundingClientRect().height;
+    const finalPlacement = starterFocusDockPlacement(visibleBounds, actualHeight);
+    state.geometry = { actualHeight, availableHeight: placement.maxHeight, fits: finalPlacement?.fits ?? false };
     if (finalPlacement) write(state, state.node, "--starter-focus-top", `${finalPlacement.top}px`);
   };
   return {
     isDocked: (node: HTMLElement) => docked?.node === node,
     isPressing: () => pointerId !== null,
+    // Height feasibility only. The actual rect, ring, text and hit-test still
+    // decide containment; external owners may override another position value.
+    geometry: (node: HTMLElement) => docked?.node === node && docked.geometry ? { ...docked.geometry } : null,
     sourceHeight: (node: HTMLElement) => docked?.node === node ? docked.sourceHeight : node.getBoundingClientRect().height,
     pin: (node: HTMLElement) => {
       if (disposed || !dialog.open || !node.isConnected || !dialog.contains(node)
@@ -162,7 +189,7 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
       const rect = node.getBoundingClientRect(), style = window.getComputedStyle(node);
       const state: DockState = { node, placeholder: null, writes: [], sourceHeight: rect.height, sourceWidth: rect.width,
         marginHeight: (Number.parseFloat(style.marginTop) || 0) + (Number.parseFloat(style.marginBottom) || 0), parentPadding: 0,
-        minimumPerRem: (Number.parseFloat(style.minHeight) || 0)
+        geometry: null, minimumPerRem: (Number.parseFloat(style.minHeight) || 0)
           / (Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16) };
       const parent = node.parentElement;
       if (!parent) return;

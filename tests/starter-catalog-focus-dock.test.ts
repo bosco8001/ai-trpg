@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createStarterFocusDock, starterFocusDockPlacement, starterFocusNavigationDelta, starterFocusNavigationTarget,
+import { createStarterFocusDock, starterFocusDockMinimumHeight, starterFocusDockPlacement, starterFocusNavigationDelta, starterFocusNavigationTarget,
   starterFocusViewportBounds } from "../src/web/starter-catalog-focus-dock.js";
 
 test("the actual control fits inside the focus-ring and simulated safe-area bounds", () => {
   const placement = starterFocusDockPlacement({ left: 0, right: 390, top: 0, bottom: 844,
     paddingTop: 47, paddingBottom: 34 }, 44);
-  assert.deepEqual(placement, { left: 8, top: 766, width: 374, maxHeight: 763 });
+  assert.deepEqual(placement, { left: 8, top: 766, width: 374, maxHeight: 763, fits: true });
 });
 
-test("an oversized control uses the available operation area instead of extending outside it", () => {
+test("an oversized measured box is reported as infeasible, never asserted to have shrunk", () => {
   const placement = starterFocusDockPlacement({ left: 10, right: 330, top: 20, bottom: 340,
     paddingTop: 47, paddingBottom: 34 }, 600);
-  assert.deepEqual(placement, { left: 18, top: 67, width: 304, maxHeight: 239 });
+  assert.deepEqual(placement, { left: 18, top: 67, width: 304, maxHeight: 239, fits: false });
+  assert.ok(placement!.top + 600 > 340 - 34, "the real extent still fails containment until CSS actually shrinks it");
 });
 
 for (const bounds of [
@@ -49,6 +50,8 @@ class Node {
   scrollHeight = 44;
   constructor(public tagName = "BUTTON") {}
   getBoundingClientRect() { return this.rect; }
+  querySelectorAll(): Node[] { return this.children.flatMap(child => [child, ...child.querySelectorAll()]); }
+  closest(tag: string): Node | null { return this.tagName === tag.toUpperCase() ? this : this.parentElement?.closest(tag) ?? null; }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
   getAttribute(key: string) { return this.attributes.get(key) ?? null; }
   hasAttribute(key: string) { return this.attributes.has(key); }
@@ -94,7 +97,9 @@ function createFixture() {
   const document = { activeElement: control, documentElement: new Node("HTML"), createElement: () => new Node("SPAN") };
   const window = { innerWidth: 390, innerHeight: 844, visualViewport: undefined,
     getComputedStyle: (node: Node) => ({ margin: "0px", marginTop: "0px", marginBottom: "0px", flex: "0 1 auto",
-      fontSize: node.style.getPropertyValue("font-size") || "16px", minHeight: node.style.getPropertyValue("min-height") || "44px",
+      getPropertyValue: (key: string) => node.style.getPropertyValue(key),
+      fontSize: node.style.getPropertyValue("font-size") || "16px", lineHeight: node.style.getPropertyValue("line-height") || "24.8px",
+      minHeight: node.style.getPropertyValue("min-height") || "44px",
       scrollPaddingTop: node.style.getPropertyValue("scroll-padding-top") || "8px",
       scrollPaddingBottom: node.style.getPropertyValue("scroll-padding-bottom") || "34px",
       paddingBottom: node === rail ? "34px" : "0px", paddingLeft: "0px", paddingRight: "0px",
@@ -266,14 +271,19 @@ test("an observed external owner keeps padding even after writing the former doc
   assert.equal(f.frame.scrollTop, 300);
 }));
 
-test("a layout-triggered release and repin cannot reclaim externally owned padding", () => fixture(f => {
+test("an insufficient rail, then automatic close release and repin, cannot reclaim external padding", () => fixture(f => {
   f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
   f.parent.style.setProperty("padding-top", "5px"); f.pin();
   f.parent.style.setProperty("padding-top", "12px", "important");
-  // An unusable rail releases before position() reaches its padding write.
+  // t78 A keeps the actual focus when geometry is insufficient; it does not
+  // pretend the sub-44px capacity contains this box. Close still auto-releases.
   f.rail.rect.top = 790; f.rail.rect.height = 54; f.dock.refresh();
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), true);
+  assert.equal(f.dock.geometry(f.control as unknown as HTMLElement)?.fits, false);
+  f.dialog.open = false; f.dock.refresh();
   assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), false);
   assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  f.dialog.open = true;
   f.rail.rect.top = 700; f.rail.rect.height = 144; f.pin(); f.dock.refresh();
   assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), true);
   assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
@@ -377,13 +387,77 @@ test("the reserve geometry is outside the scroll frame and deducts safe area and
   assert.equal(f.rail.scrollTop, 300);
 }));
 
-test("reserve placement does not invent a sub-44px operation area", () => fixture(f => {
+test("insufficient capacity keeps the actual focus and records a failed fit without inventing space", () => fixture(f => {
   f.rail.rect.top = 790; f.rail.rect.height = 54;
   f.pin();
-  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), false);
-  assert.deepEqual(f.parent.children, [f.control]);
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), true);
+  assert.equal(f.dock.geometry(f.control as unknown as HTMLElement)?.fits, false);
+  assert.equal(f.document.activeElement, f.control);
+  assert.equal(f.control.parentElement, f.parent);
   assert.deepEqual(f.control.focusCalls, []);
   assert.equal(f.frame.scrollTop, 300);
+}));
+
+// t78 A 新案例尚未執行。只驗尺寸輸入／讀回契約；fixture 不實作 CSS 排版。
+for (const viewportBottom of [160, 195])
+test(`t78 V1 ${viewportBottom}px: a measured 58px box is not positioned as a fictional 44px box`, () => {
+  const bounds = { left: 0, right: 284, top: viewportBottom - 60, bottom: viewportBottom,
+    paddingTop: 8, paddingBottom: 8 };
+  const tooTall = starterFocusDockPlacement(bounds, 58)!;
+  assert.equal(tooTall.maxHeight, 44);
+  assert.equal(tooTall.fits, false);
+  assert.equal(tooTall.top, bounds.top + 8);
+  assert.ok(tooTall.top + 58 > viewportBottom - 8);
+  const measuredAfterCompact = starterFocusDockPlacement(bounds, 44)!;
+  assert.equal(measuredAfterCompact.fits, true);
+  assert.equal(measuredAfterCompact.top + 44, viewportBottom - 8);
+});
+
+test("the compact budget includes a larger descendant line and preserves the font across dock state", () => fixture(f => {
+  const label = new Node("STRONG"); label.parentElement = f.control; f.control.children.push(label);
+  label.style.setProperty("font-size", "36px"); label.style.setProperty("line-height", "55.8px");
+  const node = f.control as unknown as HTMLElement;
+  const before = starterFocusDockMinimumHeight(node);
+  assert.equal(before, 63.8); // This fixture has no border; real CSS adds its measured borders.
+  f.pin();
+  assert.equal(starterFocusDockMinimumHeight(node), before);
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-min-height"), "63.8px");
+  assert.equal(label.style.getPropertyValue("font-size"), "36px");
+  f.dock.release();
+  assert.equal(starterFocusDockMinimumHeight(node), before);
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-min-height"), "");
+}));
+
+test("the sheet's compact padding participates in the budget without changing source padding", () => fixture(f => {
+  f.dialog.style.setProperty("--starter-focus-padding-block", "12px");
+  f.control.style.setProperty("line-height", "55px");
+  f.control.style.setProperty("padding-top", "28px");
+  assert.equal(starterFocusDockMinimumHeight(f.control as unknown as HTMLElement), 79);
+  f.pin();
+  assert.equal(f.control.style.getPropertyValue("padding-top"), "28px");
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-min-height"), "79px");
+  f.dock.release();
+  assert.equal(f.control.style.getPropertyValue("padding-top"), "28px");
+}));
+
+test("position reads the unchanged actual box after CSS writes and retains an explicit failed fit", () => fixture(f => {
+  // Deliberately do not make a style write shrink the fixture's rect.
+  f.control.rect.height = 120; f.control.scrollHeight = 120;
+  f.pin();
+  assert.deepEqual(f.dock.geometry(f.control as unknown as HTMLElement), { actualHeight: 120, availableHeight: 94, fits: false });
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-top"), "708px");
+  assert.equal(f.frame.scrollTop, 300);
+  f.control.rect.height = 44; f.dock.refresh();
+  assert.deepEqual(f.dock.geometry(f.control as unknown as HTMLElement), { actualHeight: 44, availableHeight: 94, fits: true });
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-top"), "758px");
+}));
+
+test("an external min-height owner is retained on refresh and release", () => fixture(f => {
+  f.pin();
+  f.control.style.setProperty("--starter-focus-min-height", "90px", "important");
+  f.dock.refresh(); f.dock.release();
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-min-height"), "90px");
+  assert.equal(f.control.style.getPropertyPriority("--starter-focus-min-height"), "important");
 }));
 
 test("source space follows the real control's font and content height without accumulating padding", () => fixture(f => {
