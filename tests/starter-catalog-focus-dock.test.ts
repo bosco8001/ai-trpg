@@ -224,6 +224,133 @@ test("a later override of summary padding is preserved without stealing focus", 
   assert.equal(f.frame.scrollTop, 300);
 }));
 
+// t77u 補修案例尚未執行。鎖住外部寫入→refresh→release／repin 的真實 helper 鏈；
+// fixture 不會模擬原生 details、CSS 空間分配或來源縮短後的 scroll clamp。
+for (const external of [
+  { name: "value", value: "12px", priority: "" },
+  { name: "value and priority", value: "12px", priority: "important" },
+  { name: "priority only", value: "49px", priority: "important" },
+  { name: "removal", value: "", priority: "" },
+]) test(`refresh cedes summary padding after an external ${external.name} change`, () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.parent.style.setProperty("padding-top", "5px"); f.pin();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "49px");
+  if (external.value) f.parent.style.setProperty("padding-top", external.value, external.priority);
+  else f.parent.style.removeProperty("padding-top");
+  for (let i = 0; i < 3; i++) {
+    f.dock.refresh();
+    assert.equal(f.parent.style.getPropertyValue("padding-top"), external.value);
+    assert.equal(f.parent.style.getPropertyPriority("padding-top"), external.priority);
+  }
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), true);
+  assert.equal(f.document.activeElement, f.control);
+  assert.equal(f.control.parentElement, f.parent);
+  assert.equal(f.frame.scrollTop, 300);
+  f.dock.release();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), external.value);
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), external.priority);
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-top"), "");
+  assert.deepEqual(f.control.focusCalls, []);
+}));
+
+test("an observed external owner keeps padding even after writing the former dock value again", () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.parent.style.setProperty("padding-top", "5px"); f.pin();
+  const dockValue = f.parent.style.getPropertyValue("padding-top");
+  f.parent.style.setProperty("padding-top", "12px"); f.dock.refresh();
+  f.parent.style.setProperty("padding-top", dockValue);
+  f.control.rect.height = 88; f.control.scrollHeight = 120;
+  f.dock.refresh(); f.dock.release();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), dockValue);
+  assert.notEqual(dockValue, "5px");
+  assert.equal(f.frame.scrollTop, 300);
+}));
+
+test("a layout-triggered release and repin cannot reclaim externally owned padding", () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.parent.style.setProperty("padding-top", "5px"); f.pin();
+  f.parent.style.setProperty("padding-top", "12px", "important");
+  // An unusable rail releases before position() reaches its padding write.
+  f.rail.rect.top = 790; f.rail.rect.height = 54; f.dock.refresh();
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), false);
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  f.rail.rect.top = 700; f.rail.rect.height = 144; f.pin(); f.dock.refresh();
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), true);
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), "important");
+  f.dock.release(); f.pin(); f.dock.dispose();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), "important");
+  assert.equal(f.document.activeElement, f.control);
+  assert.equal(f.control.parentElement, f.parent);
+  assert.deepEqual(f.control.focusCalls, []);
+  assert.equal(f.frame.scrollTop, 300);
+}));
+
+test("release observes an external owner before any refresh and later repin preserves it", () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.pin(); f.parent.style.setProperty("padding-top", "12px");
+  f.dock.release(); f.pin(); f.dock.refresh(); f.dock.release();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), "");
+}));
+
+test("root and source-height changes do not rewrite padding ceded to an external owner", () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.pin(); f.parent.style.setProperty("padding-top", "12px", "important"); f.dock.refresh();
+  f.document.documentElement.style.setProperty("font-size", "32px");
+  f.control.rect.height = 88; f.control.scrollHeight = 120;
+  f.dock.refresh();
+  assert.equal(f.dock.sourceHeight(f.control as unknown as HTMLElement), 120);
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  f.parent.style.setProperty("padding-top", "18px"); f.dock.refresh(); f.dock.release();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "18px");
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), "");
+  assert.equal(f.frame.scrollTop, 300);
+}));
+
+test("ceding one inline property leaves other owned geometry responsive and restorable", () => fixture(f => {
+  f.control.style.setProperty("--starter-focus-left", "21px", "important"); f.pin();
+  f.control.style.setProperty("--starter-focus-top", "99px", "important");
+  f.rail.rect.bottom = 800; f.dock.refresh();
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-top"), "99px");
+  assert.equal(f.control.style.getPropertyPriority("--starter-focus-top"), "important");
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-max-height"), "50px");
+  f.dock.release();
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-left"), "21px");
+  assert.equal(f.control.style.getPropertyPriority("--starter-focus-left"), "important");
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-max-height"), "");
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-top"), "99px");
+}));
+
+test("a pending pointer release preserves a later padding owner and does not refocus", () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.pin(); f.dock.beginPointer(7);
+  f.parent.style.setProperty("padding-top", "12px", "important");
+  const next = new Node("SUMMARY"); f.document.activeElement = next;
+  f.dock.refresh(); f.dock.leaveFocus(f.control as unknown as HTMLElement);
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), true);
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  assert.equal(f.dock.endPointer(7), true); f.dock.refresh(); f.dock.dispose();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), "important");
+  assert.equal(f.document.activeElement, next);
+  assert.deepEqual(f.control.focusCalls, []);
+  assert.equal(f.frame.scrollTop, 300);
+}));
+
+test("dispose retains unobserved external padding and late work cannot reclaim it", () => fixture(f => {
+  f.control.tagName = "SUMMARY"; f.parent.tagName = "DETAILS";
+  f.pin(); f.parent.style.setProperty("padding-top", "12px", "important");
+  f.dock.dispose(); f.dock.refresh(); f.pin();
+  assert.equal(f.parent.style.getPropertyValue("padding-top"), "12px");
+  assert.equal(f.parent.style.getPropertyPriority("padding-top"), "important");
+  assert.equal(f.dock.isDocked(f.control as unknown as HTMLElement), false);
+  assert.equal(f.control.style.getPropertyValue("--starter-focus-top"), "");
+  assert.equal(f.control.parentElement, f.parent);
+  assert.equal(f.frame.scrollTop, 300);
+}));
+
 test("focus transfer releases the old control without focusing a replacement", () => fixture(f => {
   f.pin(); const next = new Node(); f.document.activeElement = next;
   f.dock.refresh();

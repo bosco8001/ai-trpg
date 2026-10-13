@@ -1,4 +1,4 @@
-// 尚未執行；交指定 AI TRPG Architecture Critic 在隔離環境執行。
+// 開發代理未執行；交指定 AI TRPG Architecture Critic 在隔離環境執行。
 // 重用審查者的 Playwright Page，不安裝套件、不啟動服務、不修改正式程式。
 import assert from "node:assert/strict";
 
@@ -19,11 +19,27 @@ export async function probeStarterCatalogG4(page, options) {
   assert.ok(["click", "enter"].includes(entryAction), "進入操作須為 click 或 enter");
   assert.ok(["click", "enter"].includes(returnAction), "返回操作須為 click 或 enter");
   const sheet = page.locator("dialog.starter-catalog__sheet[open]");
-  assert.equal(await sheet.count(), 0, "每案從未開啟名冊的新 Page 開始");
-  await page.getByRole("button", { name: "起始配套名冊", exact: true }).click();
   const row = sheet.locator("button.starter-catalog__row").filter({ hasText: "魔術師" });
-  await row.waitFor({ state: "visible" });
-  assert.equal(await row.count(), 1, "需正式魔術師列，不使用假 DOM");
+  const frame = sheet.locator(".class-catalog__frame");
+  // 量測上限與原生可達位置分開記錄；沒有 frame 時立即回 null，不再等 locator。
+  const capturePreparation = () => page.evaluate(() => {
+    const node = document.querySelector("dialog.starter-catalog__sheet[open] .class-catalog__frame");
+    if (!node) return null;
+    const rect = node.getBoundingClientRect(), style = getComputedStyle(node), viewport = window.visualViewport;
+    return { scrollTop: node.scrollTop, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight,
+      maximumScroll: node.scrollHeight - node.clientHeight,
+      remainingScroll: node.scrollHeight - node.clientHeight - node.scrollTop,
+      frame: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right,
+        width: rect.width, height: rect.height },
+      visibleFrameHeight: Math.max(0, Math.min(rect.bottom, (viewport?.offsetTop ?? 0)
+        + (viewport?.height ?? window.innerHeight)) - Math.max(rect.top, viewport?.offsetTop ?? 0)),
+      scrollPaddingTop: style.scrollPaddingTop, scrollPaddingBottom: style.scrollPaddingBottom,
+      rootFontSize: getComputedStyle(document.documentElement).fontSize,
+      viewport: { width: window.innerWidth, height: window.innerHeight,
+        visualWidth: viewport?.width, visualHeight: viewport?.height,
+        offsetTop: viewport?.offsetTop, offsetLeft: viewport?.offsetLeft,
+        devicePixelRatio: window.devicePixelRatio } };
+  });
   const settleSheet = async () => {
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.waitForFunction(() => {
@@ -32,32 +48,79 @@ export async function probeStarterCatalogG4(page, options) {
         animation.playState !== "running" && animation.playState !== "pending");
     });
   };
-  await settleSheet();
-  if (options.reopenBeforeEntry) {
-    // 明確是進入配套之前關閉／重開，不冒稱重建 t75u 的全部歷史準備。
-    await page.keyboard.press("Escape");
-    assert.equal(await sheet.count(), 0, "準備步驟須真正關閉名冊");
+  const bottomToleranceCssPx = 1; // 僅測試準備的量測差；產品 containment 仍嚴格。
+  let preparation = { requestedBottom: !!options.scrollToBottom, bottomToleranceCssPx,
+    beforeBottom: null, afterBottom: null, alreadyAtBottom: false, actualMovement: null, entryCompleted: false };
+  try {
+    assert.equal(await sheet.count(), 0, "每案從未開啟名冊的新 Page 開始");
     await page.getByRole("button", { name: "起始配套名冊", exact: true }).click();
     await row.waitFor({ state: "visible" });
+    assert.equal(await row.count(), 1, "需正式魔術師列，不使用假 DOM");
     await settleSheet();
+    if (options.reopenBeforeEntry) {
+      // 明確是進入配套之前關閉／重開，不冒稱重建 t75u 的全部歷史準備。
+      await page.keyboard.press("Escape");
+      assert.equal(await sheet.count(), 0, "準備步驟須真正關閉名冊");
+      await page.getByRole("button", { name: "起始配套名冊", exact: true }).click();
+      await row.waitFor({ state: "visible" });
+      await settleSheet();
+    }
+    const before = await capturePreparation();
+    preparation.beforeBottom = before;
+    assert.ok(before, "準備步驟須存在正式閱讀區");
+    if (options.scrollToBottom) {
+      assert.ok(before.maximumScroll > 0, "底部準備須有實際捲動範圍，否則另列受阻");
+      preparation.alreadyAtBottom = before.scrollTop > 0
+        && Math.abs(before.remainingScroll) <= bottomToleranceCssPx;
+      await frame.hover({ position: { x: 10, y: 10 } });
+      await page.mouse.wheel(0, before.scrollHeight);
+      // 保留一次原生 wheel 及原等待上限。到達量測邊界須有實際位移，
+      // alreadyAtBottom 例外只表示原位置成立，不授予產品閱讀權限。
+      await page.waitForFunction(({ before, alreadyAtBottom, tolerance }) => {
+        const node = document.querySelector("dialog.starter-catalog__sheet[open] .class-catalog__frame");
+        if (!node) return false;
+        const rect = node.getBoundingClientRect(), viewport = window.visualViewport;
+        const maximum = node.scrollHeight - node.clientHeight;
+        const sameGeometry = node.scrollHeight === before.scrollHeight && node.clientHeight === before.clientHeight
+          && rect.top === before.frame.top && rect.left === before.frame.left
+          && rect.width === before.frame.width && rect.height === before.frame.height
+          && window.innerWidth === before.viewport.width && window.innerHeight === before.viewport.height
+          && viewport?.width === before.viewport.visualWidth && viewport?.height === before.viewport.visualHeight
+          && viewport?.offsetTop === before.viewport.offsetTop && viewport?.offsetLeft === before.viewport.offsetLeft
+          && getComputedStyle(document.documentElement).fontSize === before.rootFontSize;
+        return sameGeometry && maximum > 0 && node.scrollTop > 0
+          && Math.abs(maximum - node.scrollTop) <= tolerance
+          && (alreadyAtBottom || node.scrollTop > before.scrollTop);
+      }, { before, alreadyAtBottom: preparation.alreadyAtBottom, tolerance: bottomToleranceCssPx });
+    }
+    const after = await capturePreparation();
+    preparation.afterBottom = after;
+    assert.ok(after, "準備後閱讀區不得消失");
+    preparation = { ...preparation, ...after, actualMovement: after.scrollTop - before.scrollTop };
+    if (options.scrollToBottom) {
+      const geometry = sample => ({ scrollHeight: sample.scrollHeight, clientHeight: sample.clientHeight,
+        frame: sample.frame, rootFontSize: sample.rootFontSize, viewport: sample.viewport });
+      assert.deepEqual(geometry(after), geometry(before), "底部準備前後尺寸須一致，否則另列受阻");
+      assert.ok(after.maximumScroll > 0 && after.scrollTop > 0
+        && Math.abs(after.remainingScroll) <= bottomToleranceCssPx, "底部準備差值須在量測界線內");
+      assert.ok(preparation.alreadyAtBottom || preparation.actualMovement > 0, "尚未在底部的準備須有正向實際位移");
+    }
+    // locator.press 取焦後送原生 Enter；這不是從入口開始逐次 Tab 的完整鍵盤流程。
+    if (entryAction === "enter") await row.press("Enter");
+    else await row.click();
+    await sheet.getByRole("heading", { name: "魔術師配套", exact: true }).waitFor();
+    await settleSheet();
+    preparation.entryCompleted = true;
+  } catch (error) {
+    const last = await capturePreparation().catch(() => null);
+    await options.onEvidence({ case: "G4-mage-return", targetSha: options.targetSha,
+      instrument, entryAction, returnAction, scrollToBottom: !!options.scrollToBottom,
+      reopenBeforeEntry: !!options.reopenBeforeEntry, stage: "preparation", verdict: "BLOCKED",
+      scope: "準備失敗，尚未判定 G4；不得計入產品通過或失敗", preparation, lastPreparation: last,
+      error: { name: error instanceof Error ? error.name : "Error",
+        message: error instanceof Error ? error.message : String(error) } });
+    throw error;
   }
-  const frame = sheet.locator(".class-catalog__frame");
-  if (options.scrollToBottom) {
-    assert.ok(await frame.evaluate(node => node.scrollHeight > node.clientHeight), "底部準備須有實際捲動範圍，否則另列受阻");
-    await frame.hover({ position: { x: 10, y: 10 } });
-    await page.mouse.wheel(0, await frame.evaluate(node => node.scrollHeight));
-    await page.waitForFunction(() => {
-      const node = document.querySelector("dialog.starter-catalog__sheet[open] .class-catalog__frame");
-      return node && node.scrollTop > 0 && node.scrollTop >= node.scrollHeight - node.clientHeight;
-    });
-  }
-  const preparation = await frame.evaluate(node => ({ scrollTop: node.scrollTop,
-    maximumScroll: node.scrollHeight - node.clientHeight, rootFontSize: getComputedStyle(document.documentElement).fontSize }));
-  // locator.press 取焦後送原生 Enter；這不是從入口開始逐次 Tab 的完整鍵盤流程。
-  if (entryAction === "enter") await row.press("Enter");
-  else await row.click();
-  await sheet.getByRole("heading", { name: "魔術師配套", exact: true }).waitFor();
-  await settleSheet();
 
   // 不攔截 scrollTop、scroll API、rAF 或正式 observer，不改來源分類。
   // 量測仍可能影響排版時序，必須配對 instrument=false 的無探針對照。
@@ -106,7 +169,10 @@ export async function probeStarterCatalogG4(page, options) {
         ? box.top - bounds.top : box.bottom > bounds.bottom
           ? box.bottom - bounds.bottom : box.top < bounds.top ? box.top - bounds.top : 0;
       return { reason, time: performance.now(), frameNumber,
-        scrollTop: frame.scrollTop, maximumScroll: frame.scrollHeight - frame.clientHeight,
+        scrollTop: frame.scrollTop, scrollHeight: frame.scrollHeight, clientHeight: frame.clientHeight,
+        maximumScroll: frame.scrollHeight - frame.clientHeight,
+        visibleFrameHeight: Math.max(0, Math.min(area.bottom, (viewport?.offsetTop ?? 0)
+          + (viewport?.height ?? window.innerHeight)) - Math.max(area.top, viewport?.offsetTop ?? 0)),
         frame: area, rail: rect(rail), bounds, row: box, sourceRow: sourceBox,
         sourcePlaceholder: rect(placeholder), sourceContained, rowInlineContained,
         overflowBottom: box ? box.bottom - bounds.bottom : null,

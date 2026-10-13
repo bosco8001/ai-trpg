@@ -63,8 +63,22 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
   let disposed = false;
   let pointerId: number | null = null;
   let releasePending = false;
+  // A later inline owner keeps this property for the rest of this helper's life,
+  // including automatic release/repin of the same actual control.
+  const ceded = new WeakMap<HTMLElement, Set<string>>();
+  const owns = (item: StyleWrite) => {
+    if (ceded.get(item.node)?.has(item.key)) return false;
+    if (item.node.style.getPropertyValue(item.key) === item.value
+      && item.node.style.getPropertyPriority(item.key) === item.writtenPriority) return true;
+    let keys = ceded.get(item.node);
+    if (!keys) { keys = new Set(); ceded.set(item.node, keys); }
+    keys.add(item.key);
+    return false;
+  };
   const write = (state: DockState, node: HTMLElement, key: string, value: string) => {
+    if (ceded.get(node)?.has(key)) return;
     let saved = state.writes.find(item => item.node === node && item.key === key);
+    if (saved && !owns(saved)) return;
     if (!saved) {
       saved = { node, key, previous: node.style.getPropertyValue(key),
         priority: node.style.getPropertyPriority(key), value, writtenPriority: "" };
@@ -84,9 +98,8 @@ export function createStarterFocusDock(dialog: HTMLDialogElement) {
     state.node.classList.remove("starter-catalog__focus-docked");
     state.placeholder?.remove();
     for (const item of state.writes.reverse()) {
-      // Leave a later third-party inline override intact.
-      if (item.node.style.getPropertyValue(item.key) !== item.value
-        || item.node.style.getPropertyPriority(item.key) !== item.writtenPriority) continue;
+      // Release observes ownership too; a new DockState cannot claim it back.
+      if (!owns(item)) continue;
       if (item.previous) item.node.style.setProperty(item.key, item.previous, item.priority);
       else item.node.style.removeProperty(item.key);
     }
